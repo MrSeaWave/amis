@@ -12,7 +12,7 @@ import React, {
 } from 'react';
 import isObject from 'lodash/isObject';
 import cloneDeep from 'lodash/cloneDeep';
-import {uncontrollable} from 'amis-core';
+import {uncontrollable, highlight, labelToString} from 'amis-core';
 
 import {useSetState, useUpdateEffect} from '../hooks';
 import {range} from 'amis-core';
@@ -28,7 +28,8 @@ export interface PickerColumnItem {
   visibleItemCount?: number;
   itemHeight?: number;
   options?: PickerOption[];
-  optionRender?: (option: string | object | PickerOption) => React.ReactNode;
+  highlightTxt?: string;
+  optionRender?: (...params: any) => React.ReactNode;
   onChange?: (
     value?: PickerOption | string,
     index?: number,
@@ -74,6 +75,7 @@ const PickerColumn = forwardRef<{}, PickerColumnProps>((props, ref) => {
     valueField = 'value',
     swipeDuration = 1000,
     labelField = 'text',
+    highlightTxt = '',
     options = [],
     classnames: cx
   } = props;
@@ -94,9 +96,9 @@ const PickerColumn = forwardRef<{}, PickerColumnProps>((props, ref) => {
   const getOptionText = (option: [] | PickerOption) => {
     if (isObject(option) && labelField in option) {
       //@ts-ignore
-      return option[labelField];
+      return labelToString(option[labelField]);
     }
-    return option;
+    return labelToString(option);
   };
 
   const getOptionValue = (option: [] | PickerOption) => {
@@ -294,7 +296,7 @@ const PickerColumn = forwardRef<{}, PickerColumnProps>((props, ref) => {
       lineHeight: `${itemHeight}px`
     };
     return state.options.map((option, index: number) => {
-      const text: string | PickerOption = getOptionText(option);
+      const text: string = getOptionText(option);
       const disabled = isOptionDisabled(option);
 
       const data = {
@@ -313,13 +315,15 @@ const PickerColumn = forwardRef<{}, PickerColumnProps>((props, ref) => {
 
       const childData = {
         className: 'text-ellipsis',
-        children: text
+        children: (highlightTxt
+          ? highlight(text, highlightTxt, cx('Select-option-hl'))
+          : text) as React.ReactNode
       };
 
       return (
         <li {...data} ref={menuItemRef}>
           {props.optionRender ? (
-            props.optionRender(option)
+            props.optionRender(option, {index, checked: state.index === index})
           ) : (
             <div {...childData} />
           )}

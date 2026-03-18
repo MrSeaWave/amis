@@ -2,6 +2,7 @@ import {ThemeProps, themeable} from 'amis-core';
 import React from 'react';
 import {Options, Option} from 'amis-core';
 import {LocaleProps, localeable} from 'amis-core';
+import type {TestIdBuilder} from 'amis-core';
 
 export interface ListMenuProps extends ThemeProps, LocaleProps {
   options: Options;
@@ -13,6 +14,8 @@ export interface ListMenuProps extends ThemeProps, LocaleProps {
   itemRender: (option: Option) => JSX.Element;
   getItemProps: (props: {item: Option; index: number}) => any;
   prefix?: JSX.Element;
+  children?: React.ReactNode | Array<React.ReactNode>;
+  testIdBuilder?: TestIdBuilder;
 }
 
 interface RenderResult {
@@ -35,7 +38,9 @@ export class ListMenu extends React.Component<ListMenuProps> {
       getItemProps,
       highlightIndex,
       selectedOptions,
-      onSelect
+      mobileUI,
+      onSelect,
+      testIdBuilder
     } = this.props;
 
     if (Array.isArray(option.children) && option.children.length) {
@@ -72,6 +77,7 @@ export class ListMenu extends React.Component<ListMenuProps> {
         )}
         key={index}
         onClick={onSelect ? (e: any) => onSelect(e, option) : undefined}
+        {...testIdBuilder?.getChild(option.value || index).getTestId()}
         {...getItemProps({
           item: option,
           index: index
@@ -85,11 +91,19 @@ export class ListMenu extends React.Component<ListMenuProps> {
   }
 
   render() {
-    const {classnames: cx, options, placeholder, prefix, children} = this.props;
+    const {
+      classnames: cx,
+      options,
+      placeholder,
+      prefix,
+      children,
+      mobileUI,
+      selectedOptions
+    } = this.props;
     const __ = this.props.translate;
 
     return (
-      <div className={cx('ListMenu')}>
+      <div className={cx('ListMenu', {'is-mobile': mobileUI})}>
         {prefix}
         {Array.isArray(options) && options.length ? (
           options.reduce(

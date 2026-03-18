@@ -2,6 +2,8 @@
   position: relative;
   background-color: var(--PickerColumns-bg);
   user-select: none;
+  min-width: 0;
+  min-height: 0;
   flex: 1;
   overflow: hidden;
   font-size: var(--PickerColumns-option-fontSize);
@@ -35,11 +37,11 @@
   }
 
   &-confirm {
-    color: var(--PickerColumns-confirmAction-color) !important;
+    color: var(--PickerColumns-confirmAction-color);
   }
 
   &-cancel {
-    color: var(--PickerColumns-cancelAction-color) !important;
+    color: var(--PickerColumns-cancelAction-color);
   }
 
   &-title {
@@ -94,8 +96,6 @@
     }
   }
 
-  
-
   &-mask {
     position: absolute;
     top: 0;
@@ -135,6 +135,6 @@
 
   &-columnItemis-selected {
     font-size: 18px;
-    color: --PickerColumns-title-color;
+    color: var(--PickerColumns-title-color);
   }
 }

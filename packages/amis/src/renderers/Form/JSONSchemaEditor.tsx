@@ -1,21 +1,27 @@
 import React from 'react';
-import {FormItem, FormControlProps, FormBaseControl} from 'amis-core';
+import pick from 'lodash/pick';
+import {FormItem, FormControlProps, AMISFormItem} from 'amis-core';
 import {JSONSchemaEditor} from 'amis-ui';
-import {autobind} from 'amis-core';
+import {autobind, isObject} from 'amis-core';
 import {FormBaseControlSchema} from '../../Schema';
+
+import {schemaEditorItemPlaceholder} from 'amis-ui/lib/components/schema-editor/Common';
+import type {SchemaEditorItemPlaceholder} from 'amis-ui';
+import {isMobile} from 'amis-core';
 
 /**
  * JSON Schema Editor
- * 文档：https://baidu.gitee.io/amis/docs/components/form/json-schema-editor
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/json-schema-editor
  */
-export interface JSONSchemaEditorControlSchema extends FormBaseControlSchema {
+export interface AMISJsonSchemaEditorSchema extends AMISFormItem {
   /**
-   * 指定为 JSON Schema Editor
+   * 指定为 JSON Schema 编辑器组件，用于编辑 JSON Schema
    */
   type: 'json-schema-editor';
 
   /**
-   * 可以理解为类型模板，方便快速定义复杂类型
+   * 类型定义模板，方便快速定义复杂类型
+   * 可以理解为类型模板，用于复用常见的类型定义
    */
   definitions?: {
     [propName: string]: {
@@ -43,42 +49,67 @@ export interface JSONSchemaEditorControlSchema extends FormBaseControlSchema {
   showRootInfo?: boolean;
 
   /**
-   * 禁用类型，默认禁用了 null 类型
+   * 禁用的类型列表，默认禁用了 null 类型
    */
   disabledTypes?: Array<string>;
 
   /**
-   * 开启详情配置
+   * 是否开启高级设置面板
    */
   enableAdvancedSetting?: boolean;
 
   /**
-   * 自定义详情配置面板如：
-   *
-   * {
-   *   boolean: [
-   *      {type: "input-text", name: "aa", label: "AA" }
-   *   ]
-   * }
-   *
+   * 自定义高级设置面板配置
+   * 例如：{ boolean: [{type: "input-text", name: "aa", label: "AA"}] }
    * 当配置布尔字段详情时，就会出现以上配置
    */
   advancedSettings?: {
     [propName: string]: any;
   };
+
+  /**
+   * 各属性输入控件的占位提示文本配置
+   * 例如：{ key: "key placeholder", title: "title placeholder" }
+   */
+  placeholder?: SchemaEditorItemPlaceholder;
+
+  /**
+   * 是否为迷你模式，会隐藏一些不必要的元素
+   */
+  mini?: boolean;
 }
 
 export interface JSONSchemaEditorProps
   extends FormControlProps,
     Omit<
-      JSONSchemaEditorControlSchema,
+      AMISJsonSchemaEditorSchema,
       'type' | 'className' | 'descriptionClassName' | 'inputClassName'
     > {}
 
 export default class JSONSchemaEditorControl extends React.PureComponent<JSONSchemaEditorProps> {
   static defaultProps = {
-    enableAdvancedSetting: false
+    enableAdvancedSetting: false,
+    placeholder: schemaEditorItemPlaceholder
   };
+
+  normalizePlaceholder(): SchemaEditorItemPlaceholder {
+    const {placeholder} = this.props;
+
+    if (isObject(placeholder)) {
+      return {
+        ...schemaEditorItemPlaceholder,
+        ...pick(placeholder, [
+          'key',
+          'title',
+          'description',
+          'default',
+          'empty'
+        ])
+      };
+    }
+
+    return schemaEditorItemPlaceholder;
+  }
 
   @autobind
   renderModalProps(value: any, onChange: (value: any) => void) {
@@ -100,13 +131,20 @@ export default class JSONSchemaEditorControl extends React.PureComponent<JSONSch
   }
 
   render() {
-    const {enableAdvancedSetting, ...rest} = this.props;
+    const {enableAdvancedSetting, mobileUI, env, ...rest} = this.props;
 
     return (
       <JSONSchemaEditor
         {...rest}
+        mobileUI={mobileUI}
+        placeholder={this.normalizePlaceholder()}
         enableAdvancedSetting={enableAdvancedSetting}
         renderModalProps={this.renderModalProps}
+        popOverContainer={
+          mobileUI
+            ? env?.getModalContainer
+            : rest.popOverContainer || env.getModalContainer
+        }
       />
     );
   }

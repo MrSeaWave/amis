@@ -14,6 +14,7 @@
 
     @include button-size(
       var(--Combo-addBtn-fontSize),
+      var(--Combo-addBtn-fontWeight),
       var(--Combo-addBtn-lineHeight),
       var(--Combo-addBtn-borderRadius),
       var(--Combo-addBtn-borderRadius),
@@ -30,7 +31,7 @@
       var(--Combo-addBtn-bg),
       var(--Combo-addBtn-border),
       var(--Combo-addBtn-color),
-      var(--Combo-addBtn-onHover-bg),
+      var(--combo-multi-addBtn-hover-bg-color),
       var(--Combo-addBtn-onHover-border),
       var(--Combo-addBtn-onHover-color),
       var(--Combo-addBtn-onActive-bg),
@@ -47,13 +48,13 @@
   &-toolbar {
     margin-top: var(--gap-sm);
 
-    &--dnd {
-      padding-left: 29px;
-    }
-
     display: flex;
     flex-direction: row;
     justify-content: space-between;
+
+    &--dnd {
+      padding-left: 29px;
+    }
   }
 
   &-sortTip {

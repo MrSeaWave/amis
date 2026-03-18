@@ -23,6 +23,7 @@ export interface PickerProps extends ThemeProps, LocaleProps {
   value?: PickerValue[];
   swipeDuration?: number;
   visibleItemCount?: number;
+  highlightTxt?: string;
   itemHeight?: number;
   columns: PickerColumnItem[] | PickerColumnItem;
   onChange?: (value?: PickerValue[], index?: number, confirm?: boolean) => void;
@@ -49,6 +50,7 @@ const Picker = memo<PickerProps>(props => {
     itemHeight = 48,
     showToolbar = true,
     className = '',
+    highlightTxt = '',
     classnames: cx,
     classPrefix: ns,
     translate: __
@@ -93,6 +95,7 @@ const Picker = memo<PickerProps>(props => {
     return (
       <Column
         {...item}
+        highlightTxt={highlightTxt}
         classnames={cx}
         classPrefix={ns}
         labelField={labelField || item.labelField}
@@ -123,7 +126,7 @@ const Picker = memo<PickerProps>(props => {
           {showToolbar && (
             <Button
               className="PickerColumns-cancel"
-              level="default"
+              level="link"
               onClick={close}
             >
               {__('cancel')}
@@ -133,7 +136,7 @@ const Picker = memo<PickerProps>(props => {
           {showToolbar && (
             <Button
               className="PickerColumns-confirm"
-              level="primary"
+              level="link"
               onClick={confirm}
             >
               {__('confirm')}

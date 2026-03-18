@@ -1,6 +1,6 @@
 import React from 'react';
 import upperFirst from 'lodash/upperFirst';
-import {Renderer, RendererProps} from 'amis-core';
+import {AMISSchemaBase, AMISUrlPath, Renderer, RendererProps} from 'amis-core';
 import {autobind, detectPropValueChanged, getPropValue} from 'amis-core';
 import {Icon} from 'amis-ui';
 import {resolveVariable} from 'amis-core';
@@ -9,11 +9,14 @@ import {BaseSchema, SchemaUrlPath} from '../Schema';
 
 /**
  * Audio 音频渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/audio
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/audio
  */
-export interface AudioSchema extends BaseSchema {
+/**
+ * 音频播放器组件，用于播放音频。支持自动播放、循环与控制栏。
+ */
+export interface AMISAudioSchema extends AMISSchemaBase {
   /**
-   * 指定为音频播放器
+   * 指定为 audio 组件
    */
   type: 'audio';
 
@@ -23,9 +26,9 @@ export interface AudioSchema extends BaseSchema {
   inline?: boolean;
 
   /**
-   * "视频播放地址, 支持 $ 取变量。
+   * 音频播放地址
    */
-  src?: SchemaUrlPath;
+  src?: AMISUrlPath;
 
   /**
    * 是否循环播放
@@ -43,14 +46,14 @@ export interface AudioSchema extends BaseSchema {
   rates?: Array<number>;
 
   /**
-   * 可以配置控制器
+   * 配置控制器
    */
   controls?: Array<'rates' | 'play' | 'time' | 'process' | 'volume'>;
 }
 
 export interface AudioProps
   extends RendererProps,
-    Omit<AudioSchema, 'className'> {}
+    Omit<AMISAudioSchema, 'className'> {}
 
 export interface AudioState {
   src?: string;
@@ -266,6 +269,9 @@ export class Audio extends React.Component<AudioProps, AudioState> {
 
   @autobind
   onSeekMouseUp(e: any) {
+    if (!this.state.src) {
+      return;
+    }
     if (!this.state.seeking) {
       return;
     }
@@ -299,8 +305,10 @@ export class Audio extends React.Component<AudioProps, AudioState> {
   formatTime(seconds: number) {
     const date = new Date(seconds * 1000);
     const hh = date.getUTCHours();
-    const mm = date.getUTCMinutes();
-    const ss = this.pad(date.getUTCSeconds());
+    const mm = isNaN(date.getUTCMinutes()) ? 0 : date.getUTCMinutes();
+    const ss = isNaN(date.getUTCSeconds())
+      ? '00'
+      : this.pad(date.getUTCSeconds());
     if (hh) {
       return `${hh}:${this.pad(mm)}:${ss}`;
     }
@@ -450,6 +458,7 @@ export class Audio extends React.Component<AudioProps, AudioState> {
   render() {
     const {
       className,
+      style,
       inline,
       autoPlay,
       loop,
@@ -459,7 +468,10 @@ export class Audio extends React.Component<AudioProps, AudioState> {
     const {muted, src} = this.state;
 
     return (
-      <div className={cx('Audio', className, inline ? 'Audio--inline' : '')}>
+      <div
+        className={cx('Audio', className, inline ? 'Audio--inline' : '')}
+        style={style}
+      >
         <audio
           className={cx('Audio-original')}
           ref={this.audioRef}

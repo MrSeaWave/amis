@@ -1,5 +1,5 @@
 import {localeable} from 'amis-core';
-import {themeable} from 'amis-core';
+import {themeable, ThemeProps} from 'amis-core';
 import {uncontrollable} from 'amis-core';
 import React from 'react';
 import ResultBox from './ResultBox';
@@ -9,11 +9,13 @@ import {autobind, mapTree} from 'amis-core';
 import TabsTransfer, {TabsTransferProps} from './TabsTransfer';
 
 export interface TabsTransferPickerProps
-  extends Omit<TabsTransferProps, 'itemRender'> {
+  extends Omit<TabsTransferProps, 'itemRender'>,
+    ThemeProps {
   // 新的属性？
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
   onFocus?: () => void;
   onBlur?: () => void;
+  popOverContainer?: any;
 }
 
 export class TransferPicker extends React.Component<TabsTransferPickerProps> {
@@ -26,7 +28,7 @@ export class TransferPicker extends React.Component<TabsTransferPickerProps> {
   }
 
   @autobind
-  onFoucs() {
+  onFocus() {
     this.props.onFocus?.();
   }
 
@@ -44,13 +46,21 @@ export class TransferPicker extends React.Component<TabsTransferPickerProps> {
       className,
       onChange,
       size,
+      labelField = 'label',
+      mobileUI,
+      popOverContainer,
+      maxTagCount,
+      overflowTagPopover,
+      placeholder,
       ...rest
     } = this.props;
 
     return (
       <PickerContainer
         title={__('Select.placeholder')}
-        onFocus={this.onFoucs}
+        mobileUI={mobileUI}
+        popOverContainer={popOverContainer}
+        onFocus={this.onFocus}
         onClose={this.onBlur}
         bodyRender={({onClose, value, onChange, setState, ...states}) => {
           return (
@@ -58,6 +68,7 @@ export class TransferPicker extends React.Component<TabsTransferPickerProps> {
               {...rest}
               {...states}
               value={value}
+              mobileUI={mobileUI}
               onChange={(value: any, optionModified) => {
                 if (optionModified) {
                   let options = mapTree(rest.options, item => {
@@ -71,6 +82,7 @@ export class TransferPicker extends React.Component<TabsTransferPickerProps> {
                   onChange(value);
                 }
               }}
+              labelField={labelField}
             />
           );
         }}
@@ -89,12 +101,20 @@ export class TransferPicker extends React.Component<TabsTransferPickerProps> {
             result={value}
             onResultChange={onChange}
             onResultClick={onClick}
-            placeholder={__('Select.placeholder')}
+            placeholder={placeholder ?? __('Select.placeholder')}
             disabled={disabled}
+            itemRender={option => (
+              <span>{(option && option[labelField]) || 'undefiend'}</span>
+            )}
+            mobileUI={mobileUI}
+            maxTagCount={maxTagCount}
+            overflowTagPopover={overflowTagPopover}
           >
-            <span className={cx('TransferPicker-icon')}>
-              <Icon icon="pencil" className="icon" />
-            </span>
+            {!mobileUI ? (
+              <span className={cx('TransferPicker-icon')}>
+                <Icon icon="pencil" className="icon" />
+              </span>
+            ) : null}
           </ResultBox>
         )}
       </PickerContainer>

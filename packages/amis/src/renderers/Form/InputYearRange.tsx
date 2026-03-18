@@ -2,16 +2,16 @@ import React from 'react';
 import {FormItem} from 'amis-core';
 import cx from 'classnames';
 import {filterDate, parseDuration} from 'amis-core';
-import InputDateRange, {DateRangeControlSchema} from './InputDateRange';
+import InputDateRange, {AMISDateRangeSchemaBase} from './InputDateRange';
 import {DateRangePicker} from 'amis-ui';
 import {supportStatic} from './StaticHoc';
+import {isMobile} from 'amis-core';
 
 /**
  * YearRange 年份范围控件
- * 文档：https://baidu.gitee.io/amis/docs/components/form/input-year-range
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/input-year-range
  */
-export interface YearRangeControlSchema
-  extends Omit<DateRangeControlSchema, 'type'> {
+export interface AMISInputYearRangeSchema extends AMISDateRangeSchemaBase {
   type: 'input-year-range';
 }
 
@@ -20,6 +20,7 @@ export default class YearRangeControl extends InputDateRange {
   render() {
     const {
       className,
+      style,
       classPrefix: ns,
       minDate,
       maxDate,
@@ -27,6 +28,10 @@ export default class YearRangeControl extends InputDateRange {
       maxDuration,
       data,
       format,
+      mobileUI,
+      valueFormat,
+      inputFormat,
+      displayFormat,
       env,
       ...rest
     } = this.props;
@@ -35,12 +40,29 @@ export default class YearRangeControl extends InputDateRange {
       <div className={cx(`${ns}DateRangeControl`, className)}>
         <DateRangePicker
           viewMode="years"
-          format={format}
+          mobileUI={mobileUI}
+          valueFormat={valueFormat || format}
+          displayFormat={displayFormat || inputFormat}
           classPrefix={ns}
+          popOverContainer={
+            mobileUI
+              ? env?.getModalContainer
+              : rest.popOverContainer || env.getModalContainer
+          }
+          popOverContainerSelector={rest.popOverContainerSelector}
+          onRef={this.getRef}
           data={data}
           {...rest}
-          minDate={minDate ? filterDate(minDate, data, format) : undefined}
-          maxDate={maxDate ? filterDate(maxDate, data, format) : undefined}
+          minDate={
+            minDate
+              ? filterDate(minDate, data, valueFormat || format)
+              : undefined
+          }
+          maxDate={
+            maxDate
+              ? filterDate(maxDate, data, valueFormat || format)
+              : undefined
+          }
           minDuration={minDuration ? parseDuration(minDuration) : undefined}
           maxDuration={maxDuration ? parseDuration(maxDuration) : undefined}
           onChange={this.handleChange}
@@ -61,8 +83,9 @@ export class YearRangeControlRenderer extends YearRangeControl {
     inputFormat: 'YYYY',
     joinValues: true,
     delimiter: ',',
-    timeFormat: '',
+    /** shortcuts的兼容配置 */
     ranges: 'thisyear,prevyear',
+    shortcuts: 'thisyear,prevyear',
     animation: true
   };
 }

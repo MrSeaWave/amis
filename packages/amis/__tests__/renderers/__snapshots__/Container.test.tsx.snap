@@ -13,15 +13,17 @@ exports[`Renderer:container 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Container bg-white"
+            data-role="container"
           >
             <div
               class="cxd-Container-body"
             >
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   内容1

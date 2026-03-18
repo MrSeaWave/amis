@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {SketchPicker, GithubPicker, ColorResult} from 'react-color';
 import {Icon} from './icons';
 import {Overlay} from 'amis-core';
@@ -13,7 +13,7 @@ import {uncontrollable} from 'amis-core';
 import {PopOver} from 'amis-core';
 import PopUp from './PopUp';
 import {ClassNamesFn, themeable, ThemeProps} from 'amis-core';
-import {autobind, isMobile, isObject} from 'amis-core';
+import {autobind, isObject} from 'amis-core';
 import {localeable, LocaleProps} from 'amis-core';
 
 export type PresetColor = {color: string; title: string} | string;
@@ -27,19 +27,20 @@ export interface ColorProps extends LocaleProps, ThemeProps {
   popoverClassName?: string;
   disabled?: boolean;
   popOverContainer?: any;
+  popOverContainerSelector?: string;
   placement?: string;
   value?: any;
   onChange: (value: any) => void;
   presetColors?: PresetColor[];
   resetValue?: string;
   allowCustomColor?: boolean;
-  useMobileUI?: boolean;
 }
 
 export interface ColorControlState {
   isOpened: boolean;
   isFocused: boolean;
   inputValue: string;
+  tempValue: string;
 }
 
 export class ColorControl extends React.PureComponent<
@@ -56,7 +57,8 @@ export class ColorControl extends React.PureComponent<
   state = {
     isOpened: false,
     isFocused: false,
-    inputValue: this.props.value || ''
+    inputValue: this.props.value || '',
+    tempValue: this.props.value || ''
   };
   popover: any;
   closeTimer: number;
@@ -70,6 +72,8 @@ export class ColorControl extends React.PureComponent<
     this.focus = this.focus.bind(this);
     this.blur = this.blur.bind(this);
     this.handleChange = this.handleChange.bind(this);
+    this.handleTempChange = this.handleTempChange.bind(this);
+    this.handleConfirm = this.handleConfirm.bind(this);
     this.handleFocus = this.handleFocus.bind(this);
     this.handleBlur = this.handleBlur.bind(this);
     this.clearValue = this.clearValue.bind(this);
@@ -193,6 +197,10 @@ export class ColorControl extends React.PureComponent<
       );
     } else if (format === 'rgb') {
       onChange(`rgb(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})`);
+    } else if (format === 'hexa') {
+      onChange(
+        this.rgbaToHex(color.rgb.r, color.rgb.g, color.rgb.b, color.rgb.a)
+      );
     } else if (format === 'hsl') {
       onChange(
         `hsl(${Math.round(color.hsl.h)}, ${Math.round(
@@ -206,6 +214,68 @@ export class ColorControl extends React.PureComponent<
     // closeOnSelect && this.close();
   }
 
+  handleTempChange(color: ColorResult) {
+    let {tempValue} = this.state;
+    const {format} = this.props;
+
+    if (format === 'rgba') {
+      tempValue = `rgba(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b}, ${color.rgb.a})`;
+    } else if (format === 'rgb') {
+      tempValue = `rgb(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})`;
+    } else if (format === 'hexa') {
+      tempValue = this.rgbaToHex(
+        color.rgb.r,
+        color.rgb.g,
+        color.rgb.b,
+        color.rgb.a
+      );
+    } else if (format === 'hsl') {
+      tempValue = `hsl(${Math.round(color.hsl.h)}, ${Math.round(
+        color.hsl.s * 100
+      )}%, ${Math.round(color.hsl.l * 100)}%)`;
+    } else {
+      tempValue = color.hex;
+    }
+    this.setState({tempValue});
+  }
+
+  handleConfirm() {
+    const {onChange} = this.props;
+    const {tempValue} = this.state;
+    onChange(tempValue);
+    this.close();
+  }
+
+  /**
+   * Converts an RGBA color to an 8-digit hex color.
+   *
+   * @param r - Red component (0-255)
+   * @param g - Green component (0-255)
+   * @param b - Blue component (0-255)
+   * @param a - Alpha component (1-100)
+   * @returns The hex color string in the format #RRGGBBAA
+   */
+  rgbaToHex(r: number, g: number, b: number, a: number | undefined): string {
+    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+      return `#00000000`;
+    }
+    if (typeof a === 'undefined' || a > 1) {
+      a = 1;
+    }
+    if (a < 0.01) {
+      a = 0;
+    }
+
+    const toHex = (n: number) => n.toString(16).padStart(2, '0').toUpperCase();
+
+    const alphaHex = toHex(Math.round(a * 255));
+    const redHex = toHex(r);
+    const greenHex = toHex(g);
+    const blueHex = toHex(b);
+
+    return `#${redHex}${greenHex}${blueHex}${alphaHex}`;
+  }
+
   render() {
     const {
       classPrefix: ns,
@@ -215,19 +285,20 @@ export class ColorControl extends React.PureComponent<
       placeholder,
       disabled,
       popOverContainer,
+      popOverContainerSelector,
       format,
       clearable,
       placement,
       classnames: cx,
       presetColors,
       allowCustomColor,
-      useMobileUI
+      mobileUI
     } = this.props;
 
     const __ = this.props.translate;
     const isOpened = this.state.isOpened;
     const isFocused = this.state.isFocused;
-    const mobileUI = useMobileUI && isMobile();
+    const tempValue = this.state.tempValue;
 
     return (
       <div
@@ -272,7 +343,11 @@ export class ColorControl extends React.PureComponent<
         ) : null}
 
         <span className={cx('ColorPicker-arrow')}>
-          <Icon icon="caret" className="icon" onClick={this.handleClick} />
+          <Icon
+            icon="right-arrow-bold"
+            className="icon"
+            onClick={this.handleClick}
+          />
         </span>
 
         {!mobileUI && isOpened ? (
@@ -281,6 +356,7 @@ export class ColorControl extends React.PureComponent<
             target={() => findDOMNode(this)}
             onHide={this.close}
             container={popOverContainer || (() => findDOMNode(this))}
+            containerSelector={popOverContainerSelector}
             rootClose={false}
             show
           >
@@ -328,18 +404,20 @@ export class ColorControl extends React.PureComponent<
             container={popOverContainer}
             isShow={isOpened}
             onHide={this.handleClick}
+            showConfirm
+            onConfirm={this.handleConfirm}
           >
             {allowCustomColor ? (
               <SketchPicker
                 styles={{}}
                 disableAlpha={!!~['rgb', 'hex'].indexOf(format as string)}
-                color={value}
+                color={tempValue}
                 presetColors={presetColors}
-                onChangeComplete={this.handleChange}
+                onChangeComplete={this.handleTempChange}
               />
             ) : (
               <GithubPicker
-                color={value}
+                color={tempValue}
                 colors={
                   Array.isArray(presetColors)
                     ? (presetColors
@@ -355,7 +433,7 @@ export class ColorControl extends React.PureComponent<
                         ) as string[])
                     : undefined
                 }
-                onChangeComplete={this.handleChange}
+                onChangeComplete={this.handleTempChange}
               />
             )}
           </PopUp>

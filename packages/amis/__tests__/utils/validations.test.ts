@@ -1,4 +1,4 @@
-import {validate, str2rules} from '../../src';
+import {validate, str2rules, addRule} from '../../src';
 
 test('validation:isRequired valid', () => {
   expect(
@@ -718,10 +718,6 @@ test('validation:multipleRules invalid', () => {
     {
       rule: 'isUrl',
       msg: 'validate.isUrl'
-    },
-    {
-      rule: 'isInt',
-      msg: 'validate.isInt'
     }
   ]);
 });
@@ -831,10 +827,6 @@ test('validation:multipleMatchRegexp invalid', () => {
     {
       rule: 'matchRegexp1',
       msg: '请输入abc开头的好么'
-    },
-    {
-      rule: 'matchRegexp2',
-      msg: '请输入123结尾的好么'
     }
   ]);
 });
@@ -874,10 +866,6 @@ test('validation:multipleMatchRegexp:noSlash invalid', () => {
     {
       rule: 'matchRegexp1',
       msg: '请输入abc开头的好么'
-    },
-    {
-      rule: 'matchRegexp2',
-      msg: '请输入123结尾的好么'
     }
   ]);
 });
@@ -1339,3 +1327,146 @@ describe('validation:Time', () => {
     });
   });
 });
+
+/** ============================ 身份证相关 ============================= */
+describe('validation: isId', () => {
+  test('validation: isId18 valid', () => {
+    expect(
+      validate(
+        '371422196603104039',
+        {},
+        {
+          isId18: true
+        }
+      )
+    ).toMatchObject([]);
+  });
+
+  test('validation: isId18 invalid', () => {
+    expect(
+      validate(
+        '141129199309090012',
+        {},
+        {
+          isId18: true
+        }
+      )
+    ).toMatchObject([
+      {
+        msg: 'validate.isId',
+        rule: 'isId18'
+      }
+    ]);
+  });
+
+  test('validation: isId15 valid', () => {
+    expect(
+      validate(
+        '340524800101001',
+        {},
+        {
+          isId15: true
+        }
+      )
+    ).toMatchObject([]);
+  });
+
+  test('validation: isId15 invalid', () => {
+    expect(
+      validate(
+        '340524801301001',
+        {},
+        {
+          isId15: true
+        }
+      )
+    ).toMatchObject([
+      {
+        msg: 'validate.isId',
+        rule: 'isId15'
+      }
+    ]);
+  });
+
+  test('validation: isId valid', () => {
+    expect(
+      validate(
+        '371422196603104039',
+        {},
+        {
+          isId: true
+        }
+      )
+    ).toMatchObject([]);
+  });
+
+  test('validation: isId invalid', () => {
+    expect(
+      validate(
+        '141129199309090012',
+        {},
+        {
+          isId: true
+        }
+      )
+    ).toMatchObject([
+      {
+        msg: 'validate.isId',
+        rule: 'isId'
+      }
+    ]);
+  });
+
+  test('validation: isId invalid when the birthday is before 1850', () => {
+    expect(
+      validate(
+        '14112918490909001X',
+        {},
+        {
+          isId: true
+        }
+      )
+    ).toMatchObject([
+      {
+        msg: 'validate.isId',
+        rule: 'isId'
+      }
+    ]);
+  });
+
+  test('validation: isId invalid when the birthday is after today', () => {
+    const tomorrow = new Date(new Date().getTime() + 1000 * 60 * 60 * 24);
+    const year = tomorrow.getFullYear();
+    const month = tomorrow.getMonth() + 1;
+    const day = tomorrow.getDate();
+    let id = `141129${year}${month < 10 ? '0' + month : month}${
+      day < 10 ? day : '0' + day
+    }001`;
+    id = `${id}${generateCheckCode(id)}`;
+    expect(
+      validate(
+        id,
+        {},
+        {
+          isId: true
+        }
+      )
+    ).toMatchObject([
+      {
+        msg: 'validate.isId',
+        rule: 'isId'
+      }
+    ]);
+  });
+});
+
+// 生成身份证验证码
+function generateCheckCode(id: string) {
+  const arrInt = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+  const arrCh = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
+  let cardTemp = 0;
+  for (let i = 0; i < 17; i++) {
+    cardTemp += +id.slice(i, i + 1) * arrInt[i];
+  }
+  return arrCh[cardTemp % 11];
+}

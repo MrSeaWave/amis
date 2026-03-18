@@ -1,113 +1,149 @@
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {isAlive} from 'mobx-state-tree';
+import {reaction} from 'mobx';
+import Sortable from 'sortablejs';
 import isEqual from 'lodash/isEqual';
-import {ScopedContext, IScopedContext, SchemaExpression} from 'amis-core';
-import {Renderer, RendererProps} from 'amis-core';
-import {SchemaNode, ActionObject, Schema} from 'amis-core';
-import forEach from 'lodash/forEach';
-import {evalExpression, filter} from 'amis-core';
-import {BadgeObject, Checkbox, Spinner} from 'amis-ui';
-import {Button} from 'amis-ui';
-import {TableStore, ITableStore, padArr} from 'amis-core';
+import find from 'lodash/find';
+import debounce from 'lodash/debounce';
+import intersection from 'lodash/intersection';
+import isPlainObject from 'lodash/isPlainObject';
 import {
+  TableStore,
+  ITableStore,
+  ScopedContext,
+  IScopedContext,
+  SchemaExpression,
+  position,
+  animation,
+  isEffectiveApi,
+  Renderer,
+  RendererProps,
+  SchemaNode,
+  ActionObject,
+  Schema,
+  evalExpression,
+  filter,
+  noop,
   anyChanged,
+  changedEffect,
   getScrollParent,
   difference,
-  noop,
   autobind,
   isArrayChildrenModified,
   eachTree,
   isObject,
-  createObject
-} from 'amis-core';
-import {
+  createObject,
   isPureVariable,
   resolveVariable,
-  resolveVariableAndFilter
+  resolveVariableAndFilter,
+  resizeSensor,
+  offset,
+  getStyleNumber,
+  getPropValue,
+  isExpression,
+  getTree,
+  resolveVariableAndFilterForAsync,
+  getMatchedEventTargets,
+  loopTooMuch,
+  filterClassNameObject
 } from 'amis-core';
-import debounce from 'lodash/debounce';
-import Sortable from 'sortablejs';
-import {resizeSensor} from 'amis-core';
-import find from 'lodash/find';
-import {Icon} from 'amis-ui';
+import {
+  Button,
+  Icon,
+  BadgeObject,
+  Checkbox,
+  Spinner,
+  SpinnerExtraProps
+} from 'amis-ui';
 import {TableCell} from './TableCell';
+import type {AMISAutoGenerateFilterObject} from '../CRUD';
 import {HeadCellFilterDropDown} from './HeadCellFilterDropdown';
 import {HeadCellSearchDropDown} from './HeadCellSearchDropdown';
-import {TableContent} from './TableContent';
+import TableContent, {renderItemActions} from './TableContent';
 import {
   BaseSchema,
   SchemaApi,
-  SchemaClassName,
   SchemaObject,
   SchemaTokenizeableString,
-  SchemaType,
-  SchemaTpl,
-  SchemaIcon
+  SchemaTpl
 } from '../../Schema';
 import {SchemaPopOver} from '../PopOver';
-import {SchemaQuickEdit} from '../QuickEdit';
-import {SchemaCopyable} from '../Copyable';
+import {AMISQuickEdit, getQuickEditApi, SchemaQuickEdit} from '../QuickEdit';
+import {AMISCopyable, SchemaCopyable} from '../Copyable';
 import {SchemaRemark} from '../Remark';
-import {TableBody} from './TableBody';
-import {isAlive} from 'mobx-state-tree';
 import ColumnToggler from './ColumnToggler';
-
-import {offset} from 'amis-core';
-import {getStyleNumber} from 'amis-core';
 import {exportExcel} from './exportExcel';
-import type {IColumn, IRow} from 'amis-core/lib/store/table';
+import AutoFilterForm from './AutoFilterForm';
+import Cell from './Cell';
+import VCell from './VCell';
+
+import type {
+  IColumn,
+  IRow,
+  AMISVariableName,
+  AMISPopOverBase,
+  AMISSchema,
+  AMISApi,
+  AMISOptions,
+  AMISClassName,
+  AMISLocalSource,
+  AMISExpression,
+  AMISBadgeBase,
+  AMISSchemaBase,
+  AMISRemarkBase
+} from 'amis-core';
 
 /**
- * 表格列，不指定类型时默认为文本类型。
+ * 表格列配置，不指定类型时默认为文本类型
  */
-export type TableColumnObject = {
+export interface AMISTableColumnBase {
   /**
-   * 列标题
+   * 列标题文本
    */
   label: string;
 
   /**
-   * 配置是否固定当前列
+   * 是否固定当前列
    */
   fixed?: 'left' | 'right' | 'none';
 
   /**
    * 绑定字段名
    */
-  name?: string;
+  name?: AMISVariableName;
 
   /**
-   * 配置查看详情功能
+   * 查看详情配置
    */
-  popOver?: SchemaPopOver;
+  popOver?: AMISPopOverBase;
 
   /**
-   * 配置快速编辑功能
+   * 快速编辑配置
    */
-  quickEdit?: SchemaQuickEdit;
+  quickEdit?: AMISQuickEdit;
 
   /**
-   * 作为表单项时，可以单独配置编辑时的快速编辑面板。
+   * 更新时快速编辑配置
    */
-  quickEditOnUpdate?: SchemaQuickEdit;
+  quickEditOnUpdate?: AMISQuickEdit;
 
   /**
-   * 配置点击复制功能
+   * 点击复制配置
    */
-  copyable?: SchemaCopyable;
+  copyable?: AMISCopyable;
 
   /**
-   * 配置是否可以排序
+   * 是否可排序
    */
   sortable?: boolean;
 
   /**
    * 是否可快速搜索
    */
-  searchable?: boolean | SchemaObject;
+  searchable?: boolean | AMISSchema;
 
   /**
-   * 配置是否默认展示
+   * 是否默认展示
    */
   toggled?: boolean;
 
@@ -120,6 +156,16 @@ export type TableColumnObject = {
    * 列对齐方式
    */
   align?: 'left' | 'right' | 'center' | 'justify';
+
+  /**
+   * 列垂直对齐方式
+   */
+  vAlign?: 'top' | 'middle' | 'bottom';
+
+  /**
+   * 标题对齐方式
+   */
+  headerAlign?: 'left' | 'right' | 'center' | 'justify';
 
   /**
    * 列样式表
@@ -137,63 +183,81 @@ export type TableColumnObject = {
   labelClassName?: string;
 
   /**
-   * todo
+   * 是否可过滤
    */
   filterable?:
     | boolean
     | {
-        source?: string;
-        options?: Array<any>;
+        source?: AMISApi;
+        options?: AMISOptions;
       };
 
   /**
-   * 结合表格的 footable 一起使用。
-   * 填写 *、xs、sm、md、lg指定 footable 的触发条件，可以填写多个用空格隔开
+   * 响应式断点
    */
   breakpoint?: '*' | 'xs' | 'sm' | 'md' | 'lg';
 
   /**
-   * 提示信息
+   * 提示信息配置
    */
-  remark?: SchemaRemark;
+  remark?: AMISRemarkBase;
 
   /**
-   * 默认值, 只有在 inputTable 里面才有用
+   * 默认值
    */
   value?: any;
 
   /**
-   * 是否唯一, 只有在 inputTable 里面才有用
+   * 是否唯一
    */
   unique?: boolean;
 
   /**
-   * 表格列单元格是否可以获取父级数据域值，默认为true，该配置对当前列内单元格生效
+   * 是否可获取父级数据
    */
   canAccessSuperData?: boolean;
-};
 
-export type TableColumnWithType = SchemaObject & TableColumnObject;
-export type TableColumn = TableColumnWithType | TableColumnObject;
+  /**
+   * 延迟渲染阈值
+   * @default 100
+   */
+  lazyRenderAfter?: number;
 
-interface AutoFillHeightObject {
-  height: number;
+  /**
+   * 单元格内部组件自定义样式
+   */
+  innerStyle?: {
+    [propName: string]: any;
+  };
+
+  [propName: string]: any;
 }
 
-/**
- * Table 表格渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/table
- */
-export interface TableSchema extends BaseSchema {
-  /**
-   * 指定为表格渲染器。
-   */
-  type: 'table' | 'static-table';
+export type AMISTableColumn =
+  | AMISTableColumnBase
+  | (AMISSchema & AMISTableColumnBase);
 
+// 保留原来的叫法
+export type TableColumnObject = AMISTableColumnBase;
+export type TableColumnWithType = AMISSchema & AMISTableColumnBase;
+export type TableColumn = AMISTableColumn;
+
+export type AMISAutoFillHeightObject = Record<'height' | 'maxHeight', number>;
+type AutoFillHeightObject = AMISAutoFillHeightObject;
+
+/**
+ * 数据表格，支持排序、筛选、搜索、固定列、拖拽、快速编辑等。通过列配置控制单元格渲染与交互。
+ */
+export interface AMISTableBase extends AMISSchemaBase {
   /**
    * 是否固定表头
    */
   affixHeader?: boolean;
+
+  /**
+   * 是否固底
+   */
+  affixFooter?: boolean;
 
   /**
    * 表格的列信息
@@ -222,17 +286,26 @@ export interface TableSchema extends BaseSchema {
   /**
    * 底部外层 CSS 类名
    */
-  footerClassName?: SchemaClassName;
+  footerClassName?: AMISClassName;
 
   /**
    * 顶部外层 CSS 类名
    */
-  headerClassName?: SchemaClassName;
+  headerClassName?: AMISClassName;
 
   /**
    * 占位符
    */
-  placeholder?: string | SchemaTpl;
+  placeholder?:
+    | string
+    | {
+        [propName: string]: string;
+      };
+
+  /**
+   * 是否显示序号
+   */
+  showIndex?: boolean;
 
   /**
    * 是否显示底部
@@ -247,12 +320,12 @@ export interface TableSchema extends BaseSchema {
   /**
    * 数据源：绑定当前环境变量
    */
-  source?: SchemaTokenizeableString;
+  source?: AMISLocalSource;
 
   /**
    * 表格 CSS 类名
    */
-  tableClassName?: SchemaClassName;
+  tableClassName?: AMISClassName;
 
   /**
    * 标题
@@ -262,12 +335,12 @@ export interface TableSchema extends BaseSchema {
   /**
    * 工具栏 CSS 类名
    */
-  toolbarClassName?: SchemaClassName;
+  toolbarClassName?: AMISClassName;
 
   /**
    * 合并单元格配置，配置数字表示从左到右的多少列自动合并单元格。
    */
-  combineNum?: number | SchemaExpression;
+  combineNum?: number | AMISExpression;
 
   /**
    * 合并单元格配置，配置从第几列开始合并。
@@ -277,12 +350,12 @@ export interface TableSchema extends BaseSchema {
   /**
    * 顶部总结行
    */
-  prefixRow?: Array<SchemaObject>;
+  prefixRow?: Array<AMISSchema>;
 
   /**
    * 底部总结行
    */
-  affixRow?: Array<SchemaObject>;
+  affixRow?: Array<AMISSchema>;
 
   /**
    * 是否可调整列宽
@@ -290,32 +363,57 @@ export interface TableSchema extends BaseSchema {
   resizable?: boolean;
 
   /**
-   * 行样式表表达式
+   * 行样式表达式
    */
   rowClassNameExpr?: string;
 
   /**
    * 行角标
    */
-  itemBadge?: BadgeObject;
+  itemBadge?: AMISBadgeBase;
 
   /**
    * 开启查询区域，会根据列元素的searchable属性值，自动生成查询条件表单
    */
-  autoGenerateFilter?: boolean;
+  autoGenerateFilter?: AMISAutoGenerateFilterObject | boolean;
 
   /**
-   * 表格是否可以获取父级数据域值，默认为false
+   * 表格是否可获取父级数据域值，默认为false
    */
   canAccessSuperData?: boolean;
 
   /**
    * 表格自动计算高度
    */
-  autoFillHeight?: boolean | AutoFillHeightObject;
-}
+  autoFillHeight?: boolean | AMISAutoFillHeightObject;
 
-export interface TableProps extends RendererProps {
+  /**
+   * table layout
+   */
+  tableLayout?: 'fixed' | 'auto';
+
+  /**
+   * 懒加载 API，当行数据中用 defer: true 标记了，则其孩子节点将会用这个 API 来拉取数据。
+   */
+  deferApi?: AMISApi;
+
+  /**
+   * 持久化 key
+   */
+  persistKey?: string;
+}
+export type BaseTableSchema = AMISTableBase;
+/**
+ * 表格基础配置，用于展示和操作结构化数据，支持分页、排序、筛选、可编辑、列设置等功能
+ */
+export interface AMISTableSchema extends AMISTableBase {
+  /**
+   * 指定为表格渲染器。
+   */
+  type: 'table' | 'static-table';
+}
+export type TableSchema = AMISTableSchema;
+export interface TableProps extends RendererProps, SpinnerExtraProps {
   title?: string; // 标题
   header?: SchemaNode;
   footer?: SchemaNode;
@@ -332,8 +430,11 @@ export interface TableProps extends RendererProps {
   tableClassName?: string;
   source?: string;
   selectable?: boolean;
+
+  // 已选清单
   selected?: Array<any>;
   maxKeepItemSelectionLength?: number;
+  maxItemSelectionLength?: number;
   valueField?: string;
   draggable?: boolean;
   columnsTogglable?: boolean | 'auto';
@@ -361,6 +462,15 @@ export interface TableProps extends RendererProps {
     unSelectedItems: Array<object>
   ) => void;
   onPristineChange?: (data: object, rowIndexe: string) => void;
+  // 行数据集合
+  items?: Array<object>;
+
+  // 原始数据集合，前端分页时用来保存原始数据
+  fullItems?: Array<object>;
+
+  // 单条修改时触发
+  onItemChange?: (item: object, diff: object, rowIndex: string) => void;
+
   onSave?: (
     items: Array<object> | object,
     diff: Array<object> | object,
@@ -373,9 +483,12 @@ export interface TableProps extends RendererProps {
     }
   ) => void;
   onSaveOrder?: (moved: Array<object>, items: Array<object>) => void;
-  onQuery: (values: object) => void;
+  onQuery?: (values: object) => any;
   onImageEnlarge?: (data: any, target: any) => void;
   buildItemProps?: (item: any, index: number) => any;
+
+  // table 组件有可能只会渲染区间，所以这个时候序号可能是不正确的，所以需要支持外部传入 `filterItemIndex` 来修正序号
+  filterItemIndex?: (index: number | string, item: any) => number | string;
   checkOnItemClick?: boolean;
   hideCheckToggler?: boolean;
   rowClassName?: string;
@@ -392,9 +505,13 @@ export type ExportExcelToolbar = SchemaNode & {
   api?: SchemaApi;
   columns?: string[];
   exportColumns?: any[];
+  rowSlice?: string;
   filename?: string;
+  pageField?: string;
+  perPageField?: string;
 };
 
+// 如果这里的事件调整，对应CRUD里的事件配置也需要同步修改
 export type TableRendererEvent =
   | 'selectedChange'
   | 'columnSort'
@@ -402,15 +519,21 @@ export type TableRendererEvent =
   | 'columnSearch'
   | 'columnToggled'
   | 'orderChange'
-  | 'rowClick';
+  | 'rowClick'
+  | 'rowDbClick'
+  | 'rowMouseEnter'
+  | 'rowMouseLeave';
 
 export type TableRendererAction =
   | 'selectAll'
   | 'clearAll'
   | 'select'
-  | 'initDrag';
+  | 'initDrag'
+  | 'cancelDrag';
 
-export default class Table extends React.Component<TableProps, object> {
+export default class Table<
+  T extends TableProps = TableProps
+> extends React.Component<T, object> {
   static contextType = ScopedContext;
 
   static propsList: Array<string> = [
@@ -436,6 +559,7 @@ export default class Table extends React.Component<TableProps, object> {
     'hideQuickSaveBtn',
     'itemCheckableOn',
     'itemDraggableOn',
+    'draggable',
     'checkOnItemClick',
     'hideCheckToggler',
     'itemAction',
@@ -458,7 +582,9 @@ export default class Table extends React.Component<TableProps, object> {
     'autoFillHeight',
     'onSelect',
     'keepItemSelectionOnPageChange',
-    'maxKeepItemSelectionLength'
+    'maxKeepItemSelectionLength',
+    'maxItemSelectionLength',
+    'autoGenerateFilter'
   ];
   static defaultProps: Partial<TableProps> = {
     className: '',
@@ -481,46 +607,39 @@ export default class Table extends React.Component<TableProps, object> {
     resizable: true
   };
 
+  dom = React.createRef<HTMLDivElement>();
   table?: HTMLTableElement;
   sortable?: Sortable;
   dragTip?: HTMLElement;
   affixedTable?: HTMLTableElement;
-  parentNode?: HTMLElement | Window;
-  lastScrollLeft: number = -1;
-  lastScrollTop: number = 0;
-  totalWidth: number = 0;
-  totalHeight: number = 0;
-  outterWidth: number = 0;
-  outterHeight: number = 0;
-  unSensor?: Function;
-  updateTableInfoLazy: () => void;
-  widths: {
-    [propName: string]: number;
-  } = {};
-  widths2: {
-    [propName: string]: number;
-  } = {};
-  heights: {
-    [propName: string]: number;
-  } = {};
   renderedToolbars: Array<string> = [];
   subForms: any = {};
   timer: ReturnType<typeof setTimeout>;
+  toDispose: Array<() => void> = [];
+  updateTableInfoLazy = debounce(this.updateTableInfo.bind(this), 250, {
+    trailing: true,
+    leading: false
+  });
 
-  constructor(props: TableProps, context: IScopedContext) {
+  updateAutoFillHeightLazy = debounce(
+    this.updateAutoFillHeight.bind(this),
+    250,
+    {
+      trailing: true,
+      leading: false
+    }
+  );
+
+  constructor(props: T, context: IScopedContext) {
     super(props);
 
     const scoped = context;
     scoped.registerComponent(this);
 
     this.handleOutterScroll = this.handleOutterScroll.bind(this);
-    this.affixDetect = this.affixDetect.bind(this);
-    this.updateTableInfoLazy = debounce(this.updateTableInfo.bind(this), 250, {
-      trailing: true,
-      leading: true
-    });
     this.tableRef = this.tableRef.bind(this);
     this.affixedTableRef = this.affixedTableRef.bind(this);
+    this.updateTableInfo = this.updateTableInfo.bind(this);
     this.handleAction = this.handleAction.bind(this);
     this.handleCheck = this.handleCheck.bind(this);
     this.handleCheckAll = this.handleCheckAll.bind(this);
@@ -537,6 +656,10 @@ export default class Table extends React.Component<TableProps, object> {
     this.handleMouseLeave = this.handleMouseLeave.bind(this);
     this.subFormRef = this.subFormRef.bind(this);
     this.handleColumnToggle = this.handleColumnToggle.bind(this);
+    this.handleRowClick = this.handleRowClick.bind(this);
+    this.handleRowDbClick = this.handleRowDbClick.bind(this);
+    this.handleRowMouseEnter = this.handleRowMouseEnter.bind(this);
+    this.handleRowMouseLeave = this.handleRowMouseLeave.bind(this);
 
     this.updateAutoFillHeight = this.updateAutoFillHeight.bind(this);
 
@@ -558,7 +681,18 @@ export default class Table extends React.Component<TableProps, object> {
       expandConfig,
       formItem,
       keepItemSelectionOnPageChange,
-      maxKeepItemSelectionLength
+      maxKeepItemSelectionLength,
+      maxItemSelectionLength,
+      onQuery,
+      autoGenerateFilter,
+      loading,
+      canAccessSuperData,
+      lazyRenderAfter,
+      tableLayout,
+      resolveDefinitions,
+      showIndex,
+      persistKey,
+      useVirtualList
     } = props;
 
     let combineNum = props.combineNum;
@@ -569,88 +703,143 @@ export default class Table extends React.Component<TableProps, object> {
       );
     }
 
-    store.update({
-      selectable,
-      draggable,
-      columns,
-      columnsTogglable,
-      orderBy,
-      orderDir,
-      multiple,
-      footable,
-      expandConfig,
-      primaryField,
-      itemCheckableOn,
-      itemDraggableOn,
-      hideCheckToggler,
-      combineNum,
-      combineFromIndex,
-      keepItemSelectionOnPageChange,
-      maxKeepItemSelectionLength
-    });
+    store.update(
+      {
+        selectable,
+        draggable,
+        columns,
+        columnsTogglable,
+        orderBy: onQuery ? orderBy : undefined,
+        orderDir,
+        multiple,
+        footable,
+        expandConfig,
+        primaryField,
+        itemCheckableOn,
+        itemDraggableOn,
+        hideCheckToggler,
+        combineNum,
+        combineFromIndex,
+        keepItemSelectionOnPageChange,
+        maxKeepItemSelectionLength,
+        maxItemSelectionLength,
+        loading,
+        canAccessSuperData,
+        lazyRenderAfter,
+        tableLayout,
+        showIndex,
+        persistKey
+      },
+      {
+        resolveDefinitions
+      }
+    );
+
+    if (
+      isPlainObject(autoGenerateFilter) &&
+      autoGenerateFilter.defaultCollapsed === false
+    ) {
+      store.setSearchFormExpanded(true);
+    }
 
     formItem && isAlive(formItem) && formItem.setSubStore(store);
     Table.syncRows(store, this.props, undefined) && this.syncSelected();
+
+    this.toDispose.push(
+      reaction(
+        () =>
+          store
+            .getExpandedRows()
+            .filter(
+              row => row.defer && !row.loaded && !row.loading && !row.error
+            ),
+        (rows: Array<IRow>) => rows.forEach(this.loadDeferredRow)
+      )
+    );
   }
 
   static syncRows(
     store: ITableStore,
     props: TableProps,
-    prevProps?: TableProps
+    prevProps?: TableProps,
+    forceUpdateRows = false
   ) {
     const source = props.source;
-    const value = props.value || props.items;
+    const value = getPropValue(props, (props: TableProps) => props.items);
     let rows: Array<object> = [];
     let updateRows = false;
 
     // 要严格比较前后的value值，否则某些情况下会导致循环update无限渲染
-    if (
-      Array.isArray(value) &&
-      (!prevProps || !isEqual(prevProps.value || prevProps.items, value))
-    ) {
-      updateRows = true;
-      rows = value;
+    if (Array.isArray(value)) {
+      if (
+        forceUpdateRows ||
+        !prevProps ||
+        !isEqual(
+          getPropValue(prevProps, (props: TableProps) => props.items),
+          value
+        )
+      ) {
+        updateRows = true;
+        rows = value;
+      }
     } else if (typeof source === 'string') {
       const resolved = resolveVariableAndFilter(source, props.data, '| raw');
       const prev = prevProps
         ? resolveVariableAndFilter(source, prevProps.data, '| raw')
         : null;
 
-      if (prev && prev === resolved) {
+      if (prev === resolved) {
         updateRows = false;
-      } else if (Array.isArray(resolved)) {
+      } else if (
+        loopTooMuch(`Table.syncRows${store.id}`) &&
+        isEqual(prev, resolved)
+      ) {
+        updateRows = false;
+      } else {
         updateRows = true;
-        rows = resolved;
+        rows = Array.isArray(resolved) ? resolved : [];
       }
     }
 
-    updateRows && store.initRows(rows, props.getEntryId, props.reUseRow);
-    typeof props.selected !== 'undefined' &&
+    if (updateRows) {
+      store.initRows(
+        rows,
+        props.getEntryId,
+        props.reUseRow,
+        props.fullItems,
+        props.selected
+      );
+    } else if (props.reUseRow === false) {
+      /**
+       * 在reUseRow为false情况下，支持强制刷新表格行状态
+       * 适用的情况：用户每次刷新，调用接口，返回的数据都是一样的，导致updateRows为false，故针对每次返回数据一致的情况，需要强制表格更新
+       */
+      updateRows = true;
+      store.initRows(
+        value,
+        props.getEntryId,
+        props.reUseRow,
+        props.fullItems,
+        props.selected
+      );
+    }
+
+    Array.isArray(props.selected) &&
       store.updateSelected(props.selected, props.valueField);
     return updateRows;
   }
 
   componentDidMount() {
-    const currentNode = findDOMNode(this) as HTMLElement;
-    let parent: HTMLElement | Window | null = getScrollParent(currentNode);
+    const currentNode = this.dom.current!;
 
-    if (!parent || parent === document.body) {
-      parent = window;
-    }
+    this.initAutoFillHeight();
 
-    this.parentNode = parent;
-    this.updateTableInfo();
-
-    const dom = findDOMNode(this) as HTMLElement;
-    if (dom.closest('.modal-body')) {
-      return;
-    }
-
-    this.affixDetect();
-    parent.addEventListener('scroll', this.affixDetect);
-    window.addEventListener('resize', this.affixDetect);
-    this.updateAutoFillHeight();
-    window.addEventListener('resize', this.updateAutoFillHeight);
+    // todo 因为没有监控里面内容的宽度变化，所以单元格内容变化撑开时可能看不到 fixed 的阴影
+    // 应该加上 table 的宽度检测
+    this.toDispose.push(
+      resizeSensor(currentNode, this.updateTableInfoLazy, false, 'width')
+    );
+    const table = this.table!;
 
     const {store, autoGenerateFilter, onSearchableFromInit} = this.props;
 
@@ -666,6 +855,59 @@ export default class Table extends React.Component<TableProps, object> {
     }
   }
 
+  @autobind
+  async loadDeferredRow(row: IRow) {
+    const {env} = this.props;
+    const deferApi = row.data.deferApi || this.props.deferApi;
+
+    if (!isEffectiveApi(deferApi)) {
+      throw new Error('deferApi is required');
+    }
+
+    try {
+      row.markLoading(true);
+
+      const response = await env.fetcher(deferApi, row.locals);
+      if (!response.ok) {
+        throw new Error(response.msg);
+      }
+
+      row.updateData(response.data);
+      row.markLoaded(true);
+      row.setError('');
+    } catch (e) {
+      row.setError(e.message);
+      env.notify('error', e.message);
+    } finally {
+      row.markLoading(false);
+    }
+  }
+
+  autoFillHeightDispose?: () => void;
+  autoFillHeightDispose2?: () => void;
+  initAutoFillHeight() {
+    const props = this.props;
+    const currentNode = this.dom.current!;
+
+    if (props.autoFillHeight) {
+      this.autoFillHeightDispose = resizeSensor(
+        currentNode.parentElement!,
+        this.updateAutoFillHeightLazy,
+        false,
+        'height'
+      );
+      this.toDispose.push(this.autoFillHeightDispose);
+      this.autoFillHeightDispose2 = resizeSensor(
+        document.body,
+        this.updateAutoFillHeight,
+        false,
+        'height'
+      );
+      this.toDispose.push(this.autoFillHeightDispose2);
+      this.updateAutoFillHeight();
+    }
+  }
+
   /**
    * 自动设置表格高度占满界面剩余区域
    * 用 css 实现有点麻烦，要改很多结构，所以先用 dom hack 了，避免对之前的功能有影响
@@ -675,174 +917,234 @@ export default class Table extends React.Component<TableProps, object> {
     if (!autoFillHeight) {
       return;
     }
-    const table = findDOMNode(this) as HTMLElement;
-    const tableContent = table.querySelector(
-      `.${ns}Table-content`
-    ) as HTMLElement;
-    const tableContentWrap = table.querySelector(
-      `.${ns}Table-contentWrap`
-    ) as HTMLElement;
-    const footToolbar = table.querySelector(
-      `.${ns}Table-footToolbar`
-    ) as HTMLElement;
-    const leftFixedColumns = table.querySelector(
-      `.${ns}Table-fixedLeft`
-    ) as HTMLElement;
-    const rightFixedColumns = table.querySelector(
-      `.${ns}Table-fixedRight`
-    ) as HTMLElement;
+    const table = this.table!;
+    const tableContent = table.parentElement as HTMLElement;
 
     if (!tableContent) {
       return;
     }
 
-    // 计算 table-content 在 dom 中的位置
-    const tableContentTop = offset(tableContent).top;
-    const viewportHeight = window.innerHeight;
-    // 有时候会拿不到 footToolbar？
-    const footToolbarHeight = footToolbar ? offset(footToolbar).height : 0;
-    // 有时候会拿不到 footToolbar，等一下在执行
-    if (!footToolbarHeight && footerToolbar && footerToolbar.length) {
+    // 可能数据还没到，没有渲染 footer
+    // 也可能是弹窗中，弹窗还在动画中，等一下再执行
+    if (
+      !tableContent.offsetHeight ||
+      tableContent.getBoundingClientRect().height / tableContent.offsetHeight <
+        0.8
+    ) {
       this.timer = setTimeout(() => {
         this.updateAutoFillHeight();
       }, 100);
       return;
     }
-    const tableContentWrapMarginButtom = getStyleNumber(
-      tableContentWrap,
-      'margin-bottom'
-    );
 
-    // 循环计算父级节点的 pddding，这里不考虑父级节点还可能会有其它兄弟节点的情况了
-    let allParentPaddingButtom = 0;
-    let parentNode = tableContent.parentElement;
-    while (parentNode) {
-      const paddingButtom = getStyleNumber(parentNode, 'padding-bottom');
-      const borderBottom = getStyleNumber(parentNode, 'border-bottom-width');
-      allParentPaddingButtom =
-        allParentPaddingButtom + paddingButtom + borderBottom;
-      parentNode = parentNode.parentElement;
+    // 计算 table-content 在 dom 中的位置
+
+    let viewportHeight = window.innerHeight;
+    let tableContentTop = offset(tableContent).top;
+
+    const parent = getScrollParent(tableContent.parentElement as HTMLElement);
+    if (parent && parent !== document.body) {
+      viewportHeight = parent.clientHeight - 1;
+      tableContentTop = position(tableContent, parent).top;
     }
 
-    const height = isObject(autoFillHeight)
-      ? (autoFillHeight as AutoFillHeightObject).height
+    let tableContentBottom = 0;
+    let selfNode = tableContent;
+    let parentNode = selfNode.parentElement;
+    while (parentNode) {
+      const paddingBottom = getStyleNumber(parentNode, 'padding-bottom');
+      const borderBottom = getStyleNumber(parentNode, 'border-bottom-width');
+
+      let nextSiblingHeight = 0;
+      let nextSibling = selfNode.nextElementSibling as HTMLElement;
+      while (nextSibling) {
+        const positon = getComputedStyle(nextSibling).position;
+        if (positon !== 'absolute' && positon !== 'fixed') {
+          const rect1 = selfNode.getBoundingClientRect();
+          const rect2 = nextSibling.getBoundingClientRect();
+
+          // 浏览器缩放/扩大的时候会出现精度问题
+          if (rect1.bottom - rect2.top <= 0.5) {
+            nextSiblingHeight +=
+              nextSibling.offsetHeight +
+              getStyleNumber(nextSibling, 'margin-bottom');
+          }
+        }
+
+        nextSibling = nextSibling.nextElementSibling as HTMLElement;
+      }
+
+      const marginBottom = getStyleNumber(selfNode, 'margin-bottom');
+      tableContentBottom +=
+        paddingBottom + borderBottom + marginBottom + nextSiblingHeight;
+
+      selfNode = parentNode;
+      parentNode = selfNode.parentElement;
+
+      if (parent && parent !== document.body && parent === selfNode) {
+        break;
+      }
+    }
+
+    const heightField =
+      autoFillHeight && (autoFillHeight as AutoFillHeightObject).maxHeight
+        ? 'maxHeight'
+        : 'height';
+
+    const heightValue = isObject(autoFillHeight)
+      ? (autoFillHeight as AutoFillHeightObject)[heightField]
       : 0;
 
-    const tableContentHeight = height
-      ? `${height}px`
-      : `${
-          viewportHeight -
-          tableContentTop -
-          tableContentWrapMarginButtom -
-          footToolbarHeight -
-          allParentPaddingButtom
-        }px`;
+    const tableContentHeight = heightValue
+      ? `${heightValue}px`
+      : `${Math.round(
+          viewportHeight - tableContentTop - tableContentBottom - 1
+        )}px`;
 
-    tableContent.style.height = tableContentHeight;
-    /**autoFillHeight开启后固定列会溢出Table高度，需要同步一下 */
-    if (leftFixedColumns) {
-      leftFixedColumns.style.height = tableContentHeight;
-      leftFixedColumns.style.overflowY = 'auto';
-    }
-    if (rightFixedColumns) {
-      rightFixedColumns.style.height = tableContentHeight;
-      rightFixedColumns.style.overflowY = 'auto';
-    }
+    tableContent.style[heightField] = tableContentHeight;
+    tableContent.style.setProperty(
+      `--Table-content-${heightField}`,
+      tableContentHeight
+    );
   }
 
   componentDidUpdate(prevProps: TableProps) {
     const props = this.props;
     const store = props.store;
+    let forceReSync = false;
 
-    if (
-      anyChanged(
-        [
-          'selectable',
-          'columnsTogglable',
-          'draggable',
-          'orderBy',
-          'orderDir',
-          'multiple',
-          'footable',
-          'primaryField',
-          'itemCheckableOn',
-          'itemDraggableOn',
-          'hideCheckToggler',
-          'combineNum',
-          'combineFromIndex',
-          'expandConfig'
-        ],
-        prevProps,
-        props
-      )
-    ) {
-      let combineNum = props.combineNum;
-      if (typeof combineNum === 'string') {
-        combineNum = parseInt(
-          resolveVariableAndFilter(combineNum, props.data, '| raw'),
-          10
-        );
+    changedEffect(
+      [
+        'selectable',
+        'columnsTogglable',
+        'draggable',
+        'orderBy',
+        'orderDir',
+        'multiple',
+        'footable',
+        'primaryField',
+        'itemCheckableOn',
+        'itemDraggableOn',
+        'hideCheckToggler',
+        'combineNum',
+        'combineFromIndex',
+        'expandConfig',
+        'columns',
+        'loading',
+        'canAccessSuperData',
+        'lazyRenderAfter',
+        'tableLayout',
+        'showIndex',
+        'persistKey'
+      ],
+      prevProps,
+      props,
+      changes => {
+        if (
+          changes.hasOwnProperty('combineNum') &&
+          typeof changes.combineNum === 'string'
+        ) {
+          changes.combineNum = parseInt(
+            resolveVariableAndFilter(
+              changes.combineNum as string,
+              props.data,
+              '| raw'
+            ),
+            10
+          );
+        }
+        if (
+          !forceReSync &&
+          changes.hasOwnProperty('combineNum') &&
+          store.combineNum !== changes.combineNum
+        ) {
+          forceReSync = true;
+        }
+        if (changes.orderBy && !props.onQuery) {
+          delete changes.orderBy;
+        }
+        store.update(changes as any, {
+          resolveDefinitions: props.resolveDefinitions
+        });
       }
-      store.update({
-        selectable: props.selectable,
-        columnsTogglable: props.columnsTogglable,
-        draggable: props.draggable,
-        orderBy: props.orderBy,
-        orderDir: props.orderDir,
-        multiple: props.multiple,
-        primaryField: props.primaryField,
-        footable: props.footable,
-        itemCheckableOn: props.itemCheckableOn,
-        itemDraggableOn: props.itemDraggableOn,
-        hideCheckToggler: props.hideCheckToggler,
-        combineNum: combineNum,
-        combineFromIndex: props.combineFromIndex,
-        expandConfig: props.expandConfig
-      });
-    }
-
-    if (prevProps.columns !== props.columns) {
-      store.update({
-        columns: props.columns
-      });
-    }
+    );
 
     if (
+      forceReSync ||
       anyChanged(['source', 'value', 'items'], prevProps, props) ||
       (!props.value &&
         !props.items &&
         (props.data !== prevProps.data ||
           (typeof props.source === 'string' && isPureVariable(props.source))))
     ) {
-      Table.syncRows(store, props, prevProps) && this.syncSelected();
+      Table.syncRows(store, props, prevProps, forceReSync) &&
+        this.syncSelected();
     } else if (isArrayChildrenModified(prevProps.selected!, props.selected!)) {
       const prevSelectedRows = store.selectedRows
         .map(item => item.id)
         .join(',');
+
       store.updateSelected(props.selected || [], props.valueField);
-      const selectedRows = store.selectedRows.map(item => item.id).join(',');
-      prevSelectedRows !== selectedRows && this.syncSelected();
+
+      if (
+        Array.isArray(props.selected) &&
+        Array.isArray(prevProps.selected) &&
+        props.selected.length === prevProps.selected.length
+      ) {
+        // 只有长度一样才检测具体的值是否变了
+        const selectedRows = store.selectedRows.map(item => item.id).join(',');
+        prevSelectedRows !== selectedRows && this.syncSelected();
+      } else {
+        this.syncSelected();
+      }
     }
 
-    // 延迟执行，否则表格还没更新，拿到的宽度不对，导致表头错位
-    Promise.resolve().then(() => this.updateTableInfoLazy());
+    // 检测属性变化，来切换功能
+    if (props.autoFillHeight !== prevProps.autoFillHeight) {
+      if (this.autoFillHeightDispose) {
+        this.toDispose = this.toDispose.filter(
+          fn =>
+            ![this.autoFillHeightDispose, this.autoFillHeightDispose2].includes(
+              fn
+            )
+        );
+        this.autoFillHeightDispose();
+        delete this.autoFillHeightDispose;
+        delete this.autoFillHeightDispose2;
+        const tableContent = this.table?.parentElement as HTMLElement;
+        if (tableContent) {
+          tableContent.style.height = '';
+        }
+      }
+
+      this.initAutoFillHeight();
+    }
   }
 
   componentWillUnmount() {
     const {formItem} = this.props;
 
-    const parent = this.parentNode;
-    parent && parent.removeEventListener('scroll', this.affixDetect);
-    window.removeEventListener('resize', this.affixDetect);
-    window.removeEventListener('resize', this.updateAutoFillHeight);
-    (this.updateTableInfoLazy as any).cancel();
-    this.unSensor && this.unSensor();
+    this.toDispose.forEach(fn => fn());
+    this.toDispose = [];
+    delete this.autoFillHeightDispose;
+    delete this.autoFillHeightDispose2;
 
+    this.updateTableInfoLazy.cancel();
+    this.updateAutoFillHeightLazy.cancel();
     formItem && isAlive(formItem) && formItem.setSubStore(null);
     clearTimeout(this.timer);
 
     const scoped = this.context as IScopedContext;
     scoped.unRegisterComponent(this);
+  }
+
+  scrollToTop() {
+    this.dom.current?.scrollIntoView();
+    if (this.props.autoFillHeight) {
+      this.table?.scrollIntoView();
+    }
+    const scrolledY = window.scrollY;
+    scrolledY && window.scroll(0, scrolledY);
   }
 
   subFormRef(form: any, x: number, y: number) {
@@ -861,59 +1163,110 @@ export default class Table extends React.Component<TableProps, object> {
     const {onAction} = this.props;
 
     // todo
-    onAction(e, action, ctx);
+    return onAction(e, action, ctx);
   }
 
-  async handleCheck(item: IRow, value: boolean, shift?: boolean) {
-    const {store, data, dispatchEvent} = this.props;
+  async handleCheck(item: IRow, value?: boolean, shift?: boolean) {
+    const {store, data, dispatchEvent, selectable} = this.props;
 
-    const selectedItems = value
-      ? [...store.selectedRows.map(row => row.data), item.data]
-      : store.selectedRows.filter(row => row.id !== item.id);
-    const unSelectedItems = value
-      ? store.unSelectedRows.filter(row => row.id !== item.id)
-      : [...store.unSelectedRows.map(row => row.data), item.data];
-
-    const rendererEvent = await dispatchEvent(
-      'selectedChange',
-      createObject(data, {
-        selectedItems,
-        unSelectedItems
-      })
-    );
-
-    if (rendererEvent?.prevented) {
+    if (!selectable) {
       return;
     }
 
-    if (shift) {
-      store.toggleShift(item);
-    } else {
-      item.toggle();
-    }
+    value = value !== undefined ? value : !item.checked;
 
+    if (shift) {
+      store.toggleShift(item, value);
+    } else {
+      // 如果picker的value是绑定的上层数量变量
+      // 那么用户只能通过事件动作来更新上层变量来实现选中
+      item.toggle(value);
+    }
     this.syncSelected();
+
+    await dispatchEvent(
+      'selectedChange',
+      createObject(data, {
+        ...store.eventContext,
+        item: item.data
+      })
+    );
+  }
+
+  handleRowClick(item: IRow, index: number) {
+    const {dispatchEvent, filterItemIndex, store, data} = this.props;
+    return dispatchEvent(
+      'rowClick',
+      createObject(data, {
+        rowItem: item.data, // 保留rowItem 可能有用户已经在用 兼容之前的版本
+        item: item.data,
+        index: parseInt(
+          `${filterItemIndex?.(item.index, item) ?? item.index}`,
+          10
+        ),
+        indexPath: filterItemIndex?.(item.path, item) ?? item.path
+      })
+    );
+  }
+
+  handleRowDbClick(item: IRow, index: number) {
+    const {dispatchEvent, filterItemIndex, store, data} = this.props;
+
+    return dispatchEvent(
+      'rowDbClick',
+      createObject(data, {
+        item: item.data,
+        index: parseInt(
+          `${filterItemIndex?.(item.index, item) ?? item.index}`,
+          10
+        ),
+        indexPath: filterItemIndex?.(item.path, item) ?? item.path
+      })
+    );
+  }
+
+  handleRowMouseEnter(item: IRow, index: number) {
+    const {dispatchEvent, filterItemIndex, store, data} = this.props;
+    return dispatchEvent(
+      'rowMouseEnter',
+      createObject(data, {
+        item: item.data,
+        index: parseInt(
+          `${filterItemIndex?.(item.index, item) ?? item.index}`,
+          10
+        ),
+        indexPath: filterItemIndex?.(item.path, item) ?? item.path
+      })
+    );
+  }
+
+  handleRowMouseLeave(item: IRow, index: number) {
+    const {dispatchEvent, filterItemIndex, store, data} = this.props;
+    return dispatchEvent(
+      'rowMouseLeave',
+      createObject(data, {
+        item: item.data,
+        index: parseInt(
+          `${filterItemIndex?.(item.index, item) ?? item.index}`,
+          10
+        ),
+        indexPath: filterItemIndex?.(item.path, item) ?? item.path
+      })
+    );
   }
 
   async handleCheckAll() {
     const {store, data, dispatchEvent} = this.props;
 
-    const items = store.getSelectedRows().map(item => item.data);
-
-    const rendererEvent = await dispatchEvent(
-      'selectedChange',
-      createObject(data, {
-        selectedItems: store.allChecked ? [] : items,
-        unSelectedItems: store.allChecked ? items : []
-      })
-    );
-
-    if (rendererEvent?.prevented) {
-      return;
-    }
-
     store.toggleAll();
     this.syncSelected();
+
+    await dispatchEvent(
+      'selectedChange',
+      createObject(data, {
+        ...store.eventContext
+      })
+    );
   }
 
   handleQuickChange(
@@ -930,14 +1283,22 @@ export default class Table extends React.Component<TableProps, object> {
       return;
     }
 
-    const {
-      onSave,
-      onPristineChange,
-      saveImmediately: propsSaveImmediately,
-      primaryField
-    } = this.props;
+    const {onSave, onPristineChange, primaryField, onItemChange} = this.props;
 
     item.change(values, savePristine);
+
+    // 依然解决不了问题，所以先注释掉
+    // 预期是，这个表党项修改的时候，把其他还没运算公式的表单更新最新值
+    // 好让公式计算触发的值是最新的
+    // 但是事与愿违，应该是修改了 store.data 但是 props.data 还没变过来
+    // 即便如此，但是最终还是会算正确，只是会多触发几次 onChange :(
+    // const y = item.index;
+    // const str = `-${y}`;
+    // Object.keys(this.subForms).forEach(key => {
+    //   if (key.endsWith(str)) {
+    //     this.subForms[key].props.store.updateData(values);
+    //   }
+    // });
 
     // 值发生变化了，需要通过 onSelect 通知到外面，否则会出现数据不同步的问题
     item.modified && this.syncSelected();
@@ -945,27 +1306,34 @@ export default class Table extends React.Component<TableProps, object> {
     if (savePristine) {
       onPristineChange?.(item.data, item.path);
       return;
-    } else if (!saveImmediately && !propsSaveImmediately) {
-      return;
     }
 
-    if (saveImmediately && saveImmediately.api) {
-      this.props.onAction(
-        null,
-        {
-          actionType: 'ajax',
-          api: saveImmediately.api,
-          reload: options?.reload
-        },
-        values
-      );
-      return;
-    }
+    onItemChange?.(
+      item.data,
+      difference(item.data, item.pristine, ['id', primaryField]),
+      item.path
+    );
 
     if (!onSave) {
+      const api = getQuickEditApi(saveImmediately);
+
+      if (isEffectiveApi(api)) {
+        // 调用自身的onAction方法
+        this.props.onAction(
+          null,
+          {
+            actionType: 'ajax',
+            api,
+            reload: options?.reload
+          },
+          item.locals
+        );
+      }
+
       return;
     }
 
+    // 调用crud的onSave方法
     onSave(
       item.data,
       difference(item.data, item.pristine, ['id', primaryField]),
@@ -995,6 +1363,27 @@ export default class Table extends React.Component<TableProps, object> {
       }
     }
 
+    // 校验直接放在单元格里面的表单项
+    const subFormItems = store.children.filter(
+      item => item?.storeType === 'FormItemStore'
+    );
+    if (subFormItems.length) {
+      const result = await Promise.all(
+        subFormItems.map(item => {
+          let ctx = {};
+
+          if (item.rowIndex && store.rows[item.rowIndex]) {
+            ctx = store.rows[item.rowIndex].data;
+          }
+
+          return item.validate(ctx);
+        })
+      );
+      if (~result.indexOf(false)) {
+        return;
+      }
+    }
+
     const rows = store.modifiedRows.map(item => item.data);
     const rowIndexes = store.modifiedRows.map(item => item.path);
     const diff = store.modifiedRows.map(item =>
@@ -1003,7 +1392,8 @@ export default class Table extends React.Component<TableProps, object> {
     const unModifiedRows = store.rows
       .filter(item => !item.modified)
       .map(item => item.data);
-    onSave(
+
+    return onSave(
       rows,
       diff,
       rowIndexes,
@@ -1036,7 +1426,6 @@ export default class Table extends React.Component<TableProps, object> {
 
   syncSelected() {
     const {store, onSelect} = this.props;
-
     onSelect &&
       onSelect(
         store.selectedRows.map(item => item.data),
@@ -1054,6 +1443,14 @@ export default class Table extends React.Component<TableProps, object> {
       key => this.subForms[key] && subForms.push(this.subForms[key])
     );
     subForms.forEach(item => item.clearErrors());
+
+    // 去掉错误提示
+    const subFormItems = store.children.filter(
+      item => item?.storeType === 'FormItemStore'
+    );
+    if (subFormItems.length) {
+      subFormItems.map(item => item.reset());
+    }
   }
 
   bulkUpdate(value: any, items: Array<object>) {
@@ -1066,7 +1463,7 @@ export default class Table extends React.Component<TableProps, object> {
       );
       const newValue = {...value, ids: undefined};
       rows.forEach(row => row.change(newValue));
-    } else {
+    } else if (Array.isArray(items)) {
       const rows = store.rows.filter(item => ~items.indexOf(item.pristine));
       rows.forEach(row => row.change(value));
     }
@@ -1078,260 +1475,56 @@ export default class Table extends React.Component<TableProps, object> {
     return store.selectedRows.map(item => item.data);
   }
 
-  affixDetect() {
-    if (!this.props.affixHeader || !this.table || this.props.autoFillHeight) {
+  updateTableInfo(callback?: () => void) {
+    if (this.resizeLine) {
       return;
     }
-
-    const ns = this.props.classPrefix;
-    const dom = findDOMNode(this) as HTMLElement;
-    const clip = (this.table as HTMLElement).getBoundingClientRect();
-    const offsetY =
-      this.props.affixOffsetTop ?? this.props.env.affixOffsetTop ?? 0;
-    const headingHeight =
-      dom.querySelector(`.${ns}Table-heading`)?.getBoundingClientRect()
-        .height || 0;
-    const headerHeight =
-      dom.querySelector(`.${ns}Table-headToolbar`)?.getBoundingClientRect()
-        .height || 0;
-
-    const affixed =
-      clip.top - headerHeight - headingHeight < offsetY &&
-      clip.top + clip.height - 40 > offsetY;
-    const affixedDom = dom.querySelector(`.${ns}Table-fixedTop`) as HTMLElement;
-    const affixedShadowDom = dom.querySelector(
-      `.${ns}Table-fixedTop-shadow`
-    ) as HTMLElement;
-    const affixedDomHeight =
-      getComputedStyle(affixedDom).getPropertyValue('height');
-
-    affixedDom.style.cssText += `top: ${offsetY}px;width: ${
-      (this.table.parentNode as HTMLElement).offsetWidth
-    }px`;
-    affixedShadowDom.style.cssText += `top: ${affixedDomHeight};width: ${
-      (this.table.parentNode as HTMLElement).offsetWidth
-    }px`;
-
-    affixed
-      ? affixedDom.classList.add('in')
-      : affixedDom.classList.remove('in');
-    // store.markHeaderAffix(clip.top < offsetY && (clip.top + clip.height - 40) > offsetY);
-  }
-
-  updateTableInfo() {
-    if (!this.table) {
-      return;
-    }
-
-    const table = this.table;
-    const outter = table.parentNode as HTMLElement;
-    const affixHeader = this.props.affixHeader;
-    const ns = this.props.classPrefix;
-
-    // 完成宽高都没有变化就直接跳过了。
-    // if (this.totalWidth === table.scrollWidth && this.totalHeight === table.scrollHeight) {
-    //     return;
-    // }
-
-    this.totalWidth = table.scrollWidth;
-    this.totalHeight = table.scrollHeight;
-    this.outterWidth = outter.offsetWidth;
-    this.outterHeight = outter.offsetHeight;
-
-    let widths: {
-      [propName: string]: number;
-    } = (this.widths = {});
-    let widths2: {
-      [propName: string]: number;
-    } = (this.widths2 = {});
-    let heights: {
-      [propName: string]: number | string;
-    } = (this.heights = {});
-
-    heights.header = table
-      .querySelector('thead>tr:last-child')!
-      .getBoundingClientRect().height;
-    heights.header2 = table
-      .querySelector('thead>tr:first-child')!
-      .getBoundingClientRect().height;
-
-    forEach(
-      table.querySelectorAll('thead>tr:last-child>th'),
-      (item: HTMLElement) => {
-        widths[item.getAttribute('data-index') as string] =
-          item.getBoundingClientRect().width;
-      }
-    );
-
-    forEach(
-      table.querySelectorAll('thead>tr:first-child>th'),
-      (item: HTMLElement) => {
-        widths2[item.getAttribute('data-index') as string] =
-          item.getBoundingClientRect().width;
-      }
-    );
-
-    forEach(
-      table.querySelectorAll('tbody>tr>*:last-child'),
-      /**
-       * ! 弹窗中的特殊说明
-       * ! 在弹窗中，modal 有一个 scale 的动画，导致 getBoundingClientRect 获取的高度不准确
-       * ! width 准确是因为 table-layout: auto 导致
-       */
-      (item: HTMLElement, index: number) =>
-        (heights[index] = getComputedStyle(item).height)
-    );
-
-    // 让 react 去更新非常慢，还是手动更新吧。
-    const dom = findDOMNode(this) as HTMLElement;
-
-    forEach(
-      // 折叠 footTable 不需要改变
-      dom.querySelectorAll(
-        `.${ns}Table-fixedTop table, .${ns}Table-fixedLeft>table, .${ns}Table-fixedRight>table`
-      ),
-      (table: HTMLTableElement) => {
-        let totalWidth = 0;
-        let totalWidth2 = 0;
-        forEach(
-          table.querySelectorAll('thead>tr:last-child>th'),
-          (item: HTMLElement) => {
-            const width = widths[item.getAttribute('data-index') as string];
-            item.style.cssText += `width: ${width}px; height: ${heights.header}px`;
-            totalWidth += width;
-          }
-        );
-        forEach(
-          table.querySelectorAll('thead>tr:first-child>th'),
-          (item: HTMLElement) => {
-            const rowSpan = Number(item.getAttribute('rowspan'));
-            const colSpan = Number(item.getAttribute('colspan'));
-            let thWidth = widths2[item.getAttribute('data-index') as string];
-            let thHeight = Number(heights.header2);
-
-            /* 考虑表头分组的情况，需要将固定列中对应的表头的高度按照rowSpan扩大指定倍数 */
-            if (!isNaN(thHeight) && !isNaN(rowSpan)) {
-              thHeight *= rowSpan;
-            }
-
-            /* 考虑表头分组的情况，需要将分组表头按照colSpan缩小至指定倍数 */
-            if (!isNaN(thWidth) && !isNaN(colSpan) && colSpan !== 0) {
-              thWidth /= colSpan;
-            }
-
-            item.style.cssText += `width: ${thWidth}px; height: ${thHeight}px`;
-            totalWidth2 += thWidth;
-          }
-        );
-
-        forEach(table.querySelectorAll('colgroup>col'), (item: HTMLElement) => {
-          const width = widths[item.getAttribute('data-index') as string];
-          item.setAttribute('width', `${width}`);
-        });
-
-        forEach(
-          table.querySelectorAll('tbody>tr'),
-          (item: HTMLElement, index) => {
-            item.style.cssText += `height: ${heights[index]}`;
-          }
-        );
-
-        table.style.cssText += `width: ${Math.max(
-          totalWidth,
-          totalWidth2
-        )}px;table-layout: auto;`;
-      }
-    );
-
-    if (affixHeader) {
-      (
-        dom.querySelector(
-          `.${ns}Table-fixedTop>.${ns}Table-wrapper`
-        ) as HTMLElement
-      ).style.cssText += `width: ${this.outterWidth}px`;
-    }
-
-    this.lastScrollLeft = -1;
+    this.props.store.initTableWidth();
+    this.props.store.syncTableWidth();
     this.handleOutterScroll();
+    callback && setTimeout(callback, 20);
   }
 
+  // 当表格滚动是，需要让 affixHeader 部分的表格也滚动
   handleOutterScroll() {
-    const outter = (this.table as HTMLElement).parentNode as HTMLElement;
-    const scrollLeft = outter.scrollLeft;
-    const ns = this.props.classPrefix;
-    const dom = findDOMNode(this) as HTMLElement;
-    const fixedLeft = dom.querySelectorAll(`.${ns}Table-fixedLeft`);
-    const fixedRight = dom.querySelectorAll(`.${ns}Table-fixedRight`);
+    const table = this.table as HTMLElement;
+    if (!table) {
+      return;
+    }
 
-    if (scrollLeft !== this.lastScrollLeft) {
-      this.lastScrollLeft = scrollLeft;
+    const outter = table?.parentNode as HTMLElement;
+    const scrollLeft = outter.scrollLeft;
+    if (this.affixedTable) {
+      this.affixedTable.parentElement!.scrollLeft = scrollLeft;
+    }
+
+    if (this.props.store.filteredColumns.some(column => column.fixed)) {
       let leading = scrollLeft === 0;
       let trailing =
-        Math.ceil(scrollLeft) + this.outterWidth >= this.totalWidth;
-      // console.log(scrollLeft, store.outterWidth, store.totalWidth, (scrollLeft + store.outterWidth) === store.totalWidth);
-      // store.setLeading(leading);
-      // store.setTrailing(trailing);
+        Math.ceil(scrollLeft) + outter.offsetWidth >= table.scrollWidth;
 
-      if (fixedLeft && fixedLeft.length) {
-        for (let i = 0, len = fixedLeft.length; i < len; i++) {
-          let node = fixedLeft[i];
-          leading ? node.classList.remove('in') : node.classList.add('in');
-        }
-      }
-
-      if (fixedRight && fixedRight.length) {
-        for (let i = 0, len = fixedRight.length; i < len; i++) {
-          let node = fixedRight[i];
-          trailing ? node.classList.remove('in') : node.classList.add('in');
-        }
-      }
-      const table = this.affixedTable;
-      if (table) {
-        table.style.cssText += `transform: translateX(-${scrollLeft}px)`;
-      }
-    }
-
-    /* 同步固定列内容的垂直滚动 */
-    if (outter.scrollTop !== this.lastScrollTop) {
-      this.lastScrollTop = outter.scrollTop;
-
-      if (fixedLeft && fixedLeft.length) {
-        forEach(fixedLeft, node => node.scrollTo({top: outter.scrollTop}));
-      }
-
-      if (fixedRight && fixedRight.length) {
-        forEach(fixedRight, node => node.scrollTo({top: outter.scrollTop}));
-      }
+      [table, this.affixedTable]
+        .filter(item => item)
+        .forEach((table: HTMLElement) => {
+          table.classList.remove('table-fixed-left', 'table-fixed-right');
+          leading || table.classList.add('table-fixed-left');
+          trailing || table.classList.add('table-fixed-right');
+        });
     }
   }
 
-  @autobind
-  handleFixedColumnsScroll(event: React.UIEvent<any>) {
-    /** table内容区当前Top */
-    const currentScrollTop = this.lastScrollTop;
-    /** 固定列的新Top */
-    const fixedScrollTop = event.currentTarget.scrollTop;
-
-    if (currentScrollTop !== fixedScrollTop) {
-      this.lastScrollTop = fixedScrollTop;
-      const tableContentDom = (this.table as HTMLElement)
-        .parentNode as HTMLElement;
-
-      tableContentDom.scrollTo({top: fixedScrollTop});
-    }
-  }
+  tableUnWatchResize?: () => void;
 
   tableRef(ref: HTMLTableElement) {
     this.table = ref;
+    isAlive(this.props.store) && this.props.store.setTable(ref);
 
+    this.tableUnWatchResize?.();
     if (ref) {
-      this.unSensor = resizeSensor(
-        ref.parentNode as HTMLElement,
-        this.updateTableInfoLazy
-      );
-    } else {
-      this.unSensor && this.unSensor();
-      delete this.unSensor;
+      this.handleOutterScroll();
+      this.tableUnWatchResize = resizeSensor(ref, () => {
+        this.handleOutterScroll();
+      });
     }
   }
 
@@ -1347,12 +1540,13 @@ export default class Table extends React.Component<TableProps, object> {
 
   affixedTableRef(ref: HTMLTableElement) {
     this.affixedTable = ref;
+    ref && this.handleOutterScroll();
   }
 
   initDragging() {
     const {store, classPrefix: ns} = this.props;
     this.sortable = new Sortable(
-      (this.table as HTMLElement).querySelector('tbody') as HTMLElement,
+      (this.table as HTMLElement).querySelector(':scope>tbody') as HTMLElement,
       {
         group: 'table',
         animation: 150,
@@ -1367,7 +1561,12 @@ export default class Table extends React.Component<TableProps, object> {
 
           const parent = e.to as HTMLElement;
           if (e.oldIndex < parent.childNodes.length - 1) {
-            parent.insertBefore(e.item, parent.childNodes[e.oldIndex]);
+            parent.insertBefore(
+              e.item,
+              parent.childNodes[
+                e.oldIndex > e.newIndex ? e.oldIndex + 1 : e.oldIndex
+              ]
+            );
           } else {
             parent.appendChild(e.item);
           }
@@ -1383,7 +1582,8 @@ export default class Table extends React.Component<TableProps, object> {
   }
 
   getPopOverContainer() {
-    return findDOMNode(this);
+    const {popOverContainer} = this.props;
+    return popOverContainer ? popOverContainer() : this.dom.current;
   }
 
   handleMouseMove(e: React.MouseEvent<any>) {
@@ -1397,14 +1597,14 @@ export default class Table extends React.Component<TableProps, object> {
 
     const {store, affixColumns, itemActions} = this.props;
 
-    if (
-      (affixColumns === false ||
-        (store.leftFixedColumns.length === 0 &&
-          store.rightFixedColumns.length === 0)) &&
-      (!itemActions || !itemActions.filter(item => !item.hiddenOnHover).length)
-    ) {
-      return;
-    }
+    // if (
+    //   (affixColumns === false ||
+    //     (store.leftFixedColumns.length === 0 &&
+    //       store.rightFixedColumns.length === 0)) &&
+    //   (!itemActions || !itemActions.filter(item => !item.hiddenOnHover).length)
+    // ) {
+    //   return;
+    // }
 
     const id = tr.getAttribute('data-id') as string;
     const row = store.hoverRow;
@@ -1432,9 +1632,10 @@ export default class Table extends React.Component<TableProps, object> {
     const target = e.currentTarget;
     const tr = (this.draggingTr = target.closest('tr')!);
     const id = tr.getAttribute('data-id')!;
-    const tbody = tr.parentNode!;
+    const tbody = tr.parentNode as HTMLTableElement;
     this.originIndex = Array.prototype.indexOf.call(tbody.childNodes, tr);
 
+    tbody.classList.add('is-dragging');
     tr.classList.add('is-dragging');
 
     e.dataTransfer.effectAllowed = 'move';
@@ -1456,7 +1657,7 @@ export default class Table extends React.Component<TableProps, object> {
 
     this.draggingSibling = siblings.map(item => {
       let tr: HTMLTableRowElement = tbody.querySelector(
-        `tr[data-id="${item.id}"]`
+        `:scope>tr[data-id="${item.id}"]`
       ) as HTMLTableRowElement;
 
       tr.classList.add('is-drop-allowed');
@@ -1478,18 +1679,22 @@ export default class Table extends React.Component<TableProps, object> {
     if (
       !overTr ||
       !~overTr.className.indexOf('is-drop-allowed') ||
-      overTr === this.draggingTr
+      overTr === this.draggingTr ||
+      animation.animating
     ) {
       return;
     }
 
     const tbody = overTr.parentElement!;
-    const dRect = this.draggingTr.getBoundingClientRect();
     const tRect = overTr.getBoundingClientRect();
-    let ratio = dRect.top < tRect.top ? 0.1 : 0.9;
 
-    const next = (e.clientY - tRect.top) / (tRect.bottom - tRect.top) > ratio;
-    tbody.insertBefore(this.draggingTr, (next && overTr.nextSibling) || overTr);
+    const next = (e.clientY - tRect.top) / (tRect.bottom - tRect.top) > 0.5;
+    animation.capture(tbody);
+    const before = next ? overTr.nextSibling : overTr;
+    before
+      ? tbody.insertBefore(this.draggingTr, before)
+      : tbody.appendChild(this.draggingTr);
+    animation.animateAll();
   }
 
   @autobind
@@ -1519,6 +1724,7 @@ export default class Table extends React.Component<TableProps, object> {
     );
 
     tr.classList.remove('is-dragging');
+    tbody.classList.remove('is-dragging');
     tr.removeEventListener('dragend', this.handleDragEnd);
     tbody.removeEventListener('dragover', this.handleDragOver);
     tbody.removeEventListener('drop', this.handleDrop);
@@ -1528,11 +1734,17 @@ export default class Table extends React.Component<TableProps, object> {
   }
 
   @autobind
-  handleImageEnlarge(info: any, target: {rowIndex: number; colIndex: number}) {
+  handleImageEnlarge(
+    info: any,
+    target: {rowIndex: number; colIndex: number; type: string}
+  ) {
     const onImageEnlarge = this.props.onImageEnlarge;
 
     // 如果已经是多张了，直接跳过
-    if (Array.isArray(info.list)) {
+    if (
+      (Array.isArray(info.list) && info.enlargeWithGallary !== true) ||
+      info.enlargeWithGallary === false
+    ) {
       return onImageEnlarge && onImageEnlarge(info, target);
     }
 
@@ -1541,7 +1753,8 @@ export default class Table extends React.Component<TableProps, object> {
     const column = store.columns[target.colIndex].pristine;
 
     let index = target.rowIndex;
-    const list: Array<any> = [];
+    let list: Array<any> = [];
+
     store.rows.forEach((row, i) => {
       const src = resolveVariable(column.name, row.data);
 
@@ -1552,22 +1765,25 @@ export default class Table extends React.Component<TableProps, object> {
         return;
       }
 
-      list.push({
-        src,
-        originalSrc: column.originalSrc
-          ? filter(column.originalSrc, row.data)
-          : src,
-        title: column.enlargeTitle
-          ? filter(column.enlargeTitle, row.data)
-          : column.title
-          ? filter(column.title, row.data)
-          : undefined,
-        caption: column.enlargeCaption
-          ? filter(column.enlargeCaption, row.data)
-          : column.caption
-          ? filter(column.caption, row.data)
-          : undefined
-      });
+      const images = Array.isArray(src) ? src : [src];
+      list = list.concat(
+        images.map(item => ({
+          src: item,
+          originalSrc: column.originalSrc
+            ? filter(column.originalSrc, row.data)
+            : item,
+          title: column.enlargeTitle
+            ? filter(column.enlargeTitle, row.data)
+            : column.title
+            ? filter(column.title, row.data)
+            : undefined,
+          caption: column.enlargeCaption
+            ? filter(column.enlargeCaption, row.data)
+            : column.caption
+            ? filter(column.caption, row.data)
+            : undefined
+        }))
+      );
     });
 
     if (list.length > 1) {
@@ -1586,11 +1802,9 @@ export default class Table extends React.Component<TableProps, object> {
   }
 
   // 以下变量都是用于列宽度调整拖拽
-  resizeLine: HTMLElement;
-  resizeLineLeft: number;
-  targetTh: HTMLElement;
-  targetThWidth: number;
+  resizeLine?: HTMLElement;
   lineStartX: number;
+  lineStartWidth: number;
 
   // 开始列宽度调整
   @autobind
@@ -1598,28 +1812,36 @@ export default class Table extends React.Component<TableProps, object> {
     this.lineStartX = e.clientX;
     const currentTarget = e.currentTarget;
     this.resizeLine = currentTarget;
-    this.resizeLineLeft = parseInt(
-      getComputedStyle(this.resizeLine).getPropertyValue('left'),
-      10
-    );
-    this.targetTh = this.resizeLine.parentElement! as HTMLElement;
-    this.targetThWidth = this.targetTh.getBoundingClientRect().width;
+    const store = this.props.store;
+    const index = parseInt(this.resizeLine!.getAttribute('data-index')!, 10);
+    const column = store.columns[index];
+    this.lineStartWidth = column.realWidth || column.width;
+    this.resizeLine!.classList.add('is-resizing');
+
     document.addEventListener('mousemove', this.handleColResizeMouseMove);
     document.addEventListener('mouseup', this.handleColResizeMouseUp);
+
+    // 防止选中文本
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   // 垂直线拖拽移动
   @autobind
   handleColResizeMouseMove(e: MouseEvent) {
     const moveX = e.clientX - this.lineStartX;
-    // 光标right为-4px，列宽改变时会自动跟随，不需要单独处理位置
-    // this.resizeLine.style.left = this.resizeLineLeft + moveX + 'px';
-    this.targetTh.style.width = this.targetThWidth + moveX + 'px';
+    const store = this.props.store;
+    const index = parseInt(this.resizeLine!.getAttribute('data-index')!, 10);
+    const column = store.columns[index];
+
+    column.setWidth(Math.max(this.lineStartWidth + moveX, 30, column.minWidth));
   }
 
   // 垂直线拖拽结束
   @autobind
   handleColResizeMouseUp(e: MouseEvent) {
+    this.resizeLine!.classList.remove('is-resizing');
+    delete this.resizeLine;
     document.removeEventListener('mousemove', this.handleColResizeMouseMove);
     document.removeEventListener('mouseup', this.handleColResizeMouseUp);
   }
@@ -1628,6 +1850,7 @@ export default class Table extends React.Component<TableProps, object> {
     const {store} = this.props;
 
     store.updateColumns(columns);
+    store.persistSaveToggledColumns();
   }
 
   renderAutoFilterForm(): React.ReactNode {
@@ -1638,138 +1861,34 @@ export default class Table extends React.Component<TableProps, object> {
       onSearchableFromSubmit,
       onSearchableFromInit,
       classnames: cx,
-      translate: __
+      translate: __,
+      query,
+      data,
+      autoGenerateFilter,
+      testIdBuilder,
+      filterCanAccessSuperData = true
     } = this.props;
-    const searchableColumns = store.searchableColumns;
-    const activedSearchableColumns = store.activedSearchableColumns;
 
+    const searchableColumns = store.searchableColumns;
     if (!searchableColumns.length) {
       return null;
     }
-
-    const body: Array<any> = [];
-
-    padArr(activedSearchableColumns, 3, true).forEach(group => {
-      const children: Array<any> = [];
-
-      group.forEach(column => {
-        children.push(
-          column
-            ? {
-                ...(column.searchable === true
-                  ? {
-                      type: 'input-text',
-                      name: column.name,
-                      label: column.label
-                    }
-                  : {
-                      type: 'input-text',
-                      name: column.name,
-                      ...column.searchable
-                    }),
-                name: column.searchable?.name ?? column.name,
-                label: column.searchable?.label ?? column.label
-              }
-            : {
-                type: 'tpl',
-                tpl: ''
-              }
-        );
-      });
-
-      body.push({
-        type: 'group',
-        body: children
-      });
-    });
-
-    let showExpander = body.length > 1;
-
-    // todo 以后做动画
-    if (!store.searchFormExpanded) {
-      body.splice(1, body.length - 1);
-    }
-
-    return render(
-      'searchable-form',
-      {
-        type: 'form',
-        api: null,
-        title: '',
-        mode: 'horizontal',
-        submitText: __('search'),
-        body: body,
-        actions: [
-          {
-            type: 'dropdown-button',
-            label: __('Table.searchFields'),
-            className: cx('Table-searchableForm-dropdown', 'mr-2'),
-            level: 'link',
-            trigger: 'click',
-            size: 'sm',
-            align: 'right',
-            buttons: searchableColumns.map(column => {
-              return {
-                type: 'checkbox',
-                className: cx('Table-searchableForm-checkbox'),
-                inputClassName: cx('Table-searchableForm-checkbox-inner'),
-                name: `__search_${column.searchable?.name ?? column.name}`,
-                option: column.searchable?.label ?? column.label,
-                value: column.enableSearch,
-                badge: {
-                  offset: [-10, 5],
-                  visibleOn: `${
-                    column.toggable && !column.toggled && column.enableSearch
-                  }`
-                },
-                onChange: (value: boolean) => {
-                  column.setEnableSearch(value);
-                  store.setSearchFormExpanded(true);
-                }
-              };
-            })
-          },
-          {
-            type: 'submit',
-            label: __('search'),
-            level: 'primary',
-            className: 'w-18'
-          },
-          {
-            type: 'reset',
-            label: __('reset'),
-            className: 'w-18'
-          },
-
-          showExpander
-            ? {
-                children: () => (
-                  <a
-                    className={cx(
-                      'Table-SFToggler',
-                      store.searchFormExpanded ? 'is-expanded' : ''
-                    )}
-                    onClick={store.toggleSearchFormExpanded}
-                  >
-                    {__(store.searchFormExpanded ? 'collapse' : 'expand')}
-                    <span className={cx('Table-SFToggler-arrow')}>
-                      <Icon icon="right-arrow-bold" className="icon" />
-                    </span>
-                  </a>
-                )
-              }
-            : null
-        ].filter(item => item)
-      },
-      {
-        key: 'searchable-form',
-        panelClassName: cx('Table-searchableForm'),
-        actionsClassName: cx('Table-searchableForm-footer'),
-        onReset: onSearchableFromReset,
-        onSubmit: onSearchableFromSubmit,
-        onInit: onSearchableFromInit,
-        formStore: undefined
-      }
+    return (
+      <AutoFilterForm
+        store={store}
+        query={query}
+        data={data}
+        translate={__}
+        classnames={cx}
+        render={render}
+        canAccessSuperData={filterCanAccessSuperData}
+        autoGenerateFilter={autoGenerateFilter}
+        onSearchableFromReset={onSearchableFromReset}
+        onSearchableFromSubmit={onSearchableFromSubmit}
+        onSearchableFromInit={onSearchableFromInit}
+        popOverContainer={this.getPopOverContainer}
+        testIdBuilder={testIdBuilder?.getChild('filter')}
+      />
     );
   }
 
@@ -1783,20 +1902,42 @@ export default class Table extends React.Component<TableProps, object> {
       saveImmediately,
       headingClassName,
       quickSaveApi,
-      translate: __
+      translate: __,
+      columns
     } = this.props;
+
+    // 当被修改列的 column 开启 quickEdit.saveImmediately 时，不展示提交、放弃按钮
+    let isModifiedColumnSaveImmediately = false;
+    if (store.modifiedRows.length === 1) {
+      const saveImmediatelyColumnNames: string[] =
+        columns
+          ?.map(column =>
+            column?.quickEdit?.saveImmediately ? column?.name : ''
+          )
+          .filter(a => a) || [];
+
+      const item = store.modifiedRows[0];
+      const diff = difference(item.data, item.pristine);
+      if (intersection(saveImmediatelyColumnNames, Object.keys(diff)).length) {
+        isModifiedColumnSaveImmediately = true;
+      }
+    }
 
     if (
       title ||
       (quickSaveApi &&
         !saveImmediately &&
+        !isModifiedColumnSaveImmediately &&
         store.modified &&
         !hideQuickSaveBtn) ||
       store.moved
     ) {
       return (
         <div className={cx('Table-heading', headingClassName)} key="heading">
-          {!saveImmediately && store.modified && !hideQuickSaveBtn ? (
+          {!saveImmediately &&
+          store.modified &&
+          !hideQuickSaveBtn &&
+          !isModifiedColumnSaveImmediately ? (
             <span>
               {__('Table.modified', {
                 modified: store.modified
@@ -1857,38 +1998,80 @@ export default class Table extends React.Component<TableProps, object> {
       store,
       query,
       onQuery,
-      multiple,
-      env,
       render,
       classPrefix: ns,
       resizable,
       classnames: cx,
       autoGenerateFilter,
       dispatchEvent,
-      data
+      data,
+      testIdBuilder,
+      translate: __
     } = this.props;
+
+    // 注意，这里用关了哪些 store 里面的东西，TableContent 里面得也用一下
+    // 因为 renderHeadCell 是 TableContent 回调的，tableContent 不重新渲染，这里面也不会重新渲染
+
+    const tIdCell = testIdBuilder?.getChild(`head-cell-${column.name}`);
+    const style = {...props.style};
+    const [stickyStyle, stickyClassName] = store.getStickyStyles(
+      column,
+      store.filteredColumns
+    );
+    Object.assign(style, stickyStyle);
+
+    const resizeLine = (
+      <div
+        className={cx('Table-content-colDragLine')}
+        key={`resize-${column.id}`}
+        data-index={column.index}
+        onMouseDown={this.handleColResizeMouseDown}
+      />
+    );
+
+    // th 里面不应该设置
+    if (style?.width) {
+      delete style.width;
+    }
+
+    if (column.pristine.headerAlign) {
+      style.textAlign = column.pristine.headerAlign;
+    } else if (column.pristine.align) {
+      style.textAlign = column.pristine.align;
+    }
+
+    const {key, ...restProps} = props;
+    const columnClassName = filterClassNameObject(
+      column.pristine.className,
+      data
+    );
+    const thClassName = cx(columnClassName, stickyClassName);
 
     if (column.type === '__checkme') {
       return (
-        <th {...props} className={cx(column.pristine.className)}>
-          {store.rows.length && multiple ? (
+        <th {...restProps} key={key} style={style} className={thClassName}>
+          {store.rows.length && store.multiple ? (
             <Checkbox
               classPrefix={ns}
               partial={store.someChecked && !store.allChecked}
               checked={store.someChecked}
-              disabled={store.isSelectionThresholdReached}
+              disabled={store.isSelectionThresholdReached && !store.someChecked}
               onChange={this.handleCheckAll}
             />
           ) : (
             '\u00A0'
           )}
+
+          {resizable === false ? null : resizeLine}
         </th>
       );
     } else if (column.type === '__dragme') {
-      return <th {...props} className={cx(column.pristine.className)} />;
+      return (
+        <th {...restProps} key={key} style={style} className={thClassName} />
+      );
     } else if (column.type === '__expandme') {
       return (
-        <th {...props} className={cx(column.pristine.className)}>
+        <th {...restProps} key={key} style={style} className={thClassName}>
           {(store.footable &&
             (store.footable.expandAll === false || store.footable.accordion)) ||
           (store.expandConfig &&
@@ -1906,25 +2089,57 @@ export default class Table extends React.Component<TableProps, object> {
               <Icon icon="right-arrow-bold" className="icon" />
             </a>
           )}
+
+          {resizable === false ? null : resizeLine}
+        </th>
+      );
+    } else if (column.type === '__index') {
+      return (
+        <th {...restProps} key={key} style={style} className={thClassName}>
+          {__('Table.index')}
+
+          {resizable === false ? null : resizeLine}
         </th>
       );
     }
 
-    let affix = [];
+    const prefix: Array<JSX.Element> = [];
+    const affix: Array<JSX.Element> = [];
+
+    if (column.isPrimary && store.isNested) {
+      (store.footable &&
+        (store.footable.expandAll === false || store.footable.accordion)) ||
+        (store.expandConfig &&
+          (store.expandConfig.expandAll === false ||
+            store.expandConfig.accordion)) ||
+        prefix.push(
+          <a
+            key="expandBtn"
+            className={cx(
+              'Table-expandBtn2',
+              store.allExpanded ? 'is-active' : ''
+            )}
+            // data-tooltip="展开/收起全部"
+            // data-position="top"
+            onClick={store.toggleExpandAll}
+          >
+            <Icon icon="right-arrow-bold" className="icon" />
+          </a>
+        );
+    }
 
     if (column.searchable && column.name && !autoGenerateFilter) {
       affix.push(
         <HeadCellSearchDropDown
+          {...restProps}
           key="table-head-search"
           {...this.props}
           onQuery={onQuery}
           name={column.name}
           searchable={column.searchable}
-          sortable={false}
           type={column.type}
           data={query}
-          orderBy={store.orderBy}
-          orderDir={store.orderDir}
+          testIdBuilder={tIdCell?.getChild('search')}
           popOverContainer={this.getPopOverContainer}
         />
       );
@@ -1932,6 +2147,7 @@ export default class Table extends React.Component<TableProps, object> {
     if (column.sortable && column.name) {
       affix.push(
         <span
+          {...restProps}
           key="table-head-sort"
           className={cx('TableCell-sortBtn')}
           onClick={async () => {
@@ -1947,7 +2163,7 @@ export default class Table extends React.Component<TableProps, object> {
               orderBy = column.name as string;
             }
 
-            const order = orderDir ? 'desc' : 'asc';
+            const order = orderBy ? (orderDir ? 'desc' : 'asc') : '';
             const rendererEvent = await dispatchEvent(
               'columnSort',
               createObject(data, {
@@ -1960,13 +2176,15 @@ export default class Table extends React.Component<TableProps, object> {
               return;
             }
 
-            store.setOrderByInfo(orderBy, order);
-
-            onQuery &&
+            if (
+              !onQuery ||
               onQuery({
-                orderBy: store.orderBy,
-                orderDir: store.orderDir
-              });
+                orderBy,
+                orderDir: order
+              }) === false
+            ) {
+              store.changeOrder(orderBy, order);
+            }
           }}
         >
           <i
@@ -2000,7 +2218,7 @@ export default class Table extends React.Component<TableProps, object> {
         </span>
       );
     }
-    if (!column.searchable && column.filterable && column.name) {
+    if (!column.searchable && column.filterable && column.name && onQuery) {
       affix.push(
         <HeadCellFilterDropDown
           key="table-head-filter"
@@ -2009,58 +2227,46 @@ export default class Table extends React.Component<TableProps, object> {
           name={column.name}
           type={column.type}
           data={query}
+          superData={createObject(data, query)}
           filterable={column.filterable}
           popOverContainer={this.getPopOverContainer}
+          testIdBuilder={tIdCell?.getChild('filter')}
         />
       );
     }
 
-    if (column.pristine.width) {
-      props.style = props.style || {};
-      props.style.width = column.pristine.width;
-    }
-
-    if (column.pristine.align) {
-      props.style = props.style || {};
-      props.style.textAlign = column.pristine.align;
-    }
-
-    const resizeLine = (
-      <div
-        className={cx('Table-content-colDragLine')}
-        key={`resize-${column.index}`}
-        onMouseDown={this.handleColResizeMouseDown}
-      ></div>
-    );
-
     return (
       <th
-        {...props}
-        className={cx(props ? (props as any).className : '', {
+        {...restProps}
+        key={key}
+        style={style}
+        className={cx(props ? (props as any).className : '', stickyClassName, {
           'TableCell--sortable': column.sortable,
           'TableCell--searchable': column.searchable,
           'TableCell--filterable': column.filterable,
           'Table-operationCell': column.type === 'operation'
         })}
+        {...tIdCell?.getTestId()}
       >
+        {prefix}
         <div
+          key="content"
           className={cx(
-            `${ns}TableCell--title`,
-            column.pristine.className,
+            `TableCell--title`,
+            columnClassName,
             column.pristine.labelClassName
           )}
           style={props.style}
         >
-          {column.label ? render('tpl', column.label) : null}
+          {props.label ?? column.label
+            ? render('tpl', props.label ?? column.label)
+            : null}
 
           {column.remark
             ? render('remark', {
                 type: 'remark',
                 tooltip: column.remark,
-                container:
-                  env && env.getModalContainer
-                    ? env.getModalContainer
-                    : undefined
+                container: this.getPopOverContainer
               })
             : null}
         </div>
@@ -2081,134 +2287,63 @@ export default class Table extends React.Component<TableProps, object> {
     const {
       render,
       store,
-      multiple,
       classPrefix: ns,
       classnames: cx,
-      checkOnItemClick,
-      popOverContainer,
       canAccessSuperData,
-      itemBadge
+      itemBadge,
+      translate,
+      testIdBuilder,
+      filterItemIndex,
+      offset
     } = this.props;
 
-    if (column.name && item.rowSpans[column.name] === 0) {
-      return null;
-    }
+    // 如果列数大于20，并且列不是固定列，则使用按需渲染模式
+    const Comp =
+      store.filteredColumns.length > 20 && !column.fixed ? VCell : Cell;
 
-    if (column.type === '__checkme') {
-      return (
-        <td key={props.key} className={cx(column.pristine.className)}>
-          <Checkbox
-            classPrefix={ns}
-            type={multiple ? 'checkbox' : 'radio'}
-            checked={item.checked}
-            disabled={item.checkdisable || !item.checkable}
-            onChange={
-              checkOnItemClick ? noop : this.handleCheck.bind(this, item)
-            }
-          />
-        </td>
-      );
-    } else if (column.type === '__dragme') {
-      return (
-        <td
-          key={props.key}
-          className={cx(column.pristine.className, {
-            'is-dragDisabled': !item.draggable
-          })}
-        >
-          {item.draggable ? <Icon icon="drag" className="icon" /> : null}
-        </td>
-      );
-    } else if (column.type === '__expandme') {
-      return (
-        <td key={props.key} className={cx(column.pristine.className)}>
-          {item.depth > 2
-            ? Array.from({length: item.depth - 2}).map((_, index) => (
-                <i key={index} className={cx('Table-divider-' + (index + 1))} />
-              ))
-            : null}
-
-          {item.expandable ? (
-            <a
-              className={cx(
-                'Table-expandBtn',
-                item.expanded ? 'is-active' : ''
-              )}
-              // data-tooltip="展开/收起"
-              // data-position="top"
-              onClick={item.toggleExpanded}
-            >
-              <Icon icon="right-arrow-bold" className="icon" />
-            </a>
-          ) : null}
-        </td>
-      );
-    }
-
-    let prefix: React.ReactNode = null;
-
-    if (
-      !ignoreDrag &&
-      column.isPrimary &&
-      store.isNested &&
-      store.draggable &&
-      item.draggable
-    ) {
-      prefix = (
-        <a
-          draggable
-          onDragStart={this.handleDragStart}
-          className={cx('Table-dragBtn')}
-        >
-          <Icon icon="drag" className="icon" />
-        </a>
-      );
-    }
-
-    const subProps: any = {
-      ...props,
-      // 操作列不下发loading，否则会导致操作栏里面的所有按钮都出现loading
-      loading: column.type === 'operation' ? false : props.loading,
-      btnDisabled: store.dragging,
-      data: item.locals,
-      value: column.name
-        ? resolveVariable(
-            column.name,
-            canAccessSuperData ? item.locals : item.data
-          )
-        : column.value,
-      popOverContainer: popOverContainer || this.getPopOverContainer,
-      rowSpan: item.rowSpans[column.name as string],
-      quickEditFormRef: this.subFormRef,
-      prefix,
-      onImageEnlarge: this.handleImageEnlarge,
-      canAccessSuperData,
-      row: item,
-      itemBadge,
-      showBadge:
-        !props.isHead &&
-        itemBadge &&
-        store.firstToggledColumnIndex === props.colIndex
-    };
-    delete subProps.label;
-
-    return render(
-      region,
-      {
-        ...column.pristine,
-        column: column.pristine,
-        type: 'cell'
-      },
-      subProps
+    return (
+      <Comp
+        key={props.key}
+        region={region}
+        column={column}
+        item={item}
+        props={props}
+        ignoreDrag={ignoreDrag}
+        render={render}
+        filterItemIndex={filterItemIndex}
+        store={store}
+        multiple={store.multiple}
+        canAccessSuperData={canAccessSuperData}
+        classnames={cx}
+        classPrefix={ns}
+        itemBadge={itemBadge}
+        onCheck={this.handleCheck}
+        onDragStart={this.handleDragStart}
+        popOverContainer={this.getPopOverContainer}
+        quickEditFormRef={this.subFormRef}
+        onImageEnlarge={this.handleImageEnlarge}
+        translate={translate}
+        testIdBuilder={testIdBuilder?.getChild(
+          `cell-${props.rowPath}-${column.index}`
+        )}
+        offset={offset}
+      />
     );
   }
 
   renderAffixHeader(tableClassName: string) {
-    const {store, affixHeader, render, classnames: cx} = this.props;
+    const {
+      store,
+      affixHeader,
+      render,
+      classnames: cx,
+      autoFillHeight,
+      env
+    } = this.props;
     const hideHeader = store.filteredColumns.every(column => !column.label);
     const columnsGroup = store.columnGroup;
 
-    return affixHeader ? (
+    return affixHeader && !autoFillHeight ? (
       <>
         <div
           className={cx('Table-fixedTop', {
@@ -2217,181 +2352,88 @@ export default class Table extends React.Component<TableProps, object> {
         >
           {this.renderHeader(false)}
           {this.renderHeading()}
-          <div className={cx('Table-fixedLeft')}>
-            {store.leftFixedColumns.length
-              ? this.renderFixedColumns(
-                  store.rows,
-                  store.leftFixedColumns,
-                  true,
-                  tableClassName
-                )
-              : null}
-          </div>
-          <div className={cx('Table-fixedRight')}>
-            {store.rightFixedColumns.length
-              ? this.renderFixedColumns(
-                  store.rows,
-                  store.rightFixedColumns,
-                  true,
-                  tableClassName
-                )
-              : null}
-          </div>
-          <div className={cx('Table-wrapper')}>
-            <table ref={this.affixedTableRef} className={tableClassName}>
-              <colgroup>
-                {store.filteredColumns.map(column => (
-                  <col key={column.index} data-index={column.index} />
-                ))}
-              </colgroup>
-              <thead>
-                {columnsGroup.length ? (
+          {store.columnWidthReady ? (
+            <div className={cx('Table-wrapper')}>
+              <table
+                ref={this.affixedTableRef}
+                className={cx(
+                  tableClassName,
+                  store.tableLayout === 'fixed' ? 'is-layout-fixed' : ''
+                )}
+              >
+                <colgroup>
+                  {store.filteredColumns.map(column => {
+                    const style: any = {
+                      width: `var(--Table-column-${column.index}-width)`
+                    };
+
+                    if (store.tableLayout === 'auto') {
+                      style.minWidth = style.width;
+                    }
+
+                    return (
+                      <col
+                        data-index={column.index}
+                        style={style}
+                        key={column.id}
+                      />
+                    );
+                  })}
+                </colgroup>
+                <thead>
+                  {columnsGroup.length ? (
+                    <tr>
+                      {columnsGroup.map((item, index) => {
+                        const [stickyStyle, stickyClassName] =
+                          store.getStickyStyles(
+                            item as any,
+                            columnsGroup as any
+                          );
+
+                        return item.rowSpan === 1 ? ( // 如果是分组自己，则用 th 渲染
+                          <th
+                            key={index}
+                            data-index={item.index}
+                            colSpan={item.colSpan}
+                            rowSpan={item.rowSpan}
+                            style={stickyStyle}
+                            className={stickyClassName}
+                          >
+                            {item.label ? render('tpl', item.label) : null}
+                          </th>
+                        ) : (
+                          // 否则走 renderCell 因为不走的话，排序按钮不会渲染
+                          this.renderHeadCell(item.has[0], {
+                            'label': item.label,
+                            'key': index,
+                            'data-index': item.index,
+                            'colSpan': item.colSpan,
+                            'rowSpan': item.rowSpan,
+                            'style': stickyStyle,
+                            'className': stickyClassName
+                          })
+                        );
+                      })}
+                    </tr>
+                  ) : null}
                   <tr>
-                    {columnsGroup.map((item, index) => (
-                      <th
-                        key={index}
-                        data-index={item.index}
-                        colSpan={item.colSpan}
-                        rowSpan={item.rowSpan}
-                      >
-                        {item.label ? render('tpl', item.label) : null}
-                      </th>
-                    ))}
+                    {store.filteredColumns.map(column =>
+                      columnsGroup.find(group => ~group.has.indexOf(column))
+                        ?.rowSpan === 2
+                        ? null
+                        : this.renderHeadCell(column, {
+                            'key': column.index,
+                            'data-index': column.index
+                          })
+                    )}
                   </tr>
-                ) : null}
-                <tr>
-                  {store.filteredColumns.map(column =>
-                    columnsGroup.find(group => ~group.has.indexOf(column))
-                      ?.rowSpan === 2
-                      ? null
-                      : this.renderHeadCell(column, {
-                          'key': column.index,
-                          'data-index': column.index
-                        })
-                  )}
-                </tr>
-              </thead>
-            </table>
-          </div>
+                </thead>
+              </table>
+            </div>
+          ) : null}
         </div>
-        <div className={cx('Table-fixedTop-shadow')}></div>
       </>
     ) : null;
-  }
-
-  renderFixedColumns(
-    rows: Array<any>,
-    columns: Array<IColumn>,
-    headerOnly: boolean = false,
-    tableClassName: string = ''
-  ) {
-    const {
-      placeholder,
-      store,
-      classnames: cx,
-      render,
-      data,
-      translate,
-      locale,
-      checkOnItemClick,
-      buildItemProps,
-      rowClassNameExpr,
-      rowClassName,
-      itemAction,
-      dispatchEvent,
-      onEvent
-    } = this.props;
-    const hideHeader = store.filteredColumns.every(column => !column.label);
-    const columnsGroup = store.columnGroup;
-
-    return (
-      <table
-        className={cx('Table-table', tableClassName, {
-          'Table-table--withCombine': store.combineNum > 0
-        })}
-      >
-        <thead>
-          {columnsGroup.length ? (
-            <tr>
-              {columnsGroup.map((item, index) => {
-                const renderColumns = columns.filter(a => ~item.has.indexOf(a));
-
-                return renderColumns.length ? (
-                  <th
-                    key={index}
-                    data-index={item.index}
-                    colSpan={renderColumns.length}
-                    rowSpan={item.rowSpan}
-                  >
-                    {item.label}
-                  </th>
-                ) : null;
-              })}
-            </tr>
-          ) : null}
-          <tr className={hideHeader ? 'fake-hide' : ''}>
-            {columns.map(column =>
-              columnsGroup.find(group => ~group.has.indexOf(column))
-                ?.rowSpan === 2
-                ? null
-                : this.renderHeadCell(column, {
-                    'key': column.index,
-                    'data-index': column.index
-                  })
-            )}
-          </tr>
-        </thead>
-
-        {headerOnly ? null : !rows.length ? (
-          <tbody>
-            <tr className={cx('Table-placeholder')}>
-              <td colSpan={columns.length}>
-                {render(
-                  'placeholder',
-                  translate(placeholder || 'placeholder.noData')
-                )}
-              </td>
-            </tr>
-          </tbody>
-        ) : (
-          <TableBody
-            tableClassName={cx(tableClassName, {
-              'Table-table--withCombine': store.combineNum > 0
-            })}
-            itemAction={itemAction}
-            classnames={cx}
-            render={render}
-            renderCell={this.renderCell}
-            onCheck={this.handleCheck}
-            onQuickChange={store.dragging ? undefined : this.handleQuickChange}
-            footable={store.footable}
-            ignoreFootableContent
-            footableColumns={store.footableColumns}
-            checkOnItemClick={checkOnItemClick}
-            buildItemProps={buildItemProps}
-            onAction={this.handleAction}
-            rowClassNameExpr={rowClassNameExpr}
-            rowClassName={rowClassName}
-            columns={columns}
-            rows={rows}
-            locale={locale}
-            translate={translate}
-            rowsProps={{
-              regionPrefix: 'fixed/',
-              renderCell: (
-                region: string,
-                column: IColumn,
-                item: IRow,
-                props: any
-              ) => this.renderCell(region, column, item, props, true),
-              data,
-              dispatchEvent,
-              onEvent
-            }}
-          />
-        )}
-      </table>
-    );
   }
 
   renderToolbar(toolbar: SchemaNode) {
@@ -2406,6 +2448,9 @@ export default class Table extends React.Component<TableProps, object> {
     } else if (type === 'export-excel') {
       this.renderedToolbars.push(type);
       return this.renderExportExcel(toolbar);
+    } else if (type === 'export-excel-template') {
+      this.renderedToolbars.push(type);
+      return this.renderExportExcelTemplate(toolbar);
     }
 
     return void 0;
@@ -2417,6 +2462,7 @@ export default class Table extends React.Component<TableProps, object> {
       store,
       classPrefix: ns,
       classnames: cx,
+      affixRow,
       ...rest
     } = this.props;
     const __ = rest.translate;
@@ -2431,10 +2477,11 @@ export default class Table extends React.Component<TableProps, object> {
       <ColumnToggler
         {...rest}
         {...(isObject(config) ? config : {})}
-        tooltip={config?.tooltip || __('Table.columnsVisibility')}
-        tooltipContainer={
-          env && env.getModalContainer ? env.getModalContainer : undefined
-        }
+        tooltip={{
+          content: config?.tooltip || __('Table.columnsVisibility'),
+          placement: 'bottom'
+        }}
+        tooltipContainer={rest.popOverContainer || env.getModalContainer}
         align={config?.align ?? 'left'}
         isActived={store.hasColumnHidden()}
         classnames={cx}
@@ -2488,50 +2535,60 @@ export default class Table extends React.Component<TableProps, object> {
                 )
               }
             >
-              {__('Checkboxes.selectAll')}
+              {__('Select.checkAll')}
             </Checkbox>
           </li>
         ) : null}
 
-        {store.toggableColumns.map(column => (
-          <li
-            className={cx('ColumnToggler-menuItem')}
-            key={column.index}
-            onClick={async () => {
-              const {data, dispatchEvent} = this.props;
-              let columns = store.activeToggaleColumns.map(
-                item => item.pristine
-              );
-              if (!column.toggled) {
-                columns.push(column.pristine);
-              } else {
-                columns = columns.filter(c => c.name !== column.pristine.name);
-              }
-              const rendererEvent = await dispatchEvent(
-                'columnToggled',
-                createObject(data, {
-                  columns
-                })
-              );
+        {!config?.draggable &&
+          store.toggableColumns.map(column => (
+            <li
+              className={cx('ColumnToggler-menuItem')}
+              key={column.index}
+              onClick={async () => {
+                const {data, dispatchEvent} = this.props;
+                let columns = store.activeToggaleColumns.map(
+                  item => item.pristine
+                );
+                if (!column.toggled) {
+                  columns.push(column.pristine);
+                } else {
+                  columns = columns.filter(
+                    c => c.name !== column.pristine.name
+                  );
+                }
+                const rendererEvent = await dispatchEvent(
+                  'columnToggled',
+                  createObject(data, {
+                    columns
+                  })
+                );
 
-              if (rendererEvent?.prevented) {
-                return;
-              }
+                if (rendererEvent?.prevented) {
+                  return;
+                }
 
-              column.toggleToggle();
-            }}
-          >
-            <Checkbox size="sm" classPrefix={ns} checked={column.toggled}>
-              {column.label ? render('tpl', column.label) : null}
-            </Checkbox>
-          </li>
-        ))}
+                column.toggleToggle();
+              }}
+            >
+              <Checkbox size="sm" classPrefix={ns} checked={column.toggled}>
+                {column.label ? render('tpl', column.label) : null}
+              </Checkbox>
+            </li>
+          ))}
       </ColumnToggler>
     );
   }
 
   renderDragToggler() {
-    const {store, env, draggable, classPrefix: ns, translate: __} = this.props;
+    const {
+      store,
+      env,
+      draggable,
+      classPrefix: ns,
+      translate: __,
+      popOverContainer
+    } = this.props;
 
     if (!draggable || store.isNested) {
       return null;
@@ -2542,10 +2599,8 @@ export default class Table extends React.Component<TableProps, object> {
         disabled={!!store.modified}
         classPrefix={ns}
         key="dragging-toggle"
-        tooltip={__('Table.startSort')}
-        tooltipContainer={
-          env && env.getModalContainer ? env.getModalContainer : undefined
-        }
+        tooltip={{content: __('Table.startSort'), placement: 'bottom'}}
+        tooltipContainer={popOverContainer || env.getModalContainer}
         size="sm"
         active={store.dragging}
         onClick={(e: React.MouseEvent<any>) => {
@@ -2561,16 +2616,7 @@ export default class Table extends React.Component<TableProps, object> {
   }
 
   renderExportExcel(toolbar: ExportExcelToolbar) {
-    const {
-      store,
-      env,
-      classPrefix: ns,
-      classnames: cx,
-      translate: __,
-      data,
-      render
-    } = this.props;
-
+    const {store, translate: __, render} = this.props;
     let columns = store.filteredColumns || [];
 
     if (!columns) {
@@ -2582,12 +2628,55 @@ export default class Table extends React.Component<TableProps, object> {
       {
         label: __('CRUD.exportExcel'),
         ...(toolbar as any),
+
+        type: 'button'
+      },
+      {
+        loading: store.exportExcelLoading,
+        onAction: () => {
+          store.update({exportExcelLoading: true});
+          import('exceljs').then(async (E: any) => {
+            const ExcelJS = E.default || E;
+            try {
+              await exportExcel(ExcelJS, this.props, toolbar);
+            } catch (error) {
+              console.error(error);
+            } finally {
+              store.update({exportExcelLoading: false});
+            }
+          });
+        }
+      }
+    );
+  }
+
+  /**
+   * 导出 Excel 模板
+   */
+  renderExportExcelTemplate(toolbar: ExportExcelToolbar) {
+    const {store, translate: __, render} = this.props;
+    let columns = store.filteredColumns || [];
+
+    if (!columns) {
+      return null;
+    }
+
+    return render(
+      'exportExcelTemplate',
+      {
+        label: __('CRUD.exportExcelTemplate'),
+        ...(toolbar as any),
         type: 'button'
       },
       {
         onAction: () => {
-          import('exceljs').then(async (ExcelJS: any) => {
-            exportExcel(ExcelJS, this.props, toolbar);
+          import('exceljs').then(async (E: any) => {
+            const ExcelJS = E.default || E;
+            try {
+              await exportExcel(ExcelJS, this.props, toolbar, true);
+            } catch (error) {
+              console.error(error);
+            }
           });
         }
       }
@@ -2670,9 +2759,7 @@ export default class Table extends React.Component<TableProps, object> {
       ? headerToolbarRender(
           {
             ...this.props,
-            selectedItems: store.selectedRows.map(item => item.data),
-            items: store.rows.map(item => item.data),
-            unSelectedItems: store.unSelectedRows.map(item => item.data),
+            ...store.eventContext,
             ...otherProps
           },
           this.renderToolbar
@@ -2725,7 +2812,8 @@ export default class Table extends React.Component<TableProps, object> {
       showFooter,
       store,
       data,
-      classnames: cx
+      classnames: cx,
+      affixFooter
     } = this.props;
 
     if (showFooter === false) {
@@ -2736,13 +2824,28 @@ export default class Table extends React.Component<TableProps, object> {
       ? footerToolbarRender(
           {
             ...this.props,
-            selectedItems: store.selectedRows.map(item => item.data),
-            items: store.rows.map(item => item.data)
+            ...store.eventContext
           },
           this.renderToolbar
         )
       : null;
     const actions = this.renderActions('footer');
+
+    const footerNode =
+      footer && (!Array.isArray(footer) || footer.length) ? (
+        <div
+          className={cx(
+            'Table-footer',
+            footerClassName,
+            affixFooter ? 'Table-footer--affix' : ''
+          )}
+          key="footer"
+        >
+          {render('footer', footer, {
+            data: store.getData(data)
+          })}
+        </div>
+      ) : null;
 
     const toolbarNode =
       actions || child ? (
@@ -2750,20 +2853,13 @@ export default class Table extends React.Component<TableProps, object> {
           className={cx(
             'Table-toolbar Table-footToolbar',
             toolbarClassName,
-            footerToolbarClassName
+            footerToolbarClassName,
+            !footerNode && affixFooter ? 'Table-footToolbar--affix' : ''
           )}
           key="footer-toolbar"
         >
           {actions}
           {child}
-        </div>
-      ) : null;
-    const footerNode =
-      footer && (!Array.isArray(footer) || footer.length) ? (
-        <div className={cx('Table-footer', footerClassName)} key="footer">
-          {render('footer', footer, {
-            data: store.getData(data)
-          })}
         </div>
       ) : null;
     return footerNode && toolbarNode
@@ -2793,10 +2889,13 @@ export default class Table extends React.Component<TableProps, object> {
       prefixRowClassNameExpr,
       prefixRowClassName,
       autoFillHeight,
+      affixHeader,
       itemActions,
       dispatchEvent,
       onEvent,
-      loading = false
+      loadingConfig,
+      testIdBuilder,
+      data
     } = this.props;
 
     // 理论上来说 store.rows 应该也行啊
@@ -2806,10 +2905,15 @@ export default class Table extends React.Component<TableProps, object> {
     return (
       <>
         <TableContent
+          testIdBuilder={testIdBuilder}
           tableClassName={cx(
             {
               'Table-table--checkOnItemClick': checkOnItemClick,
-              'Table-table--withCombine': store.combineNum > 0
+              'Table-table--withCombine': store.combineNum > 0,
+              'Table-table--affixHeader':
+                affixHeader && !autoFillHeight && store.columnWidthReady,
+              'Table-table--tableFillHeight':
+                autoFillHeight && !store.items.length
             },
             tableClassName
           )}
@@ -2820,15 +2924,24 @@ export default class Table extends React.Component<TableProps, object> {
           classnames={cx}
           columns={store.filteredColumns}
           columnsGroup={store.columnGroup}
-          rows={store.rows}
+          rows={store.items} // store.rows 是没有变更的，所以不会触发更新
           placeholder={placeholder}
           render={render}
-          onMouseMove={this.handleMouseMove}
+          onMouseMove={
+            // 如果没有 itemActions, 那么就不需要处理了。
+            Array.isArray(itemActions) && itemActions.length
+              ? this.handleMouseMove
+              : undefined
+          }
           onScroll={this.handleOutterScroll}
           tableRef={this.tableRef}
           renderHeadCell={this.renderHeadCell}
           renderCell={this.renderCell}
           onCheck={this.handleCheck}
+          onRowClick={this.handleRowClick}
+          onRowDbClick={this.handleRowDbClick}
+          onRowMouseEnter={this.handleRowMouseEnter}
+          onRowMouseLeave={this.handleRowMouseLeave}
           onQuickChange={store.dragging ? undefined : this.handleQuickChange}
           footable={store.footable}
           footableColumns={store.footableColumns}
@@ -2846,61 +2959,40 @@ export default class Table extends React.Component<TableProps, object> {
           translate={translate}
           dispatchEvent={dispatchEvent}
           onEvent={onEvent}
-          loading={loading}
-        />
+          loading={store.loading} // store 的同步较慢，所以统一用 store 来下发，否则会出现 props 和 store 变化触发子节点两次 re-rerender
+        >
+          {renderItemActions({
+            store,
+            classnames: cx,
+            render,
+            itemActions
+          })}
+        </TableContent>
 
-        <Spinner overlay show={loading} />
+        <Spinner loadingConfig={loadingConfig} overlay show={store.loading} />
       </>
     );
-  }
-
-  doAction(action: ActionObject, args: any, throwErrors: boolean): any {
-    const {store, valueField, data} = this.props;
-
-    const actionType = action?.actionType as string;
-
-    switch (actionType) {
-      case 'selectAll':
-        store.clear();
-        store.toggleAll();
-        break;
-      case 'clearAll':
-        store.clear();
-        break;
-      case 'select':
-        const dataSource = store.getData(data);
-        const selected: Array<any> = [];
-        dataSource.items.forEach((item: any, rowIndex: number) => {
-          const flag = evalExpression(args?.selected, {record: item, rowIndex});
-          if (flag) {
-            selected.push(item);
-          }
-        });
-        store.updateSelected(selected, valueField);
-        break;
-      case 'initDrag':
-        store.stopDragging();
-        store.toggleDragging();
-        break;
-      default:
-        this.handleAction(undefined, action, data);
-        break;
-    }
   }
 
   render() {
     const {
       className,
+      style,
       store,
       classnames: cx,
       affixColumns,
+      affixHeader,
       autoFillHeight,
-      autoGenerateFilter
+      autoGenerateFilter,
+      mobileUI,
+      testIdBuilder,
+      id
     } = this.props;
 
     this.renderedToolbars = []; // 用来记录哪些 toolbar 已经渲染了，已经渲染了就不重复渲染了。
-    const heading = this.renderHeading();
-    const header = this.renderHeader();
+    const heading =
+      affixHeader && !autoFillHeight ? null : this.renderHeading();
+    const header = affixHeader && !autoFillHeight ? null : this.renderHeader();
     const footer = this.renderFooter();
     const tableClassName = cx('Table-table', this.props.tableClassName, {
       'Table-table--withCombine': store.combineNum > 0
@@ -2908,56 +3000,216 @@ export default class Table extends React.Component<TableProps, object> {
 
     return (
       <div
-        className={cx('Table', className, {
+        ref={this.dom}
+        className={cx('Table', {'is-mobile': mobileUI}, className, {
           'Table--unsaved': !!store.modified || !!store.moved,
           'Table--autoFillHeight': autoFillHeight
         })}
+        style={store.buildStyles(style)}
+        data-id={id}
+        {...testIdBuilder?.getTestId()}
       >
         {autoGenerateFilter ? this.renderAutoFilterForm() : null}
+        {this.renderAffixHeader(tableClassName)}
         {header}
         {heading}
         <div
           className={cx('Table-contentWrap')}
           onMouseLeave={this.handleMouseLeave}
         >
-          <div
-            className={cx('Table-fixedLeft', {
-              'Table-fixedLeft--autoFillHeight': autoFillHeight
-            })}
-            onMouseMove={this.handleMouseMove}
-            onScroll={this.handleFixedColumnsScroll}
-          >
-            {affixColumns !== false && store.leftFixedColumns.length
-              ? this.renderFixedColumns(
-                  store.rows,
-                  store.leftFixedColumns,
-                  false,
-                  tableClassName
-                )
-              : null}
-          </div>
-          <div
-            className={cx('Table-fixedRight', {
-              'Table-fixedLeft--autoFillHeight': autoFillHeight
-            })}
-            onMouseMove={this.handleMouseMove}
-            onScroll={this.handleFixedColumnsScroll}
-          >
-            {affixColumns !== false && store.rightFixedColumns.length
-              ? this.renderFixedColumns(
-                  store.rows,
-                  store.rightFixedColumns,
-                  false,
-                  tableClassName
-                )
-              : null}
-          </div>
           {this.renderTableContent()}
         </div>
-        {this.renderAffixHeader(tableClassName)}
+
         {footer}
       </div>
     );
+  }
+}
+
+export class TableRendererBase<
+  T extends TableProps = TableProps
+> extends Table<T> {
+  receive(values: any, subPath?: string) {
+    const scoped = this.context as IScopedContext;
+
+    /**
+     * 因为Table在scope上注册，导致getComponentByName查询组件时会优先找到Table，和CRUD联动的动作都会失效
+     * 这里先做兼容处理，把动作交给上层的CRUD处理
+     */
+    if (this.props?.host) {
+      // CRUD会把自己透传给Table，这样可以保证找到CRUD
+      return this.props.host.receive?.(values, subPath);
+    }
+
+    if (subPath) {
+      return scoped.send(subPath, values);
+    }
+  }
+
+  /**
+   * 通过 index 或者 condition 获取需要处理的目标
+   *
+   * - index 支持数字
+   * - index 支持逗号分隔的数字列表
+   * - index 支持路径比如 0.1.2,0.1.3
+   * - index 支持表达式，比如 0.1.2,${index}
+   *
+   * - condition 上下文为当前行的数据
+   *
+   * @param ctx
+   * @param index
+   * @param condition
+   * @returns
+   */
+  async getEventTargets(
+    ctx: any,
+    index?: string | number,
+    condition?: string,
+    oldCondition?: string
+  ) {
+    const {store} = this.props;
+    return getMatchedEventTargets<IRow>(
+      store.rows,
+      ctx || this.props.data,
+      index,
+      condition,
+      oldCondition
+    );
+  }
+
+  async reload(
+    subPath?: string,
+    query?: any,
+    ctx?: any,
+    silent?: boolean,
+    replace?: boolean,
+    args?: any
+  ) {
+    if (args?.index || args?.condition) {
+      // 局部刷新
+      const targets = await this.getEventTargets(
+        ctx || this.props.data,
+        args.index,
+        args?.condition
+      );
+      await Promise.all(targets.map(target => this.loadDeferredRow(target)));
+      return;
+    }
+
+    const scoped = this.context as IScopedContext;
+
+    if (this.props?.host) {
+      // CRUD会把自己透传给Table，这样可以保证找到CRUD
+      return this.props.host.reload?.(subPath, query, ctx);
+    }
+
+    if (subPath) {
+      return scoped.reload(subPath, ctx);
+    }
+  }
+
+  async setData(
+    values: any,
+    replace?: boolean,
+    index?: number | string,
+    condition?: any
+  ) {
+    const {store} = this.props;
+
+    if (index !== undefined || condition !== undefined) {
+      const targets = await this.getEventTargets(
+        this.props.data,
+        index,
+        condition
+      );
+      targets.forEach(target => {
+        target.updateData(values);
+      });
+    } else if (this.props?.host) {
+      // 如果在 CRUD 里面，优先让 CRUD 去更新状态
+      return this.props.host.setData?.(values, replace, index, condition);
+    } else {
+      const data = {
+        ...values,
+        rows: values.rows ?? values.items // 做个兼容
+      };
+      return store.updateData(data, undefined, replace);
+    }
+  }
+
+  getData() {
+    const {store, data} = this.props;
+    return store.getData(data);
+  }
+
+  hasModifiedItems() {
+    return this.props.store.modified;
+  }
+
+  async doAction(
+    action: ActionObject,
+    ctx: any,
+    throwErrors: boolean,
+    args: any
+  ) {
+    const {store, valueField, data} = this.props;
+
+    const actionType = action?.actionType;
+    switch (actionType) {
+      case 'selectAll':
+        store.clear();
+        store.toggleAll();
+        this.syncSelected();
+        break;
+      case 'clearAll':
+        store.clear();
+        this.syncSelected();
+        break;
+      case 'select':
+        const rows = await this.getEventTargets(
+          ctx,
+          args.index,
+          args.condition,
+          args.selected
+        );
+        store.updateSelected(
+          rows.map(item => item.data),
+          valueField
+        );
+        this.syncSelected();
+        break;
+      case 'initDrag':
+        store.startDragging();
+        break;
+      case 'cancelDrag':
+        store.stopDragging();
+        break;
+      case 'submitQuickEdit':
+        this.handleSave();
+        break;
+      case 'toggleExpanded':
+        const targets = await this.getEventTargets(
+          ctx,
+          args.index,
+          args.condition
+        );
+        targets.forEach(target => {
+          store.toggleExpanded(target);
+        });
+        break;
+      case 'setExpanded':
+        const targets2 = await this.getEventTargets(
+          ctx,
+          args.index,
+          args.condition
+        );
+        targets2.forEach(target => {
+          store.setExpanded(target, !!args.value);
+        });
+        break;
+      default:
+        return this.handleAction(undefined, action, data);
+    }
   }
 }
 
@@ -2966,42 +3218,6 @@ export default class Table extends React.Component<TableProps, object> {
   storeType: TableStore.name,
   name: 'table'
 })
-export class TableRenderer extends Table {
-  receive(values: any, subPath?: string) {
-    const scoped = this.context as IScopedContext;
-    const parents = scoped?.parent?.getComponents();
-
-    /**
-     * 因为Table在scope上注册，导致getComponentByName查询组件时会优先找到Table，和CRUD联动的动作都会失效
-     * 这里先做兼容处理，把动作交给上层的CRUD处理
-     */
-    if (Array.isArray(parents) && parents.length) {
-      // CRUD的name会透传给Table，这样可以保证找到CRUD
-      const crud = parents.find(cmpt => cmpt?.props?.name === this.props?.name);
-
-      return crud?.receive?.(values, subPath);
-    }
-
-    if (subPath) {
-      return scoped.send(subPath, values);
-    }
-  }
-
-  reload(subPath?: string, query?: any, ctx?: any) {
-    const scoped = this.context as IScopedContext;
-    const parents = scoped?.parent?.getComponents();
-
-    if (Array.isArray(parents) && parents.length) {
-      // CRUD的name会透传给Table，这样可以保证找到CRUD
-      const crud = parents.find(cmpt => cmpt?.props?.name === this.props?.name);
-
-      return crud?.reload?.(subPath, query, ctx);
-    }
-
-    if (subPath) {
-      return scoped.reload(subPath, ctx);
-    }
-  }
-}
+export class TableRenderer extends TableRendererBase {}
 
 export {TableCell};

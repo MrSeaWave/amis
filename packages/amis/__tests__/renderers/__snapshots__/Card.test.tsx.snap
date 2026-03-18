@@ -13,6 +13,7 @@ exports[`Renderer:card 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Card className cxd-Card--link"
@@ -27,7 +28,7 @@ exports[`Renderer:card 1`] = `
                   class="cxd-Card-title"
                 >
                   <span
-                    class="cxd-TplField"
+                    class="cxd-TplField fr-view"
                   >
                     <span>
                       标题
@@ -40,7 +41,7 @@ exports[`Renderer:card 1`] = `
               class="cxd-Card-body bodyClassName"
             >
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   这里是内容
@@ -94,6 +95,7 @@ exports[`Renderer:cards color 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Cards"
@@ -105,7 +107,7 @@ exports[`Renderer:cards color 1`] = `
               class="cxd-Cards-body cxd-Grid"
             >
               <div
-                class="cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
+                class="cxd-Grid-col--xs12 cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
               >
                 <div
                   class="cxd-Card cxd-Card--link"
@@ -118,7 +120,7 @@ exports[`Renderer:cards color 1`] = `
                       style="background: rgb(180, 0, 158);"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           TR
@@ -154,7 +156,7 @@ exports[`Renderer:cards color 1`] = `
                 </div>
               </div>
               <div
-                class="cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
+                class="cxd-Grid-col--xs12 cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
               >
                 <div
                   class="cxd-Card cxd-Card--link"
@@ -167,7 +169,7 @@ exports[`Renderer:cards color 1`] = `
                       style="background: rgb(0, 180, 255);"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           CH
@@ -203,7 +205,7 @@ exports[`Renderer:cards color 1`] = `
                 </div>
               </div>
               <div
-                class="cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
+                class="cxd-Grid-col--xs12 cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
               >
                 <div
                   class="cxd-Card cxd-Card--link"
@@ -216,7 +218,7 @@ exports[`Renderer:cards color 1`] = `
                       style="background: rgb(181, 14, 14);"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           GE
@@ -252,7 +254,7 @@ exports[`Renderer:cards color 1`] = `
                 </div>
               </div>
               <div
-                class="cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
+                class="cxd-Grid-col--xs12 cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
               >
                 <div
                   class="cxd-Card cxd-Card--link"
@@ -265,7 +267,7 @@ exports[`Renderer:cards color 1`] = `
                       style="background: rgb(0, 120, 215);"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           PR
@@ -301,7 +303,7 @@ exports[`Renderer:cards color 1`] = `
                 </div>
               </div>
               <div
-                class="cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
+                class="cxd-Grid-col--xs12 cxd-Grid-col--sm6 cxd-Grid-col--md4 cxd-Grid-col--lg3"
               >
                 <div
                   class="cxd-Card cxd-Card--link"
@@ -314,7 +316,7 @@ exports[`Renderer:cards color 1`] = `
                       style="background: rgb(232, 17, 35);"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           WE
@@ -371,9 +373,10 @@ exports[`Renderer:cards hightlight 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
-            class="cxd-Card"
+            class="cxd-Card cxd-Card--link"
           >
             <div
               class="cxd-Card-multiMedia--left"
@@ -395,7 +398,7 @@ exports[`Renderer:cards hightlight 1`] = `
                       class="cxd-Card-title"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           标题
@@ -410,7 +413,7 @@ exports[`Renderer:cards hightlight 1`] = `
                       class="cxd-Card-highlight test-highlight-class"
                     />
                     <span
-                      class="cxd-TplField label label-warning"
+                      class="cxd-TplField fr-view label label-warning"
                     >
                       <span>
                         标签
@@ -422,7 +425,7 @@ exports[`Renderer:cards hightlight 1`] = `
                   class="cxd-Card-body"
                 >
                   <span
-                    class="cxd-TplField"
+                    class="cxd-TplField fr-view"
                   >
                     <span>
                       这里是内容
@@ -436,7 +439,7 @@ exports[`Renderer:cards hightlight 1`] = `
                     class="cxd-Card-secondary"
                   >
                     <span
-                      class="cxd-TplField"
+                      class="cxd-TplField fr-view"
                     >
                       <span>
                         次要说明
@@ -470,7 +473,7 @@ exports[`Renderer:cards hightlight 1`] = `
                           class="cxd-Button cxd-Button--link cxd-Button--size-sm"
                         >
                           <i
-                            class="m-r-xs fa fa-ellipsis-h"
+                            class="fa fa-ellipsis-h icon m-r-xs fa fa-ellipsis-h"
                           />
                         </button>
                       </div>
@@ -500,9 +503,10 @@ exports[`Renderer:cards hightlight 2`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
-            class="cxd-Card"
+            class="cxd-Card cxd-Card--link"
           >
             <div
               class="cxd-Card-multiMedia--left"
@@ -524,7 +528,7 @@ exports[`Renderer:cards hightlight 2`] = `
                       class="cxd-Card-title"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           标题
@@ -539,7 +543,7 @@ exports[`Renderer:cards hightlight 2`] = `
                       class="cxd-Card-highlight test-highlight-class"
                     />
                     <span
-                      class="cxd-TplField label label-warning"
+                      class="cxd-TplField fr-view label label-warning"
                     >
                       <span>
                         标签
@@ -551,7 +555,7 @@ exports[`Renderer:cards hightlight 2`] = `
                   class="cxd-Card-body"
                 >
                   <span
-                    class="cxd-TplField"
+                    class="cxd-TplField fr-view"
                   >
                     <span>
                       这里是内容
@@ -565,7 +569,7 @@ exports[`Renderer:cards hightlight 2`] = `
                     class="cxd-Card-secondary"
                   >
                     <span
-                      class="cxd-TplField"
+                      class="cxd-TplField fr-view"
                     >
                       <span>
                         次要说明
@@ -599,7 +603,7 @@ exports[`Renderer:cards hightlight 2`] = `
                           class="cxd-Button cxd-Button--link cxd-Button--size-sm"
                         >
                           <i
-                            class="m-r-xs fa fa-ellipsis-h"
+                            class="fa fa-ellipsis-h icon m-r-xs fa fa-ellipsis-h"
                           />
                         </button>
                       </div>
@@ -629,9 +633,10 @@ exports[`Renderer:cards media 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
-            class="cxd-Card"
+            class="cxd-Card cxd-Card--link"
           >
             <div
               class="cxd-Card-multiMedia--left"
@@ -653,7 +658,7 @@ exports[`Renderer:cards media 1`] = `
                       class="cxd-Card-title"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           标题
@@ -665,7 +670,7 @@ exports[`Renderer:cards media 1`] = `
                     class="cxd-Card-toolbar"
                   >
                     <span
-                      class="cxd-TplField label label-warning"
+                      class="cxd-TplField fr-view label label-warning"
                     >
                       <span>
                         标签
@@ -677,7 +682,7 @@ exports[`Renderer:cards media 1`] = `
                   class="cxd-Card-body"
                 >
                   <span
-                    class="cxd-TplField"
+                    class="cxd-TplField fr-view"
                   >
                     <span>
                       这里是内容
@@ -691,7 +696,7 @@ exports[`Renderer:cards media 1`] = `
                     class="cxd-Card-secondary"
                   >
                     <span
-                      class="cxd-TplField"
+                      class="cxd-TplField fr-view"
                     >
                       <span>
                         次要说明
@@ -725,7 +730,7 @@ exports[`Renderer:cards media 1`] = `
                           class="cxd-Button cxd-Button--link cxd-Button--size-sm"
                         >
                           <i
-                            class="m-r-xs fa fa-ellipsis-h"
+                            class="fa fa-ellipsis-h icon m-r-xs fa fa-ellipsis-h"
                           />
                         </button>
                       </div>

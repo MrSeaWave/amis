@@ -13,6 +13,7 @@ exports[`EventAction:custom 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <button
             class="cxd-Button cxd-Button--primary cxd-Button--size-default"
@@ -39,7 +40,7 @@ exports[`EventAction:custom 1`] = `
             </span>
           </button>
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               18岁的天空
@@ -65,6 +66,7 @@ exports[`EventAction:custom 2`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <button
             class="cxd-Button cxd-Button--primary cxd-Button--size-default"
@@ -91,7 +93,7 @@ exports[`EventAction:custom 2`] = `
             </span>
           </button>
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               18岁的天空
@@ -117,6 +119,7 @@ exports[`EventAction:custom 3`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <button
             class="cxd-Button cxd-Button--primary cxd-Button--size-default"
@@ -143,7 +146,7 @@ exports[`EventAction:custom 3`] = `
             </span>
           </button>
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               17岁的天空

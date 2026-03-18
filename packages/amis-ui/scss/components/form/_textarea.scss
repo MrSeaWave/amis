@@ -1,29 +1,31 @@
 .#{$ns}TextareaControl {
-  @include input-text();
   --Form-input-clearBtn-padding: #{px2rem(2px)};
-
   position: relative;
+
+  @include input-text();
 
   > textarea.#{$ns}TextareaControl-input--counter {
     // 23 px 是计数器 counter 的高度
-    padding-bottom: 23px;
+    padding-bottom: px2rem(23px);
+    // 设置size时会把textarea设置成inline-block，导致高度异常，所以这里需要设置成block
+    display: block !important;
   }
 
   > textarea {
-    @include input-border();
-
     border: 1px solid var(--Form-input-borderColor);
     border-radius: var(--Form-input-borderRadius);
+    color: var(--colors-neutral-text-2);
     background: var(--Form-input-bg);
-    padding: var(--Form-input-paddingY) var(--Form-input-paddingX);
-    /* 避免和clear btn 重叠 */
-    padding-right: calc(var(--Form-input-paddingX) + var(--Form-fontSize));
+    padding: var(--input-textarea-paddingTop) var(--input-textarea-paddingRight)
+      var(--input-textarea-paddingBottom) var(--input-textarea-paddingLeft);
     font-size: var(--Form-input-fontSize);
     display: block;
     width: 100%;
     line-height: var(--Form-input-lineHeight);
     outline: none;
     resize: vertical;
+
+    @include input-border();
 
     &::placeholder {
       color: var(--Form-input-placeholderColor);
@@ -41,17 +43,17 @@
     bottom: 1px;
     right: var(--scrollbar-width);
     padding-bottom: var(--Form-input-paddingY);
-    background-color: #fff;
     text-align: right;
-    // right: var(--Form-input-paddingX);
-    // bottom: var(--Form-input-paddingY);
-    font-size: var(--fontSizeSm);
-    // padding: 0 5px;
     border-radius: 3px;
-    color: #84868c;
+    color: var(--input-count-multi-color);
+    font-size: var(--input-count-multi-fontSize);
+
+    > i {
+      font-style: normal;
+    }
 
     &.is-empty {
-      color: #84868c;
+      color: var(--input-count-multi-color);
     }
   }
 

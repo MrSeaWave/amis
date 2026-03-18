@@ -2,7 +2,7 @@
  * @file 用来渲染 Markdown
  */
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {AMISSchemaBase, Renderer, RendererProps} from 'amis-core';
 import {BaseSchema} from '../Schema';
 import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
 import {LazyComponent} from 'amis-core';
@@ -10,12 +10,11 @@ import {getPropValue} from 'amis-core';
 import {isApiOutdated, isEffectiveApi} from 'amis-core';
 
 /**
- * Markdown 渲染
- * 文档：https://baidu.gitee.io/amis/docs/components/markdown
+ * Markdown 渲染组件，用于渲染 Markdown 内容。支持代码高亮、数学公式等扩展语法。
  */
-export interface MarkdownSchema extends BaseSchema {
+export interface AMISMarkdownSchema extends AMISSchemaBase {
   /**
-   * markdown 渲染
+   * 指定为 markdown 组件
    */
   type: 'markdown';
 
@@ -30,7 +29,7 @@ export interface MarkdownSchema extends BaseSchema {
   className?: string;
 
   /**
-   * 名字映射
+   * 名称映射
    */
   name?: string;
 }
@@ -41,7 +40,7 @@ function loadComponent(): Promise<any> {
 
 export interface MarkdownProps
   extends RendererProps,
-    Omit<MarkdownSchema, 'type' | 'className'> {}
+    Omit<AMISMarkdownSchema, 'type' | 'className'> {}
 
 interface MarkdownState {
   content: string;
@@ -99,10 +98,10 @@ export class Markdown extends React.Component<MarkdownProps, MarkdownState> {
   }
 
   render() {
-    const {className, classnames: cx, options} = this.props;
+    const {className, style, classnames: cx, options} = this.props;
 
     return (
-      <div className={cx('Markdown', className)}>
+      <div className={cx('Markdown', className)} style={style}>
         <LazyComponent
           getComponent={loadComponent}
           content={this.state.content || ''}

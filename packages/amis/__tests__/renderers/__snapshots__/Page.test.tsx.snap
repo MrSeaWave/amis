@@ -22,7 +22,10 @@ exports[`Renderer:Page 1`] = `
               className="cxd-Page-title"
             >
               <span
-                className="cxd-TplField"
+                className="cxd-TplField fr-view"
+                onClick={[Function]}
+                onMouseEnter={[Function]}
+                onMouseLeave={[Function]}
               >
                 <span
                   dangerouslySetInnerHTML={
@@ -40,10 +43,10 @@ exports[`Renderer:Page 1`] = `
                 onMouseOver={[Function]}
               >
                 <span
-                  className="cxd-Remark-icon icon"
+                  className="cxd-Remark-icon"
                 >
                   <icon-mock
-                    className=" icon-question-mark"
+                    className="icon-question-mark"
                     icon="question-mark"
                   />
                 </span>
@@ -53,7 +56,10 @@ exports[`Renderer:Page 1`] = `
               className="cxd-Page-subTitle"
             >
               <span
-                className="cxd-TplField"
+                className="cxd-TplField fr-view"
+                onClick={[Function]}
+                onMouseEnter={[Function]}
+                onMouseLeave={[Function]}
               >
                 <span
                   dangerouslySetInnerHTML={
@@ -69,7 +75,10 @@ exports[`Renderer:Page 1`] = `
             className="cxd-Page-toolbar"
           >
             <span
-              className="cxd-TplField"
+              className="cxd-TplField fr-view"
+              onClick={[Function]}
+              onMouseEnter={[Function]}
+              onMouseLeave={[Function]}
             >
               <span
                 dangerouslySetInnerHTML={
@@ -83,12 +92,16 @@ exports[`Renderer:Page 1`] = `
         </div>
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
           />
           <span
-            className="cxd-TplField"
+            className="cxd-TplField fr-view"
+            onClick={[Function]}
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <span
               dangerouslySetInnerHTML={
@@ -111,22 +124,17 @@ exports[`Renderer:Page 1`] = `
 exports[`Renderer:Page classNames 1`] = `
 <div>
   <div
-    class="cxd-Page cxd-Page--withSidebar"
+    class="cxd-Page cxd-Page--withSidebar cxd-Page--asideSticky cxd-Page--leftAside"
   >
     <div
       class="cxd-Page-aside cxd-Page-aside--withWidth aside-class-name"
     >
       <div
-        class="cxd-Page-asideInner"
-        style="position: sticky; top: 0px;"
+        class="cxd-TplField fr-view cxd-Page-asideTplWrapper"
       >
-        <div
-          class="cxd-TplField cxd-Page-asideTplWrapper"
-        >
-          <span>
-            This is aside
-          </span>
-        </div>
+        <span>
+          This is aside
+        </span>
       </div>
     </div>
     <div
@@ -145,7 +153,7 @@ exports[`Renderer:Page classNames 1`] = `
               class="cxd-Page-title"
             >
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   This is Title
@@ -155,10 +163,10 @@ exports[`Renderer:Page classNames 1`] = `
                 class="cxd-Remark cxd-Remark--warning"
               >
                 <span
-                  class="cxd-Remark-icon icon"
+                  class="cxd-Remark-icon"
                 >
                   <icon-mock
-                    classname=" icon-question-mark"
+                    classname="icon-question-mark"
                     icon="question-mark"
                   />
                 </span>
@@ -168,7 +176,7 @@ exports[`Renderer:Page classNames 1`] = `
               class="cxd-Page-subTitle"
             >
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   This is SubTitle
@@ -180,7 +188,7 @@ exports[`Renderer:Page classNames 1`] = `
             class="cxd-Page-toolbar toolbar-class-name"
           >
             <span
-              class="cxd-TplField"
+              class="cxd-TplField fr-view"
             >
               <span>
                 This is toolbar
@@ -190,9 +198,10 @@ exports[`Renderer:Page classNames 1`] = `
         </div>
         <div
           class="cxd-Page-body body-class-name"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               This is body
@@ -230,9 +239,10 @@ exports[`Renderer:Page handleAction actionType=ajax & feedback 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable a is 6
@@ -273,9 +283,10 @@ exports[`Renderer:Page handleAction actionType=ajax & feedback 1`] = `
       </div>
       <div
         class="cxd-Modal-body"
+        role="dialog-body"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           <span>
             this is feedback
@@ -332,9 +343,10 @@ exports[`Renderer:Page handleAction actionType=ajax & feedback 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable a is 6
@@ -372,9 +384,10 @@ exports[`Renderer:Page handleAction actionType=ajax 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable a is 6
@@ -412,6 +425,7 @@ exports[`Renderer:Page handleAction actionType=dialog default 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         />
       </div>
     </div>
@@ -444,6 +458,7 @@ exports[`Renderer:Page handleAction actionType=dialog default 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         />
       </div>
     </div>
@@ -476,9 +491,10 @@ exports[`Renderer:Page handleAction actionType=dialog mergeData 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable a is 
@@ -519,6 +535,7 @@ exports[`Renderer:Page handleAction actionType=dialog mergeData 1`] = `
       </div>
       <div
         class="cxd-Modal-body"
+        role="dialog-body"
       >
         <form
           class="cxd-Form cxd-Form--horizontal"
@@ -530,6 +547,7 @@ exports[`Renderer:Page handleAction actionType=dialog mergeData 1`] = `
           />
           <div
             class="cxd-Form-item cxd-Form-item--horizontal"
+            data-amis-name="a"
             data-role="form-item"
           >
             <label
@@ -537,7 +555,7 @@ exports[`Renderer:Page handleAction actionType=dialog mergeData 1`] = `
             >
               <span>
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     A
@@ -611,9 +629,10 @@ exports[`Renderer:Page handleAction actionType=dialog mergeData 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable a is 3
@@ -651,6 +670,7 @@ exports[`Renderer:Page handleAction actionType=drawer default 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         />
       </div>
     </div>
@@ -673,9 +693,6 @@ exports[`Renderer:Page handleAction actionType=drawer default 1`] = `
           icon="close"
         />
       </a>
-      <div
-        class="cxd-Drawer-header"
-      />
       <div
         class="cxd-Drawer-body"
       >
@@ -741,6 +758,7 @@ exports[`Renderer:Page handleAction actionType=drawer default 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         />
       </div>
     </div>
@@ -773,9 +791,10 @@ exports[`Renderer:Page handleAction actionType=drawer mergeData 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable a is 
@@ -804,10 +823,8 @@ exports[`Renderer:Page handleAction actionType=drawer mergeData 1`] = `
         />
       </a>
       <div
-        class="cxd-Drawer-header"
-      />
-      <div
         class="cxd-Drawer-body"
+        role="dialog-body"
       >
         <form
           class="cxd-Form cxd-Form--horizontal"
@@ -819,6 +836,7 @@ exports[`Renderer:Page handleAction actionType=drawer mergeData 1`] = `
           />
           <div
             class="cxd-Form-item cxd-Form-item--horizontal"
+            data-amis-name="a"
             data-role="form-item"
           >
             <label
@@ -826,7 +844,7 @@ exports[`Renderer:Page handleAction actionType=drawer mergeData 1`] = `
             >
               <span>
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     A
@@ -900,9 +918,10 @@ exports[`Renderer:Page handleAction actionType=drawer mergeData 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable a is 3
@@ -928,9 +947,10 @@ exports[`Renderer:Page initApi 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 2
@@ -956,6 +976,7 @@ exports[`Renderer:Page initApi error show Message 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Alert cxd-Alert--danger"
@@ -1000,12 +1021,16 @@ exports[`Renderer:Page initApi reFetch when condition changes 1`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
           />
           <span
-            className="cxd-TplField"
+            className="cxd-TplField fr-view"
+            onClick={[Function]}
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <span
               dangerouslySetInnerHTML={
@@ -1039,12 +1064,16 @@ exports[`Renderer:Page initApi reFetch when condition changes 2`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
           />
           <span
-            className="cxd-TplField"
+            className="cxd-TplField fr-view"
+            onClick={[Function]}
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <span
               dangerouslySetInnerHTML={
@@ -1089,9 +1118,10 @@ exports[`Renderer:Page initApi reload by Dialog action 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1
@@ -1129,9 +1159,10 @@ exports[`Renderer:Page initApi reload by Dialog action 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1
@@ -1172,6 +1203,7 @@ exports[`Renderer:Page initApi reload by Dialog action 2`] = `
       </div>
       <div
         class="cxd-Modal-body"
+        role="dialog-body"
       >
         <form
           class="cxd-Form cxd-Form--horizontal"
@@ -1183,6 +1215,7 @@ exports[`Renderer:Page initApi reload by Dialog action 2`] = `
           />
           <div
             class="cxd-Form-item cxd-Form-item--horizontal"
+            data-amis-name="a"
             data-role="form-item"
           >
             <label
@@ -1264,9 +1297,10 @@ exports[`Renderer:Page initApi reload by Dialog action 3`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 2
@@ -1304,9 +1338,10 @@ exports[`Renderer:Page initApi reload by Drawer action 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1
@@ -1344,9 +1379,10 @@ exports[`Renderer:Page initApi reload by Drawer action 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1
@@ -1375,10 +1411,8 @@ exports[`Renderer:Page initApi reload by Drawer action 2`] = `
         />
       </a>
       <div
-        class="cxd-Drawer-header"
-      />
-      <div
         class="cxd-Drawer-body"
+        role="dialog-body"
       >
         <form
           class="cxd-Form cxd-Form--horizontal"
@@ -1390,6 +1424,7 @@ exports[`Renderer:Page initApi reload by Drawer action 2`] = `
           />
           <div
             class="cxd-Form-item cxd-Form-item--horizontal"
+            data-amis-name="a"
             data-role="form-item"
           >
             <label
@@ -1471,9 +1506,10 @@ exports[`Renderer:Page initApi reload by Drawer action 3`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 2
@@ -1502,7 +1538,7 @@ exports[`Renderer:Page initApi reload by Form submit 1`] = `
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -1511,7 +1547,7 @@ exports[`Renderer:Page initApi reload by Form submit 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -1532,6 +1568,7 @@ exports[`Renderer:Page initApi reload by Form submit 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <div
@@ -1570,52 +1607,14 @@ exports[`Renderer:Page initApi reload by Form submit 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1
@@ -1644,7 +1643,7 @@ exports[`Renderer:Page initApi reload by Form submit 2`] = `
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -1653,7 +1652,7 @@ exports[`Renderer:Page initApi reload by Form submit 2`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -1674,6 +1673,7 @@ exports[`Renderer:Page initApi reload by Form submit 2`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <div
@@ -1712,52 +1712,14 @@ exports[`Renderer:Page initApi reload by Form submit 2`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 2
@@ -1795,9 +1757,10 @@ exports[`Renderer:Page initApi reload by action 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1
@@ -1835,9 +1798,10 @@ exports[`Renderer:Page initApi reload by action 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 2
@@ -1863,6 +1827,7 @@ exports[`Renderer:Page initApi show loading 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Spinner-overlay in"
@@ -1876,7 +1841,7 @@ exports[`Renderer:Page initApi show loading 1`] = `
             />
           </div>
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 
@@ -1902,9 +1867,10 @@ exports[`Renderer:Page initApi show loading 2`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 3
@@ -1930,9 +1896,10 @@ exports[`Renderer:Page initApi silentPolling 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 3
@@ -1958,9 +1925,10 @@ exports[`Renderer:Page initApi silentPolling 2`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 4
@@ -1987,12 +1955,16 @@ exports[`Renderer:Page initData 1`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
           />
           <span
-            className="cxd-TplField"
+            className="cxd-TplField fr-view"
+            onClick={[Function]}
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <span
               dangerouslySetInnerHTML={
@@ -2026,12 +1998,16 @@ exports[`Renderer:Page initFetchOn trigger initApi fetch when condition becomes 
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
           />
           <span
-            className="cxd-TplField"
+            className="cxd-TplField fr-view"
+            onClick={[Function]}
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <span
               dangerouslySetInnerHTML={
@@ -2065,12 +2041,16 @@ exports[`Renderer:Page location query 1`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
           />
           <span
-            className="cxd-TplField"
+            className="cxd-TplField fr-view"
+            onClick={[Function]}
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <span
               dangerouslySetInnerHTML={
@@ -2104,12 +2084,16 @@ exports[`Renderer:Page location query 2`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
           />
           <span
-            className="cxd-TplField"
+            className="cxd-TplField fr-view"
+            onClick={[Function]}
+            onMouseEnter={[Function]}
+            onMouseLeave={[Function]}
           >
             <span
               dangerouslySetInnerHTML={

@@ -8,6 +8,7 @@
     min-width: 80px;
     max-width: 150px;
     flex: 1;
+    display: flex;
 
     & > span {
       display: flex;
@@ -24,9 +25,37 @@
 
       color: var(--Form-input-color);
     }
+
+    & > * {
+      min-width: 0;
+      min-height: 0;
+      flex: 1;
+    }
+
+    &.is-mobile {
+      & > span {
+        border-radius: 0;
+        border: none;
+        border-bottom: var(--Form-input-borderWidth) solid
+          var(--Form-input-borderColor);
+      }
+
+      .#{$ns}InputBox {
+        height: 100%;
+        line-height: 1;
+
+        > .#{$ns}InputBox-caret {
+          svg {
+            top: 0.125em;
+          }
+        }
+      }
+    }
   }
 
   &-value {
+    min-width: 0;
+    min-height: 0;
     flex: 1;
     margin-left: auto;
     display: flex;
@@ -37,6 +66,8 @@
     }
 
     > div {
+      min-width: 0;
+      min-height: 0;
       flex: 1;
       flex-wrap: nowrap;
     }
@@ -59,7 +90,7 @@
     transition: transform var(--animation-duration);
     color: var(--icon-color);
     margin-top: calc((var(--Form-input-height) - var(--Switch-height)) / 2);
-
+    transform: rotate(90deg);
     > svg {
       width: 10px;
       height: 10px;
@@ -68,7 +99,7 @@
   }
 
   &-caret.is-collapsed {
-    transform: rotate(-90deg);
+    transform: rotate(0deg);
   }
 
   &.is-expanded {
@@ -118,6 +149,17 @@
         width: 25px;
         left: -33px;
         border-top: dashed 1px var(--icon-color);
+      }
+    }
+  }
+
+  &.is-mobile {
+    .#{$ns}Number {
+      border-radius: 0;
+      position: relative;
+
+      &::before {
+        @include hairline-bottom(var(--Form-input-borderColor));
       }
     }
   }

@@ -13,10 +13,11 @@ exports[`Renderer: chained select 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -25,7 +26,7 @@ exports[`Renderer: chained select 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -46,6 +47,7 @@ exports[`Renderer: chained select 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <label
@@ -53,7 +55,7 @@ exports[`Renderer: chained select 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           带搜索
@@ -110,45 +112,6 @@ exports[`Renderer: chained select 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -170,10 +133,11 @@ exports[`Renderer:select associated 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -182,7 +146,7 @@ exports[`Renderer:select associated 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -203,6 +167,7 @@ exports[`Renderer:select associated 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="b"
                   data-role="form-item"
                 >
                   <label
@@ -210,7 +175,7 @@ exports[`Renderer:select associated 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           关联选择模式
@@ -267,47 +232,349 @@ exports[`Renderer:select associated 1`] = `
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:select associated mode with virtual 1`] = `
+<div>
+  <div
+    class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+    data-role="container"
+  >
+    <div
+      class="cxd-Panel-heading"
+    >
+      <h3
+        class="cxd-Panel-title"
+      >
+        <span
+          class="cxd-TplField fr-view"
+        >
+          <span>
+            表单
+          </span>
+        </span>
+      </h3>
+    </div>
+    <div
+      class="cxd-Panel-body"
+    >
+      <form
+        class="cxd-Form cxd-Form--normal"
+        novalidate=""
+      >
+        <input
+          style="display: none;"
+          type="submit"
+        />
+        <div
+          class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="select"
+          data-role="form-item"
+        >
+          <label
+            class="cxd-Form-label"
+          >
+            <span>
+              <span
+                class="cxd-TplField fr-view"
+              >
+                <span>
+                  级联
+                </span>
+              </span>
+            </span>
+          </label>
+          <div
+            class="cxd-SelectControl cxd-Form-control has-popover"
+          >
             <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
+              class="cxd-ResultBox cxd-TransferDropDown cxd-Form-control is-opened is-clickable"
+              tabindex="-1"
             >
-              
-  
               <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
+                class="cxd-ResultBox-value-wrap"
               >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
+                <span
+                  class="cxd-ResultBox-placeholder"
+                >
+                  请选择
+                </span>
               </div>
-              
-  
               <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
+                class="cxd-ResultBox-actions"
               >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
+                <span
+                  class="cxd-ResultBox-pc-arrow"
+                >
+                  <icon-mock
+                    classname="icon icon-right-arrow-bold"
+                    icon="right-arrow-bold"
+                  />
+                </span>
               </div>
-              
-  
+            </div>
+            <div
+              class="cxd-PopOver cxd-TransferDropDown-popover"
+              role="popover"
+              style="display: block; min-width: 100px; left: 0px; top: 0px; visibility: hidden;"
+              theme="cxd"
+            >
               <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
+                class="cxd-PopOver-overlay"
               />
+              <div
+                class="cxd-TransferDropDown-content"
+              >
+                <div
+                  class="cxd-AssociatedSelection cxd-Transfer-selection"
+                >
+                  <div
+                    class="cxd-AssociatedSelection-left"
+                  >
+                    <div
+                      class="cxd-GroupedSelection"
+                    >
+                      <div
+                        style="display: block; position: relative; width: 100%; height: 100%;"
+                      >
+                        <div
+                          style="overflow: auto; will-change: transform; height: 0px; width: 100%;"
+                        >
+                          <div
+                            style="position: relative; width: auto; white-space: nowrap; min-height: 100%; height: 38760px;"
+                          >
+                            <div
+                              class="cxd-GroupedSelection-group"
+                              style="position: absolute; top: 0px; left: 0px; width: 100%; height: 38px;"
+                            >
+                              <div
+                                class="cxd-GroupedSelection-itemLabel"
+                              >
+                                <span
+                                  class=" cxd-Selection-ellipsis-line"
+                                  title="group-1 "
+                                >
+                                  group-1
+                                </span>
+                              </div>
+                            </div>
+                            <div
+                              class="cxd-GroupedSelection-group"
+                              style="position: absolute; top: 38px; left: 0px; width: 100%; height: 38px;"
+                            >
+                              <div
+                                class="cxd-GroupedSelection-items"
+                              >
+                                <div
+                                  class="cxd-GroupedSelection-item is-active"
+                                >
+                                  <div
+                                    class="cxd-GroupedSelection-itemLabel"
+                                  >
+                                    <span
+                                      class=" cxd-Selection-ellipsis-line"
+                                      title="group-1-option-1 "
+                                    >
+                                      group-1-option-1
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              class="cxd-GroupedSelection-group"
+                              style="position: absolute; top: 76px; left: 0px; width: 100%; height: 38px;"
+                            >
+                              <div
+                                class="cxd-GroupedSelection-items"
+                              >
+                                <div
+                                  class="cxd-GroupedSelection-item"
+                                >
+                                  <div
+                                    class="cxd-GroupedSelection-itemLabel"
+                                  >
+                                    <span
+                                      class=" cxd-Selection-ellipsis-line"
+                                      title="group-1-option-2 "
+                                    >
+                                      group-1-option-2
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              class="cxd-GroupedSelection-group"
+                              style="position: absolute; top: 114px; left: 0px; width: 100%; height: 38px;"
+                            >
+                              <div
+                                class="cxd-GroupedSelection-items"
+                              >
+                                <div
+                                  class="cxd-GroupedSelection-item"
+                                >
+                                  <div
+                                    class="cxd-GroupedSelection-itemLabel"
+                                  >
+                                    <span
+                                      class=" cxd-Selection-ellipsis-line"
+                                      title="group-1-option-3 "
+                                    >
+                                      group-1-option-3
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    class="cxd-AssociatedSelection-right"
+                  >
+                    <div
+                      class="cxd-TableSelection"
+                    >
+                      <div
+                        class="cxd-Table-content is-virtual"
+                      >
+                        <table
+                          class="cxd-Table-table"
+                        >
+                          <thead>
+                            <tr>
+                              <th>
+                                名称
+                              </th>
+                              <th>
+                                值得
+                              </th>
+                            </tr>
+                          </thead>
+                        </table>
+                        <div
+                          class="cxd-Table-content-virtual"
+                        >
+                          <div
+                            style="display: block; position: relative; width: 100%; height: 100%;"
+                          >
+                            <div
+                              style="overflow: auto; will-change: transform; height: 0px; width: 100%;"
+                            >
+                              <table
+                                class="cxd-Table-table"
+                                style="margin-top: 0px;"
+                              >
+                                <colgroup>
+                                  <col
+                                    style="width: 0px;"
+                                  />
+                                  <col
+                                    style="width: 0px;"
+                                  />
+                                </colgroup>
+                                <tbody>
+                                  <tr
+                                    class=""
+                                    style="height: 38px;"
+                                  >
+                                    <td>
+                                      <span>
+                                        label-1
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <span>
+                                        value-1
+                                      </span>
+                                    </td>
+                                  </tr>
+                                  <tr
+                                    class=""
+                                    style="height: 38px;"
+                                  >
+                                    <td>
+                                      <span>
+                                        label-2
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <span>
+                                        value-2
+                                      </span>
+                                    </td>
+                                  </tr>
+                                  <tr
+                                    class=""
+                                    style="height: 38px;"
+                                  >
+                                    <td>
+                                      <span>
+                                        label-3
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <span>
+                                        value-3
+                                      </span>
+                                    </td>
+                                  </tr>
+                                  <tr
+                                    class=""
+                                    style="height: 38px;"
+                                  >
+                                    <td>
+                                      <span>
+                                        label-4
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <span>
+                                        value-4
+                                      </span>
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <div
+                                style="position: absolute; width: 1px; white-space: nowrap; min-height: 100%; height: 3838px; top: 0px; visibility: hidden;"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </form>
+    </div>
+    <div
+      class="cxd-Panel-footerWrap"
+    >
+      <div
+        class="cxd-Panel-btnToolbar cxd-Panel-footer"
+      >
+        <button
+          class="cxd-Button cxd-Button--primary cxd-Button--size-default"
+          type="submit"
+        >
+          <span>
+            提交
+          </span>
+        </button>
       </div>
     </div>
   </div>
@@ -327,10 +594,11 @@ exports[`Renderer:select chained 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -339,7 +607,7 @@ exports[`Renderer:select chained 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -360,6 +628,7 @@ exports[`Renderer:select chained 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <label
@@ -367,7 +636,7 @@ exports[`Renderer:select chained 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           级联选择
@@ -424,47 +693,241 @@ exports[`Renderer:select chained 1`] = `
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:select chained mode with virtual 1`] = `
+<div>
+  <div
+    class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+    data-role="container"
+  >
+    <div
+      class="cxd-Panel-heading"
+    >
+      <h3
+        class="cxd-Panel-title"
+      >
+        <span
+          class="cxd-TplField fr-view"
+        >
+          <span>
+            表单
+          </span>
+        </span>
+      </h3>
+    </div>
+    <div
+      class="cxd-Panel-body"
+    >
+      <form
+        class="cxd-Form cxd-Form--normal"
+        novalidate=""
+      >
+        <input
+          style="display: none;"
+          type="submit"
+        />
+        <div
+          class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="select"
+          data-role="form-item"
+        >
+          <label
+            class="cxd-Form-label"
+          >
+            <span>
+              <span
+                class="cxd-TplField fr-view"
+              >
+                <span>
+                  级联
+                </span>
+              </span>
+            </span>
+          </label>
+          <div
+            class="cxd-SelectControl cxd-Form-control has-popover"
+          >
             <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
+              class="cxd-ResultBox cxd-TransferDropDown cxd-Form-control is-opened is-clickable"
+              tabindex="-1"
             >
-              
-  
               <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
+                class="cxd-ResultBox-value-wrap"
               >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
+                <span
+                  class="cxd-ResultBox-placeholder"
+                >
+                  请选择
+                </span>
               </div>
-              
-  
               <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
+                class="cxd-ResultBox-actions"
               >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
+                <span
+                  class="cxd-ResultBox-pc-arrow"
+                >
+                  <icon-mock
+                    classname="icon icon-right-arrow-bold"
+                    icon="right-arrow-bold"
+                  />
+                </span>
               </div>
-              
-  
+            </div>
+            <div
+              class="cxd-PopOver cxd-TransferDropDown-popover"
+              role="popover"
+              style="display: block; min-width: 100px; left: 0px; top: 0px; visibility: hidden;"
+              theme="cxd"
+            >
               <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
+                class="cxd-PopOver-overlay"
               />
+              <div
+                class="cxd-TransferDropDown-content"
+              >
+                <div
+                  class="cxd-ChainedSelection cxd-Transfer-selection"
+                >
+                  <div
+                    class="cxd-ChainedSelection-col"
+                  >
+                    <div
+                      style="display: block; position: relative; width: 100%; height: 100%; min-height: 266px;"
+                    >
+                      <div
+                        style="overflow: auto; will-change: transform; height: 0px; width: 100%;"
+                      >
+                        <div
+                          style="position: relative; width: auto; white-space: nowrap; min-height: 100%; height: 3838px;"
+                        >
+                          <div
+                            class="cxd-ChainedSelection-item is-active"
+                            style="position: absolute; top: 0px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-1
+                            </div>
+                          </div>
+                          <div
+                            class="cxd-ChainedSelection-item"
+                            style="position: absolute; top: 38px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-2
+                            </div>
+                          </div>
+                          <div
+                            class="cxd-ChainedSelection-item"
+                            style="position: absolute; top: 76px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-3
+                            </div>
+                          </div>
+                          <div
+                            class="cxd-ChainedSelection-item"
+                            style="position: absolute; top: 114px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-4
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    class="cxd-ChainedSelection-col"
+                  >
+                    <div
+                      style="display: block; position: relative; width: 100%; height: 100%; min-height: 266px;"
+                    >
+                      <div
+                        style="overflow: auto; will-change: transform; height: 0px; width: 100%;"
+                      >
+                        <div
+                          style="position: relative; width: auto; white-space: nowrap; min-height: 100%; height: 3838px;"
+                        >
+                          <div
+                            class="cxd-ChainedSelection-item"
+                            style="position: absolute; top: 0px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-1-option-1
+                            </div>
+                          </div>
+                          <div
+                            class="cxd-ChainedSelection-item"
+                            style="position: absolute; top: 38px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-1-option-2
+                            </div>
+                          </div>
+                          <div
+                            class="cxd-ChainedSelection-item"
+                            style="position: absolute; top: 76px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-1-option-3
+                            </div>
+                          </div>
+                          <div
+                            class="cxd-ChainedSelection-item"
+                            style="position: absolute; top: 114px; left: 0px; width: 100%; height: 38px;"
+                          >
+                            <div
+                              class="cxd-ChainedSelection-itemLabel"
+                            >
+                              group-1-option-4
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </form>
+    </div>
+    <div
+      class="cxd-Panel-footerWrap"
+    >
+      <div
+        class="cxd-Panel-btnToolbar cxd-Panel-footer"
+      >
+        <button
+          class="cxd-Button cxd-Button--primary cxd-Button--size-default"
+          type="submit"
+        >
+          <span>
+            提交
+          </span>
+        </button>
       </div>
     </div>
   </div>
@@ -484,10 +947,11 @@ exports[`Renderer:select group 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -496,7 +960,7 @@ exports[`Renderer:select group 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -517,6 +981,7 @@ exports[`Renderer:select group 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <label
@@ -524,7 +989,7 @@ exports[`Renderer:select group 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           分组
@@ -581,47 +1046,205 @@ exports[`Renderer:select group 1`] = `
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:select group mode with virtual 1`] = `
+<div>
+  <div
+    class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+    data-role="container"
+  >
+    <div
+      class="cxd-Panel-heading"
+    >
+      <h3
+        class="cxd-Panel-title"
+      >
+        <span
+          class="cxd-TplField fr-view"
+        >
+          <span>
+            表单
+          </span>
+        </span>
+      </h3>
+    </div>
+    <div
+      class="cxd-Panel-body"
+    >
+      <form
+        class="cxd-Form cxd-Form--normal"
+        novalidate=""
+      >
+        <input
+          style="display: none;"
+          type="submit"
+        />
+        <div
+          class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="select"
+          data-role="form-item"
+        >
+          <label
+            class="cxd-Form-label"
+          >
+            <span>
+              <span
+                class="cxd-TplField fr-view"
+              >
+                <span>
+                  分组
+                </span>
+              </span>
+            </span>
+          </label>
+          <div
+            class="cxd-SelectControl cxd-Form-control has-popover"
+          >
             <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
+              class="cxd-ResultBox cxd-TransferDropDown cxd-Form-control is-opened is-clickable"
+              tabindex="-1"
             >
-              
-  
               <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
+                class="cxd-ResultBox-value-wrap"
               >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
+                <span
+                  class="cxd-ResultBox-placeholder"
+                >
+                  请选择
+                </span>
               </div>
-              
-  
               <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
+                class="cxd-ResultBox-actions"
               >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
+                <span
+                  class="cxd-ResultBox-pc-arrow"
+                >
+                  <icon-mock
+                    classname="icon icon-right-arrow-bold"
+                    icon="right-arrow-bold"
+                  />
+                </span>
               </div>
-              
-  
+            </div>
+            <div
+              class="cxd-PopOver cxd-TransferDropDown-popover"
+              role="popover"
+              style="display: block; min-width: 100px; left: 0px; top: 0px; visibility: hidden;"
+              theme="cxd"
+            >
               <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
+                class="cxd-PopOver-overlay"
               />
+              <div
+                class="cxd-TransferDropDown-content"
+              >
+                <div
+                  class="cxd-GroupedSelection cxd-Transfer-selection"
+                >
+                  <div
+                    style="display: block; position: relative; width: 100%; height: 100%; min-height: 266px;"
+                  >
+                    <div
+                      style="overflow: auto; will-change: transform; height: 0px; width: 100%;"
+                    >
+                      <div
+                        style="position: relative; width: auto; white-space: nowrap; min-height: 100%; height: 8360px;"
+                      >
+                        <div
+                          class="cxd-GroupedSelection-group"
+                          style="position: absolute; top: 0px; left: 0px; width: 100%; height: 38px;"
+                        >
+                          <div
+                            class="cxd-GroupedSelection-itemLabel"
+                          >
+                            group-1
+                          </div>
+                        </div>
+                        <div
+                          class="cxd-GroupedSelection-group"
+                          style="position: absolute; top: 38px; left: 0px; width: 100%; height: 38px;"
+                        >
+                          <div
+                            class="cxd-GroupedSelection-items"
+                          >
+                            <div
+                              class="cxd-GroupedSelection-item"
+                            >
+                              <div
+                                class="cxd-GroupedSelection-itemLabel"
+                              >
+                                option-1
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="cxd-GroupedSelection-group"
+                          style="position: absolute; top: 76px; left: 0px; width: 100%; height: 38px;"
+                        >
+                          <div
+                            class="cxd-GroupedSelection-items"
+                          >
+                            <div
+                              class="cxd-GroupedSelection-item"
+                            >
+                              <div
+                                class="cxd-GroupedSelection-itemLabel"
+                              >
+                                option-2
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="cxd-GroupedSelection-group"
+                          style="position: absolute; top: 114px; left: 0px; width: 100%; height: 38px;"
+                        >
+                          <div
+                            class="cxd-GroupedSelection-items"
+                          >
+                            <div
+                              class="cxd-GroupedSelection-item"
+                            >
+                              <div
+                                class="cxd-GroupedSelection-itemLabel"
+                              >
+                                option-3
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </form>
+    </div>
+    <div
+      class="cxd-Panel-footerWrap"
+    >
+      <div
+        class="cxd-Panel-btnToolbar cxd-Panel-footer"
+      >
+        <button
+          class="cxd-Button cxd-Button--primary cxd-Button--size-default"
+          type="submit"
+        >
+          <span>
+            提交
+          </span>
+        </button>
       </div>
     </div>
   </div>
@@ -641,10 +1264,11 @@ exports[`Renderer:select menutpl 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -653,7 +1277,7 @@ exports[`Renderer:select menutpl 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -674,6 +1298,7 @@ exports[`Renderer:select menutpl 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="select"
                   data-role="form-item"
                 >
                   <label
@@ -681,7 +1306,7 @@ exports[`Renderer:select menutpl 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           选项
@@ -695,7 +1320,6 @@ exports[`Renderer:select menutpl 1`] = `
                     <div
                       aria-expanded="false"
                       aria-haspopup="listbox"
-                      aria-labelledby="downshift-0-label"
                       class="cxd-Select"
                       role="combobox"
                       tabindex="0"
@@ -738,45 +1362,6 @@ exports[`Renderer:select menutpl 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -798,10 +1383,11 @@ exports[`Renderer:select table 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -810,7 +1396,7 @@ exports[`Renderer:select table 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -831,6 +1417,7 @@ exports[`Renderer:select table 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <label
@@ -838,7 +1425,7 @@ exports[`Renderer:select table 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           表格形式
@@ -895,45 +1482,6 @@ exports[`Renderer:select table 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -942,11 +1490,11 @@ exports[`Renderer:select table 1`] = `
 </div>
 `;
 
-exports[`Renderer:select table with labelField & valueField 1`] = `
+exports[`Renderer:select table mode with virtual 1`] = `
 <div>
   <div
     class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-    style="position: relative;"
+    data-role="container"
   >
     <div
       class="cxd-Panel-heading"
@@ -955,7 +1503,7 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
         class="cxd-Panel-title"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           <span>
             表单
@@ -976,6 +1524,7 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
         />
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="select"
           data-role="form-item"
         >
           <label
@@ -983,7 +1532,236 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
+              >
+                <span>
+                  表格
+                </span>
+              </span>
+            </span>
+          </label>
+          <div
+            class="cxd-SelectControl cxd-Form-control has-popover"
+          >
+            <div
+              class="cxd-ResultBox cxd-TransferDropDown cxd-Form-control is-opened is-clickable"
+              tabindex="-1"
+            >
+              <div
+                class="cxd-ResultBox-value-wrap"
+              >
+                <span
+                  class="cxd-ResultBox-placeholder"
+                >
+                  请选择
+                </span>
+              </div>
+              <div
+                class="cxd-ResultBox-actions"
+              >
+                <span
+                  class="cxd-ResultBox-pc-arrow"
+                >
+                  <icon-mock
+                    classname="icon icon-right-arrow-bold"
+                    icon="right-arrow-bold"
+                  />
+                </span>
+              </div>
+            </div>
+            <div
+              class="cxd-PopOver cxd-TransferDropDown-popover"
+              role="popover"
+              style="display: block; min-width: 100px; left: 0px; top: 0px; visibility: hidden;"
+              theme="cxd"
+            >
+              <div
+                class="cxd-PopOver-overlay"
+              />
+              <div
+                class="cxd-TransferDropDown-content"
+              >
+                <div
+                  class="cxd-TableSelection cxd-Transfer-selection"
+                >
+                  <div
+                    class="cxd-Table-content is-virtual"
+                  >
+                    <table
+                      class="cxd-Table-table"
+                    >
+                      <thead>
+                        <tr>
+                          <th>
+                            名称
+                          </th>
+                          <th>
+                            值
+                          </th>
+                        </tr>
+                      </thead>
+                    </table>
+                    <div
+                      class="cxd-Table-content-virtual"
+                    >
+                      <div
+                        style="display: block; position: relative; width: 100%; height: 100%; min-height: 266px;"
+                      >
+                        <div
+                          style="overflow: auto; will-change: transform; height: 0px; width: 100%;"
+                        >
+                          <table
+                            class="cxd-Table-table"
+                            style="margin-top: 0px;"
+                          >
+                            <colgroup>
+                              <col
+                                style="width: 0px;"
+                              />
+                              <col
+                                style="width: 0px;"
+                              />
+                            </colgroup>
+                            <tbody>
+                              <tr
+                                class=""
+                                style="height: 38px;"
+                              >
+                                <td>
+                                  <span>
+                                    label-1
+                                  </span>
+                                </td>
+                                <td>
+                                  <span>
+                                    1
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr
+                                class=""
+                                style="height: 38px;"
+                              >
+                                <td>
+                                  <span>
+                                    label-2
+                                  </span>
+                                </td>
+                                <td>
+                                  <span>
+                                    2
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr
+                                class=""
+                                style="height: 38px;"
+                              >
+                                <td>
+                                  <span>
+                                    label-3
+                                  </span>
+                                </td>
+                                <td>
+                                  <span>
+                                    3
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr
+                                class=""
+                                style="height: 38px;"
+                              >
+                                <td>
+                                  <span>
+                                    label-4
+                                  </span>
+                                </td>
+                                <td>
+                                  <span>
+                                    4
+                                  </span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          <div
+                            style="position: absolute; width: 1px; white-space: nowrap; min-height: 100%; height: 7600px; top: 0px; visibility: hidden;"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div
+      class="cxd-Panel-footerWrap"
+    >
+      <div
+        class="cxd-Panel-btnToolbar cxd-Panel-footer"
+      >
+        <button
+          class="cxd-Button cxd-Button--primary cxd-Button--size-default"
+          type="submit"
+        >
+          <span>
+            提交
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:select table with labelField & valueField 1`] = `
+<div>
+  <div
+    class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+    data-role="container"
+  >
+    <div
+      class="cxd-Panel-heading"
+    >
+      <h3
+        class="cxd-Panel-title"
+      >
+        <span
+          class="cxd-TplField fr-view"
+        >
+          <span>
+            表单
+          </span>
+        </span>
+      </h3>
+    </div>
+    <div
+      class="cxd-Panel-body"
+    >
+      <form
+        class="cxd-Form cxd-Form--normal"
+        novalidate=""
+      >
+        <input
+          style="display: none;"
+          type="submit"
+        />
+        <div
+          class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="a"
+          data-role="form-item"
+        >
+          <label
+            class="cxd-Form-label"
+          >
+            <span>
+              <span
+                class="cxd-TplField fr-view"
               >
                 <span>
                   表格形式
@@ -996,7 +1774,6 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
           >
             <div
               class="cxd-ResultBox cxd-TransferDropDown cxd-Form-control is-opened is-clickable is-group"
-              style="position: relative;"
               tabindex="-1"
             >
               <div
@@ -1007,6 +1784,7 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                 >
                   <span
                     class="cxd-ResultBox-valueLabel"
+                    data-index="0"
                   >
                     诸葛亮
                   </span>
@@ -1024,6 +1802,7 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                 >
                   <span
                     class="cxd-ResultBox-valueLabel"
+                    data-index="1"
                   >
                     李白
                   </span>
@@ -1049,49 +1828,11 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                   />
                 </span>
               </div>
-              <div
-                class="resize-sensor"
-                style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-  
-                <div
-                  class="resize-sensor-expand"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                >
-                  
-    
-                  <div
-                    style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                  />
-                  
-  
-                </div>
-                
-  
-                <div
-                  class="resize-sensor-shrink"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                >
-                  
-    
-                  <div
-                    style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                  />
-                  
-  
-                </div>
-                
-  
-                <div
-                  class="resize-sensor-appear"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-                />
-              </div>
             </div>
             <div
-              class="cxd-PopOver cxd-TransferDropDown-popover cxd-PopOver--leftBottomLeftTop"
-              style="display: block; min-width: 100px; left: 0px; top: 0px; position: relative;"
+              class="cxd-PopOver cxd-TransferDropDown-popover"
+              role="popover"
+              style="display: block; min-width: 100px; left: 0px; top: 0px; visibility: hidden;"
               theme="cxd"
             >
               <div
@@ -1115,12 +1856,17 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                             class="cxd-Table-checkCell"
                           >
                             <label
-                              class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--sm"
+                              class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--partial cxd-Checkbox--sm checked cxd-Checkbox--checkbox--default--checked"
+                              data-role="checkbox"
                             >
                               <input
                                 type="checkbox"
                               />
-                              <i />
+                              <i>
+                                <div
+                                  class="checkbox-icon icon"
+                                />
+                              </i>
                               <span
                                 class=""
                               />
@@ -1142,12 +1888,17 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                             class="cxd-Table-checkCell"
                           >
                             <label
-                              class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                              class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm checked cxd-Checkbox--checkbox--default--checked"
+                              data-role="checkbox"
                             >
                               <input
                                 type="checkbox"
                               />
-                              <i />
+                              <i>
+                                <div
+                                  class="checkbox-icon icon"
+                                />
+                              </i>
                               <span
                                 class=""
                               />
@@ -1171,12 +1922,17 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                             class="cxd-Table-checkCell"
                           >
                             <label
-                              class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                              class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
+                              data-role="checkbox"
                             >
                               <input
                                 type="checkbox"
                               />
-                              <i />
+                              <i>
+                                <div
+                                  class="checkbox-icon icon"
+                                />
+                              </i>
                               <span
                                 class=""
                               />
@@ -1200,12 +1956,17 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                             class="cxd-Table-checkCell"
                           >
                             <label
-                              class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                              class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
+                              data-role="checkbox"
                             >
                               <input
                                 type="checkbox"
                               />
-                              <i />
+                              <i>
+                                <div
+                                  class="checkbox-icon icon"
+                                />
+                              </i>
                               <span
                                 class=""
                               />
@@ -1229,12 +1990,17 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                             class="cxd-Table-checkCell"
                           >
                             <label
-                              class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                              class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm checked cxd-Checkbox--checkbox--default--checked"
+                              data-role="checkbox"
                             >
                               <input
                                 type="checkbox"
                               />
-                              <i />
+                              <i>
+                                <div
+                                  class="checkbox-icon icon"
+                                />
+                              </i>
                               <span
                                 class=""
                               />
@@ -1258,12 +2024,17 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                             class="cxd-Table-checkCell"
                           >
                             <label
-                              class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                              class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
+                              data-role="checkbox"
                             >
                               <input
                                 type="checkbox"
                               />
-                              <i />
+                              <i>
+                                <div
+                                  class="checkbox-icon icon"
+                                />
+                              </i>
                               <span
                                 class=""
                               />
@@ -1287,12 +2058,17 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                             class="cxd-Table-checkCell"
                           >
                             <label
-                              class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                              class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
+                              data-role="checkbox"
                             >
                               <input
                                 type="checkbox"
                               />
-                              <i />
+                              <i>
+                                <div
+                                  class="checkbox-icon icon"
+                                />
+                              </i>
                               <span
                                 class=""
                               />
@@ -1314,45 +2090,6 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
                   </div>
                 </div>
               </div>
-              <div
-                class="resize-sensor"
-                style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-  
-                <div
-                  class="resize-sensor-expand"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                >
-                  
-    
-                  <div
-                    style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                  />
-                  
-  
-                </div>
-                
-  
-                <div
-                  class="resize-sensor-shrink"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                >
-                  
-    
-                  <div
-                    style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                  />
-                  
-  
-                </div>
-                
-  
-                <div
-                  class="resize-sensor-appear"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-                />
-              </div>
             </div>
           </div>
         </div>
@@ -1373,45 +2110,6 @@ exports[`Renderer:select table with labelField & valueField 1`] = `
           </span>
         </button>
       </div>
-    </div>
-    <div
-      class="resize-sensor"
-      style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-    >
-      
-  
-      <div
-        class="resize-sensor-expand"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-shrink"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-appear"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-      />
     </div>
   </div>
 </div>
@@ -1436,10 +2134,11 @@ exports[`Renderer:select tree 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -1448,7 +2147,7 @@ exports[`Renderer:select tree 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -1469,6 +2168,7 @@ exports[`Renderer:select tree 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <label
@@ -1476,7 +2176,7 @@ exports[`Renderer:select tree 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           树型展示
@@ -1533,45 +2233,6 @@ exports[`Renderer:select tree 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -1584,7 +2245,7 @@ exports[`Renderer:select virtual 1`] = `
 <div>
   <div
     class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-    style="position: relative;"
+    data-role="container"
   >
     <div
       class="cxd-Panel-heading"
@@ -1593,7 +2254,7 @@ exports[`Renderer:select virtual 1`] = `
         class="cxd-Panel-title"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           <span>
             表单
@@ -1614,6 +2275,7 @@ exports[`Renderer:select virtual 1`] = `
         />
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="select"
           data-role="form-item"
         >
           <label
@@ -1621,7 +2283,7 @@ exports[`Renderer:select virtual 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   选项
@@ -1635,11 +2297,9 @@ exports[`Renderer:select virtual 1`] = `
             <div
               aria-expanded="true"
               aria-haspopup="listbox"
-              aria-labelledby="downshift-1-label"
               aria-owns="downshift-1-menu"
               class="cxd-Select is-opened has-popover"
               role="combobox"
-              style="position: relative;"
               tabindex="0"
             >
               <div
@@ -1660,8 +2320,9 @@ exports[`Renderer:select virtual 1`] = `
                 />
               </span>
               <div
-                class="cxd-PopOver cxd-Select-popover cxd-PopOver--leftBottomLeftTop"
-                style="display: block; width: auto; left: 0px; top: 0px; position: relative;"
+                class="cxd-PopOver cxd-Select-popover"
+                role="popover"
+                style="display: block; width: auto; left: 0px; top: 0px; visibility: hidden;"
                 theme="cxd"
               >
                 <div
@@ -1847,84 +2508,6 @@ exports[`Renderer:select virtual 1`] = `
                     </div>
                   </div>
                 </div>
-                <div
-                  class="resize-sensor"
-                  style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-                >
-                  
-  
-                  <div
-                    class="resize-sensor-expand"
-                    style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                  >
-                    
-    
-                    <div
-                      style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                    />
-                    
-  
-                  </div>
-                  
-  
-                  <div
-                    class="resize-sensor-shrink"
-                    style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                  >
-                    
-    
-                    <div
-                      style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                    />
-                    
-  
-                  </div>
-                  
-  
-                  <div
-                    class="resize-sensor-appear"
-                    style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-                  />
-                </div>
-              </div>
-              <div
-                class="resize-sensor"
-                style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-  
-                <div
-                  class="resize-sensor-expand"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                >
-                  
-    
-                  <div
-                    style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                  />
-                  
-  
-                </div>
-                
-  
-                <div
-                  class="resize-sensor-shrink"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                >
-                  
-    
-                  <div
-                    style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                  />
-                  
-  
-                </div>
-                
-  
-                <div
-                  class="resize-sensor-appear"
-                  style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-                />
               </div>
             </div>
           </div>
@@ -1946,45 +2529,6 @@ exports[`Renderer:select virtual 1`] = `
           </span>
         </button>
       </div>
-    </div>
-    <div
-      class="resize-sensor"
-      style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-    >
-      
-  
-      <div
-        class="resize-sensor-expand"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-shrink"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-appear"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-      />
     </div>
   </div>
 </div>

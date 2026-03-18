@@ -3,7 +3,10 @@ import {
   FormItem,
   FormControlProps,
   FormBaseControl,
-  resolveEventData
+  resolveEventData,
+  getVariable,
+  BaseSchemaWithoutType,
+  FormBaseControlWithoutSize
 } from 'amis-core';
 import {LazyComponent} from 'amis-core';
 import {Editor} from 'amis-ui';
@@ -15,9 +18,17 @@ import type {ListenerAction} from 'amis-core';
 
 /**
  * Editor 代码编辑器
- * 文档：https://baidu.gitee.io/amis/docs/components/form/editor
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/editor
  */
-export interface EditorControlSchema extends Omit<FormBaseControl, 'size'> {
+/**
+ * Editor 代码编辑器表单组件，支持多种编程语言和高亮显示，用于输入和编辑代码内容，常用作表单中的代码输入项
+ */
+export interface AMISCodeEditorSchema
+  extends BaseSchemaWithoutType,
+    FormBaseControlWithoutSize {
+  /**
+   * 指定为 editor 组件
+   */
   type:
     | 'editor'
     | 'bat-editor'
@@ -109,12 +120,12 @@ export interface EditorControlSchema extends Omit<FormBaseControl, 'size'> {
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
 
   /**
-   * 是否展示全屏模式开关
+   * 是否显示全屏按钮
    */
   allowFullscreen?: boolean;
 
   /**
-   * 获取编辑器底层实例
+   * 编辑器实例回调
    */
   editorDidMount?: string;
 }
@@ -128,7 +139,7 @@ export interface EditorProps extends FormControlProps {
 export default class EditorControl extends React.Component<EditorProps, any> {
   static defaultProps: Partial<EditorProps> = {
     language: 'javascript',
-    editorTheme: 'vs',
+    editorTheme: '',
     allowFullscreen: true,
     options: {
       automaticLayout: true,
@@ -160,14 +171,21 @@ export default class EditorControl extends React.Component<EditorProps, any> {
     this.toDispose.forEach(fn => fn());
   }
 
-  doAction(action: ListenerAction, args: any) {
+  doAction(
+    action: ListenerAction,
+    data: any,
+    throwErrors: boolean = false,
+    args?: any
+  ) {
     const actionType = action?.actionType as string;
-    const {onChange, resetValue} = this.props;
+    const {onChange, resetValue, formStore, store, name} = this.props;
 
     if (actionType === 'clear') {
       onChange('');
     } else if (actionType === 'reset') {
-      onChange(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange(pristineVal ?? '');
     } else if (actionType === 'focus') {
       this.focus();
     }
@@ -191,7 +209,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
 
     const rendererEvent = await dispatchEvent(
       'focus',
-      resolveEventData(this.props, {value}, 'value')
+      resolveEventData(this.props, {value})
     );
 
     if (rendererEvent?.prevented) {
@@ -210,7 +228,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
 
     const rendererEvent = await dispatchEvent(
       'blur',
-      resolveEventData(this.props, {value}, 'value')
+      resolveEventData(this.props, {value})
     );
 
     if (rendererEvent?.prevented) {
@@ -225,7 +243,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
 
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value: e}, 'value')
+      resolveEventData(this.props, {value: e})
     );
 
     if (rendererEvent?.prevented) {
@@ -247,7 +265,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
     if (this.props.editorDidMount) {
       let editorDidMount = this.props.editorDidMount;
       if (typeof editorDidMount === 'string') {
-        editorDidMount = new Function('editor', 'monaco');
+        editorDidMount = new Function('editor', 'monaco', editorDidMount);
       }
       const dispose = editorDidMount(editor, monaco);
       if (typeof dispose === 'function') {
@@ -277,6 +295,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
   render() {
     const {
       className,
+      style,
       classPrefix: ns,
       classnames: cx,
       value,
@@ -284,6 +303,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
       disabled,
       options,
       editorTheme,
+      theme,
       size,
       data,
       allowFullscreen,
@@ -324,7 +344,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
           onFocus={this.handleFocus}
           onBlur={this.handleBlur}
           language={language}
-          editorTheme={editorTheme}
+          editorTheme={editorTheme || (theme === 'dark' ? 'vs-dark' : 'vs')}
           editorDidMount={this.handleEditorMounted}
           childProps={{
             placeholder: placeholder

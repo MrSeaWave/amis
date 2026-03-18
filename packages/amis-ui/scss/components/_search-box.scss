@@ -8,14 +8,13 @@
   align-items: center;
   justify-content: flex-end;
 
-  height: 30px;
+  height: var(--input-size-default-height);
   width: 30px;
   padding-left: 8px;
 
   transition: all var(--animation-duration) ease-in-out;
   border: var(--Form-input-borderWidth) solid transparent;
   border-radius: var(--Form-input-borderRadius);
-  overflow: hidden;
 
   &:hover {
     background: var(--Form-input-onHover-bg);
@@ -25,6 +24,7 @@
     background: var(--Form-input-bg);
     border: var(--Form-input-borderWidth) solid var(--Form-input-borderColor);
     width: var(--SearchBox-width);
+    position: relative;
     > input {
       flex-grow: 1;
     }
@@ -41,6 +41,11 @@
   &-searchBtn {
     display: inline-block;
     padding: #{px2rem(5px)} #{px2rem(10px)};
+
+    &--loading {
+      display: inline-flex;
+      align-items: center;
+    }
   }
 
   &-activeBtn,
@@ -53,6 +58,9 @@
   &-cancelBtn {
     cursor: pointer;
     color: var(--SearchBox-search-icon-color);
+    svg {
+      top: px2rem(2px);
+    }
 
     &:hover {
       color: var(--icon-onHover-color);
@@ -62,7 +70,7 @@
   &.is-disabled &-activeBtn,
   &.is-disabled &-searchBtn,
   &.is-disabled &-cancelBtn {
-    color: var(--icon-onDisabled-color);
+    color: var(--SearchBox-search-btn-color--disabled);
     pointer-events: none;
   }
 
@@ -112,12 +120,17 @@
     }
   }
 
-  height: 30px;
-
   &--enhance.is-active &-searchBtn {
-    height: 100%;
     color: var(--SearchBox-enhonce-icon-color);
     background: var(--SearchBox-hover-color);
+    position: absolute;
+    top: px2rem(-1px);
+    bottom: px2rem(-1px);
+    right: px2rem(-1px);
+    border-radius: 0 var(--borderRadius) var(--borderRadius) 0;
+    svg {
+      top: px2rem(2px);
+    }
 
     &:hover {
       background: var(--button-primary-hover-bg-color);
@@ -131,6 +144,12 @@
   &--enhance.is-active.is-disabled &-searchBtn {
     background: var(--SearchBox-enhonce-disabled-color);
     color: var(--SearchBox-enhonce-disabled-search-color);
+  }
+
+  &.is-mobile {
+    border-radius: 0;
+    border: none;
+    border-bottom: var(--borderWidth) solid var(--borderColor);
   }
 }
 

@@ -1,6 +1,14 @@
 import omit from 'lodash/omit';
-import {Api, ApiObject, EventTrack, fetcherResult, Payload} from '../types';
-import {fetcherConfig} from '../factory';
+import {
+  Api,
+  ApiObject,
+  EventTrack,
+  fetcherResult,
+  Payload,
+  RequestAdaptor,
+  ResponseAdaptor
+} from '../types';
+import {FetcherConfig} from '../factory';
 import {tokenize, dataMapping, escapeHtml} from './tpl-builtin';
 import {evalExpression} from './tpl';
 import {
@@ -11,13 +19,18 @@ import {
   qsstringify,
   cloneObject,
   createObject,
+  extendObject,
   qsparse,
   uuid,
-  JSONTraverse
+  JSONTraverse,
+  isEmpty
 } from './helper';
 import isPlainObject from 'lodash/isPlainObject';
 import {debug, warning} from './debug';
-import {evaluate, parse} from 'amis-formula';
+import {evaluate} from 'amis-formula';
+import {memoryParse} from './memoryParse';
+import cloneDeep from 'lodash/cloneDeep';
+import isEqual from 'lodash/isEqual';
 
 const rSchema =
   /(?:^|raw\:)(get|post|put|delete|patch|options|head|jsonp|js):/i;
@@ -28,6 +41,46 @@ interface ApiCacheConfig extends ApiObject {
 }
 
 const apiCaches: Array<ApiCacheConfig> = [];
+const requestAdaptors: Array<RequestAdaptor> = [];
+const responseAdaptors: Array<ResponseAdaptor> = [];
+
+/**
+ * 添加全局发送适配器
+ * @param adaptor
+ */
+export function addApiRequestAdaptor(adaptor: RequestAdaptor) {
+  requestAdaptors.push(adaptor);
+  return () => removeApiRequestAdaptor(adaptor);
+}
+
+/**
+ * 删除全局发送适配器
+ * @param adaptor
+ */
+export function removeApiRequestAdaptor(adaptor: RequestAdaptor) {
+  const idx = requestAdaptors.findIndex(i => i === adaptor);
+  ~idx && requestAdaptors.splice(idx, 1);
+}
+
+/**
+ * 添加全局响应适配器
+ * @param adaptor
+ */
+export function addApiResponseAdaptor(adaptor: ResponseAdaptor) {
+  responseAdaptors.push(adaptor);
+  return () => removeApiResponseAdaptor(adaptor);
+}
+// :(  之前写错了，这里为了让以前的代码能继续跑，暂时保留
+export const addApiResponseAdator = addApiResponseAdaptor;
+
+/**
+ * 删除全局响应适配器
+ * @param adaptor
+ */
+export function removeApiResponseAdaptor(adaptor: ResponseAdaptor) {
+  const idx = responseAdaptors.findIndex(i => i === adaptor);
+  ~idx && responseAdaptors.splice(idx, 1);
+}
 
 const isIE = !!(document as any).documentMode;
 
@@ -74,15 +127,20 @@ export function buildApi(
   }
 
   if (api.requestAdaptor && typeof api.requestAdaptor === 'string') {
-    api.requestAdaptor = str2function(api.requestAdaptor, 'api') as any;
+    api.requestAdaptor = str2AsyncFunction(
+      api.requestAdaptor,
+      'api',
+      'context'
+    ) as any;
   }
 
   if (api.adaptor && typeof api.adaptor === 'string') {
-    api.adaptor = str2function(
+    api.adaptor = str2AsyncFunction(
       api.adaptor,
       'payload',
       'response',
-      'api'
+      'api',
+      'context'
     ) as any;
   }
 
@@ -100,7 +158,7 @@ export function buildApi(
   const raw = (api.url = api.url || '');
   let ast: any = undefined;
   try {
-    ast = parse(api.url);
+    ast = memoryParse(api.url);
   } catch (e) {
     console.warn(`api 配置语法出错：${e}`);
     return api;
@@ -129,11 +187,65 @@ export function buildApi(
     );
   };
 
+  // 是否过滤空字符串 query
+  const queryStringify = (query: any) =>
+    qsstringify(
+      query,
+      (api as ApiObject)?.filterEmptyQuery
+        ? {
+            filter: (key: string, value: any) => {
+              return value === ''
+                ? undefined
+                : // qs源码中有filter后，不会默认使用serializeDate处理date类型
+                value instanceof Date
+                ? Date.prototype.toISOString.call(value)
+                : value;
+            }
+          }
+        : undefined
+    );
+  /** 追加data到请求的Query中 */
+  const attachDataToQuery = (
+    apiObject: ApiObject,
+    ctx: Record<string, any>,
+    merge: boolean
+  ) => {
+    apiObject.originUrl = apiObject.originUrl || apiObject.url;
+    const idx = apiObject.url.indexOf('?');
+    if (~idx) {
+      const params = (apiObject.query = {
+        ...qsparse(apiObject.url.substring(idx + 1)),
+        ...apiObject.query,
+        ...ctx
+      });
+      apiObject.url =
+        apiObject.url.substring(0, idx) + '?' + queryStringify(params);
+    } else {
+      apiObject.query = {...apiObject.query, ...ctx};
+      const query = queryStringify(merge ? apiObject.query : ctx);
+      if (query) {
+        apiObject.url = `${apiObject.url}?${query}`;
+      }
+    }
+
+    return apiObject;
+  };
+
+  let queryMapped = false;
   if (~idx) {
     const hashIdx = url.indexOf('#');
-    const params = qsparse(
+    let params = qsparse(
       url.substring(idx + 1, ~hashIdx && hashIdx > idx ? hashIdx : undefined)
     );
+
+    // 合并 api.query 的配置
+    params = dataMapping(
+      Object.assign(params, api.query),
+      data,
+      undefined,
+      api.convertKeyToPath
+    );
+    queryMapped = true;
 
     // 将里面的表达式运算完
     JSONTraverse(params, (value: any, key: string | number, host: any) => {
@@ -145,13 +257,13 @@ export function buildApi(
       }
     });
 
+    api.query = params;
     const left = replaceExpression(url.substring(0, idx), 'raw', '');
+
     api.url =
       left +
       (~left.indexOf('?') ? '&' : '?') +
-      qsstringify(
-        (api.query = dataMapping(params, data, undefined, api.convertKeyToPath))
-      ) +
+      queryStringify(api.query) +
       (~hashIdx && hashIdx > idx
         ? replaceExpression(url.substring(hashIdx))
         : '');
@@ -163,6 +275,7 @@ export function buildApi(
     return api;
   }
 
+  const hasCustomData = api.data;
   if (api.data) {
     api.body = api.data = dataMapping(
       api.data,
@@ -175,7 +288,12 @@ export function buildApi(
     api.method === 'put' ||
     api.method === 'patch'
   ) {
-    api.body = api.data = cloneObject(data);
+    api.body = api.data = data;
+  }
+
+  // 给 query 做数据映射
+  if (api.query && !queryMapped) {
+    api.query = dataMapping(api.query, data, undefined, api.convertKeyToPath);
   }
 
   // get 类请求，把 data 附带到 url 上。
@@ -184,44 +302,38 @@ export function buildApi(
       !api.data &&
       ((!~raw.indexOf('$') && autoAppend) || api.forceAppendDataToQuery)
     ) {
-      api.query = api.data = data;
+      api.data = data;
+      api.query = {
+        ...api.query,
+        ...data
+      };
     } else if (
       api.attachDataToQuery === false &&
       api.data &&
       ((!~raw.indexOf('$') && autoAppend) || api.forceAppendDataToQuery)
     ) {
-      const idx = api.url.indexOf('?');
-      if (~idx) {
-        let params = (api.query = {
-          ...qsparse(api.url.substring(idx + 1)),
-          ...data
-        });
-        api.url = api.url.substring(0, idx) + '?' + qsstringify(params);
-      } else {
-        api.query = data;
-        const query = qsstringify(data);
-        if (query) {
-          api.url = `${api.url}?${query}`;
-        }
-      }
+      api = attachDataToQuery(api, data, false);
     }
 
     if (api.data && api.attachDataToQuery !== false) {
-      const idx = api.url.indexOf('?');
-      if (~idx) {
-        let params = (api.query = {
-          ...qsparse(api.url.substring(idx + 1)),
-          ...api.data
-        });
-        api.url = api.url.substring(0, idx) + '?' + qsstringify(params);
-      } else {
-        api.query = api.data;
-        const query = qsstringify(api.data);
-        if (query) {
-          api.url = `${api.url}?${query}`;
-        }
-      }
+      api = attachDataToQuery(api, api.data, true);
       delete api.data;
+    }
+  }
+  // 非 get 类请求也可以携带参数到 url，只要 query 有值
+  else if (api.method) {
+    const idx = api.url.indexOf('?');
+    if (~idx) {
+      let params = (api.query = {
+        ...qsparse(api.url.substring(idx + 1)),
+        ...api.query
+      });
+      api.url = api.url.substring(0, idx) + '?' + queryStringify(params);
+    } else {
+      const query = queryStringify(api.query);
+      if (query) {
+        api.url = `${api.url}?${query}`;
+      }
     }
   }
 
@@ -238,6 +350,29 @@ export function buildApi(
         operationName: api.operationName,
         variables: cloneObject(api.data)
       };
+    }
+  } else if (api.jsonql) {
+    api.method = 'post';
+    api.jsonql = dataMapping(
+      api.jsonql,
+      /** 需要上层数据域的内容 */
+      extendObject(data, {...api.query, ...data}, false),
+      undefined,
+      false,
+      true
+    );
+    /** 同时设置了JSONQL和data时走兼容场景 */
+    api.body = api.data =
+      hasCustomData && api.jsonql
+        ? {
+            data: api.data,
+            jsonql: api.jsonql
+          }
+        : api.jsonql;
+
+    /** JSONQL所有method需要追加data中的变量到query中 */
+    if (api.forceAppendDataToQuery) {
+      api = attachDataToQuery(api, data, true);
     }
   }
 
@@ -272,6 +407,20 @@ export function str2AsyncFunction(
   }
 }
 
+export function callStrFunction(
+  this: any,
+  fn: string | Function,
+  argNames: Array<string>,
+  ...args: Array<any>
+) {
+  if (typeof fn === 'function') {
+    return fn.apply(this, args);
+  } else if (typeof fn === 'string' && fn) {
+    const func = str2function(fn, ...argNames)!;
+    return func?.apply(this, args);
+  }
+}
+
 export function responseAdaptor(ret: fetcherResult, api: ApiObject) {
   let data = ret.data;
   let hasStatusField = true;
@@ -282,12 +431,13 @@ export function responseAdaptor(ret: fetcherResult, api: ApiObject) {
 
   // 返回内容是 string，说明 content-type 不是 json，这时可能是返回了纯文本或 html
   if (typeof data === 'string') {
-    const contentType = (ret.headers as any)['content-type'] || '';
+    const contentType = (ret.headers as any)?.['content-type'] || '';
     // 如果是文本类型就尝试解析一下
     if (
       ret.headers &&
       contentType.startsWith('text/') &&
-      !contentType.includes('markdown')
+      !contentType.includes('markdown') &&
+      api.responseType !== 'blob'
     ) {
       try {
         data = JSON.parse(data);
@@ -361,19 +511,11 @@ export function responseAdaptor(ret: fetcherResult, api: ApiObject) {
 
   debug('api', 'response', payload);
 
-  if (payload.ok && api.responseData) {
+  if (api.responseData && (payload.ok || !isEmpty(payload.data))) {
     debug('api', 'before dataMapping', payload.data);
     const responseData = dataMapping(
       api.responseData,
-
-      createObject(
-        {api},
-        (Array.isArray(payload.data)
-          ? {
-              items: payload.data
-            }
-          : payload.data) || {}
-      ),
+      createObject({api}, normalizeApiResponseData(payload.data)),
       undefined,
       api.convertKeyToPath
     );
@@ -384,8 +526,16 @@ export function responseAdaptor(ret: fetcherResult, api: ApiObject) {
   return payload;
 }
 
+function lazyResolve<T = any>(value: T, waitFor = 1000) {
+  return new Promise<T>(resolve => {
+    setTimeout(() => {
+      resolve(value);
+    }, waitFor);
+  });
+}
+
 export function wrapFetcher(
-  fn: (config: fetcherConfig) => Promise<fetcherResult>,
+  fn: (config: FetcherConfig) => Promise<fetcherResult>,
   tracker?: (eventTrack: EventTrack, data: any) => void
 ) {
   // 避免重复处理
@@ -393,16 +543,57 @@ export function wrapFetcher(
     return fn as any;
   }
 
-  const wrappedFetcher = function (api: Api, data: object, options?: object) {
+  const wrappedFetcher = async function (
+    api: Api,
+    data: object,
+    options?: object
+  ) {
     api = buildApi(api, data, options) as ApiObject;
+    (api as ApiObject).context = data;
 
+    const adaptors = requestAdaptors.concat();
     if (api.requestAdaptor) {
-      debug('api', 'before requestAdaptor', api);
-      api = api.requestAdaptor(api) || api;
-      debug('api', 'after requestAdaptor', api);
+      const adaptor = api.requestAdaptor;
+      adaptors.unshift(async (api: ApiObject, context) => {
+        const originQuery = api.query;
+        const originQueryCopy = isPlainObject(api.query)
+          ? cloneDeep(api.query)
+          : api.query;
+
+        debug('api', 'before requestAdaptor', api);
+        api = (await adaptor.call(api, api, context)) || api;
+
+        if (
+          typeof api.url === 'string' &&
+          (api.query !== originQuery ||
+            (isPlainObject(api.query) && !isEqual(api.query, originQueryCopy)))
+        ) {
+          // 如果 api.data 有变化，且是 get 请求，那么需要重新构建 url
+          const idx = api.url.indexOf('?');
+          api.url = `${
+            ~idx ? api.url.substring(0, idx) : api.url
+          }?${qsstringify(api.query)}`;
+        }
+        debug('api', 'after requestAdaptor', api);
+        return api;
+      });
     }
 
-    if (api.data && (hasFile(api.data) || api.dataType === 'form-data')) {
+    // 执行所有的发送适配器
+    if (adaptors.length) {
+      api = await adaptors.reduce(async (api, fn) => {
+        let ret: any = await api;
+        ret = (await fn(ret, data)) || ret;
+        return ret as ApiObject;
+      }, Promise.resolve(api));
+    }
+
+    if (
+      api.data &&
+      (api.data instanceof FormData ||
+        hasFile(api.data) ||
+        api.dataType === 'form-data')
+    ) {
       api.data =
         api.data instanceof FormData
           ? api.data
@@ -414,7 +605,9 @@ export function wrapFetcher(
     ) {
       api.data = qsstringify(api.data, api.qsOptions) as any;
       api.headers = api.headers || (api.headers = {});
-      api.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      if (!api.headers['Content-Type']) {
+        api.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      }
     } else if (
       api.data &&
       typeof api.data !== 'string' &&
@@ -422,12 +615,37 @@ export function wrapFetcher(
     ) {
       api.data = JSON.stringify(api.data) as any;
       api.headers = api.headers || (api.headers = {});
-      api.headers['Content-Type'] = 'application/json';
+      // 避免覆盖用户自定义的Content-Type，如同为json请求，还有扩展的application/vnd.api+json
+      if (!api.headers['Content-Type']) {
+        api.headers['Content-Type'] = 'application/json';
+      }
+    }
+
+    // 如果发送适配器中设置了 mockResponse
+    // 则直接跳过请求发送
+    if (api.mockResponse) {
+      console.debug(
+        `fetch api ${api.url}${
+          api.data
+            ? `?${
+                typeof api.data === 'string'
+                  ? api.data
+                  : qsstringify(api.data, api.qsOptions)
+              }`
+            : ''
+        } with mock response`,
+        api.mockResponse,
+        api
+      );
+      return wrapAdaptor(
+        lazyResolve(api.mockResponse, api.mockResponse?.delay ?? 100),
+        api,
+        data
+      );
     }
 
     if (!isValidApi(api.url)) {
-      warning('api', 'invalid api url', api);
-      return Promise.resolve();
+      throw new Error(`invalid api url:${api.url}`);
     }
 
     debug('api', 'request api', api);
@@ -438,11 +656,11 @@ export function wrapFetcher(
     );
 
     if (api.method?.toLocaleLowerCase() === 'jsonp') {
-      return wrapAdaptor(jsonpFetcher(api), api);
+      return wrapAdaptor(jsonpFetcher(api), api, data);
     }
 
     if (api.method?.toLocaleLowerCase() === 'js') {
-      return wrapAdaptor(jsFetcher(fn, api), api);
+      return wrapAdaptor(jsFetcher(fn, api), api, data);
     }
 
     if (typeof api.cache === 'number' && api.cache > 0) {
@@ -451,7 +669,8 @@ export function wrapFetcher(
         apiCache
           ? (apiCache as ApiCacheConfig).cachedPromise
           : setApiCache(api, fn(api)),
-        api
+        api,
+        data
       );
     }
     // IE 下 get 请求会被缓存，所以自动加个时间戳
@@ -463,7 +682,7 @@ export function wrapFetcher(
         api.url = api.url + `&${timeStamp}`;
       }
     }
-    return wrapAdaptor(fn(api), api);
+    return wrapAdaptor(fn(api), api, data);
   };
 
   (wrappedFetcher as any)._wrappedFetcher = true;
@@ -471,27 +690,50 @@ export function wrapFetcher(
   return wrappedFetcher;
 }
 
-export function wrapAdaptor(promise: Promise<fetcherResult>, api: ApiObject) {
-  const adaptor = api.adaptor;
-  return adaptor
-    ? promise
-        .then(async response => {
-          debug('api', 'before adaptor data', (response as any).data);
-          let result = adaptor((response as any).data, response, api);
+export async function wrapAdaptor(
+  promise: Promise<fetcherResult>,
+  api: ApiObject,
+  context: any
+) {
+  const adaptors = responseAdaptors.concat();
+  if (api.adaptor) {
+    const adaptor = api.adaptor;
+    adaptors.push(
+      async (
+        payload: object,
+        response: fetcherResult,
+        api: ApiObject,
+        context: any
+      ) => {
+        debug('api', 'before adaptor data', (response as any).data);
+        let result = adaptor((response as any).data, response, api, context);
 
-          if (result?.then) {
-            result = await result;
-          }
+        if (result?.then) {
+          result = await result;
+        }
 
-          debug('api', 'after adaptor data', result);
+        debug('api', 'after adaptor data', result);
+        return result;
+      }
+    );
+  }
 
-          return {
-            ...response,
-            data: result
-          };
-        })
-        .then(ret => responseAdaptor(ret, api))
-    : promise.then(ret => responseAdaptor(ret, api));
+  const response = await adaptors.reduce(async (promise, adaptor) => {
+    let response: any = await promise;
+    let result =
+      adaptor(response.data, response, api, context) ?? response.data;
+
+    if (result?.then) {
+      result = await result;
+    }
+
+    return {
+      ...response,
+      data: result
+    } as fetcherResult;
+  }, promise);
+
+  return responseAdaptor(response, api);
 }
 
 /**
@@ -500,7 +742,7 @@ export function wrapAdaptor(promise: Promise<fetcherResult>, api: ApiObject) {
  * @returns
  */
 export function jsFetcher(
-  fetcher: (config: fetcherConfig) => Promise<fetcherResult>,
+  fetcher: (config: FetcherConfig) => Promise<fetcherResult>,
   api: ApiObject
 ): Promise<fetcherResult> {
   return new Promise((resolve, reject) => {
@@ -617,22 +859,32 @@ export function isApiOutdated(
 ): nextApi is Api {
   if (!nextApi) {
     return false;
-  } else if (!prevApi) {
+  }
+
+  // 通常是编辑器里加了属性，一开始没值，后来有了
+  if (prevApi === undefined) {
     return true;
   }
 
   nextApi = normalizeApi(nextApi);
+  prevApi = (prevApi ? normalizeApi(prevApi) : prevApi) as ApiObject;
 
   if (nextApi.autoRefresh === false) {
     return false;
   }
 
-  const trackExpression = nextApi.trackExpression ?? nextApi.url;
+  // api 本身有变化
+  if ((prevApi && prevApi.url !== nextApi.url) || !prevApi) {
+    return !!(
+      isValidApi(nextApi.url) &&
+      (!nextApi.sendOn || evalExpression(nextApi.sendOn, nextData))
+    );
+  }
 
+  const trackExpression = nextApi.trackExpression ?? nextApi.url;
   if (typeof trackExpression !== 'string' || !~trackExpression.indexOf('$')) {
     return false;
   }
-  prevApi = normalizeApi(prevApi);
 
   let isModified = false;
 
@@ -641,8 +893,12 @@ export function isApiOutdated(
       tokenize(prevApi.trackExpression || '', prevData) !==
       tokenize(nextApi.trackExpression || '', nextData);
   } else {
-    prevApi = buildApi(prevApi as Api, prevData as object, {ignoreData: true});
-    nextApi = buildApi(nextApi as Api, nextData as object, {ignoreData: true});
+    prevApi = buildApi(prevApi as Api, prevData as object, {
+      ignoreData: true
+    });
+    nextApi = buildApi(nextApi as Api, nextData as object, {
+      ignoreData: true
+    });
     isModified = prevApi.url !== nextApi.url;
   }
 
@@ -654,14 +910,28 @@ export function isApiOutdated(
 }
 
 export function isValidApi(api: string) {
-  return (
-    api &&
-    /^(?:(https?|wss?|taf):\/\/[^\/]+)?(\/?[^\s\/\?]*){1,}(\?.*)?$/.test(api)
-  );
+  if (!api || typeof api !== 'string') {
+    return false;
+  }
+  const idx = api.indexOf('://');
+
+  // 不允许 :// 结尾
+  if (~idx && idx + 3 === api.length) {
+    return false;
+  }
+
+  try {
+    // 不补一个协议，URL 判断为 false
+    api = (~idx ? '' : `schema://domain${api[0] === '/' ? '' : '/'}`) + api;
+    new URL(api);
+  } catch (error) {
+    return false;
+  }
+  return true;
 }
 
 export function isEffectiveApi(
-  api?: Api,
+  api?: Api | false,
   data?: any,
   initFetch?: boolean,
   initFetchOn?: string
@@ -686,6 +956,16 @@ export function isEffectiveApi(
       return false;
     }
     return true;
+  }
+  return false;
+}
+
+// 判断api是否存在，且SendOn为不发送
+export function shouldBlockedBySendOnApi(api?: Api, data?: any) {
+  if (isObject(api) && (api as ApiObject).url) {
+    if ((api as ApiObject).sendOn && data) {
+      return !evalExpression((api as ApiObject).sendOn as string, data);
+    }
   }
   return false;
 }

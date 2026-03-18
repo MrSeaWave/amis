@@ -1,6 +1,7 @@
 // 多语言支持
 import React from 'react';
 import hoistNonReactStatic from 'hoist-non-react-statics';
+import moment from 'moment';
 import {resolveVariable} from './utils/tpl-builtin';
 
 export type TranslateFn<T = any> = (str: T, data?: object) => T;
@@ -11,6 +12,12 @@ interface LocaleConfig {
 
 let defaultLocale: string = 'zh-CN';
 
+const momentLocaleMap: Record<string, string> = {
+  'zh-CN': 'zh-cn',
+  'en-US': 'en',
+  'de-DE': 'de'
+};
+
 const locales: {
   [propName: string]: LocaleConfig;
 } = {};
@@ -20,19 +27,46 @@ export function register(name: string, config: LocaleConfig) {
   extendLocale(name, config);
 }
 
-export function extendLocale(name: string, config: LocaleConfig) {
-  locales[name] = {
-    ...(locales[name] || {}),
-    ...config
-  };
+export function extendLocale(
+  name: string,
+  config: LocaleConfig,
+  cover: boolean = true
+) {
+  if (cover) {
+    // 覆盖式扩展语料
+    locales[name] = {
+      ...(locales[name] || {}),
+      ...config
+    };
+  } else {
+    locales[name] = {
+      ...config,
+      ...(locales[name] || {})
+    };
+  }
+}
+
+/** 删除语料数据 */
+export function removeLocaleData(name: string, key: Array<string> | string) {
+  if (Array.isArray(key)) {
+    key.forEach(item => {
+      removeLocaleData(name, item);
+    });
+    return;
+  }
+  if (locales?.[name]?.[key]) {
+    delete locales[name][key];
+  }
 }
 
 const fns: {
   [propName: string]: TranslateFn;
 } = {};
 
-function format(str: string, data?: object) {
-  return str.replace(/(\\)?\{\{([\s\S]+?)\}\}/g, (_, escape, key) => {
+export function format(str: string, data?: object) {
+  if (!str.includes('{{')) return str; // 先快速检查，避免无谓的正则执行
+
+  return str.replace(/(\\)?\{\{([^{}]+?)\}\}/g, (_, escape, key) => {
     if (escape) {
       return _.substring(1);
     }
@@ -51,8 +85,12 @@ export function makeTranslator(locale?: string): TranslateFn {
       return str;
     }
 
-    const dict = locales[locale!] || locales[defaultLocale] || locales['zh-CN'];
-    return format(dict?.[str] || str, ...args);
+    const value =
+      locales[locale!]?.[str] ||
+      locales[defaultLocale]?.[str] ||
+      locales['zh-CN']?.[str] ||
+      str;
+    return format(value, ...args);
   };
 
   locale && (fns[locale] = fn);
@@ -63,8 +101,8 @@ export function getDefaultLocale() {
   return defaultLocale;
 }
 
-export function setDefaultLocale(loacle: string) {
-  defaultLocale = loacle;
+export function setDefaultLocale(locale: string) {
+  defaultLocale = locale;
 }
 
 export interface LocaleProps {
@@ -76,7 +114,7 @@ export const LocaleContext = React.createContext('');
 
 export function localeable<
   T extends React.ComponentType<React.ComponentProps<T> & LocaleProps>
->(ComposedComponent: T) {
+>(ComposedComponent: T, methods?: Array<string>) {
   type OuterProps = JSX.LibraryManagedAttributes<
     T,
     Omit<React.ComponentProps<T>, keyof LocaleProps>
@@ -87,7 +125,7 @@ export function localeable<
 
   const result = hoistNonReactStatic(
     class extends React.Component<OuterProps> {
-      static displayName = `I18N(${
+      static displayName: string = `I18N(${
         ComposedComponent.displayName || ComposedComponent.name
       })`;
       static contextType = LocaleContext;
@@ -116,7 +154,7 @@ export function localeable<
 
       render() {
         const locale: string =
-          this.props.locale || this.context || defaultLocale;
+          this.props.locale || (this.context as string) || defaultLocale;
         const translate = this.props.translate || makeTranslator(locale);
         const injectedProps: {
           locale: string;
@@ -125,9 +163,13 @@ export function localeable<
           locale,
           translate: translate!
         };
-        const refConfig = ComposedComponent.prototype?.isReactComponent
-          ? {ref: this.childRef}
-          : {forwardedRef: this.childRef};
+        moment.locale(momentLocaleMap?.[locale] ?? locale);
+        const refConfig =
+          ComposedComponent.prototype?.isReactComponent ||
+          (ComposedComponent as any).$$typeof ===
+            Symbol.for('react.forward_ref')
+            ? {ref: this.childRef}
+            : {forwardedRef: this.childRef};
 
         const body = (
           <ComposedComponent
@@ -148,6 +190,17 @@ export function localeable<
     },
     ComposedComponent
   );
+
+  if (Array.isArray(methods)) {
+    methods.forEach(method => {
+      if (ComposedComponent.prototype[method]) {
+        (result as any).prototype[method] = function () {
+          const fn = this.ref?.[method];
+          return fn ? fn.apply(this.ref, arguments) : undefined;
+        };
+      }
+    });
+  }
 
   return result as typeof result & {
     ComposedComponent: T;

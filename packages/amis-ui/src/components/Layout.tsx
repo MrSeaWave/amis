@@ -22,39 +22,41 @@ interface LayoutProps {
   header?: boolean | React.ReactNode;
   headerClassName?: string;
   aside?: boolean | React.ReactNode;
-  asideClassName: string;
+  asideClassName?: string;
   boxed?: boolean;
   folded?: boolean;
-  asideFixed: boolean;
-  headerFixed: boolean;
+  asideFixed?: boolean;
+  headerFixed?: boolean;
   className?: string;
   contentClassName?: string;
-  footer: boolean | React.ReactNode;
-  offScreen: boolean;
+  footer?: boolean | React.ReactNode;
+  offScreen?: boolean;
   classPrefix: string;
   classnames: ClassNamesFn;
   size?: 'sm' | 'base' | 'md' | 'lg';
   children?: React.ReactNode;
   bodyClassName?: string;
+  mainClassName?: string;
 }
 
 export function Layout({
   header,
   headerClassName,
   aside,
-  asideClassName,
+  asideClassName = '',
   children,
   className,
   contentClassName,
   folded,
-  asideFixed,
-  headerFixed,
-  footer,
-  offScreen,
+  asideFixed = true,
+  headerFixed = true,
+  footer = false,
+  offScreen = false,
   size,
   boxed,
   classnames: cx,
-  bodyClassName
+  bodyClassName,
+  mainClassName
 }: LayoutProps) {
   let body = (
     <div className={cx(`Layout-body`, contentClassName)}>{children}</div>
@@ -86,22 +88,25 @@ export function Layout({
         'Layout--folded': folded,
         'Layout--offScreen': offScreen,
         [`Layout--${size}`]: size,
-        'Layout--noFooter': !footer
+        'Layout--noFooter': !footer,
+        'Layout--noHeader': !header
       })}
     >
       {header ? (
         <div className={cx('Layout-header', headerClassName)}>{header}</div>
       ) : null}
-      {aside ? (
-        <div className={cx(`Layout-aside`, asideClassName)}>
-          <div className={cx('Layout-asideWrap')}>
-            <div id="asideInner" className={cx('Layout-asideInner')}>
-              {aside}
+      <div className={cx('Layout-main', mainClassName)}>
+        {aside ? (
+          <div className={cx(`Layout-aside`, asideClassName)}>
+            <div className={cx('Layout-asideWrap')}>
+              <div id="asideInner" className={cx('Layout-asideInner')}>
+                {aside}
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
-      {body}
+        ) : null}
+        {body}
+      </div>
       {footer ? (
         <footer className={cx('Layout-footer')} role="footer">
           {footer}
@@ -110,14 +115,5 @@ export function Layout({
     </div>
   );
 }
-
-Layout.defaultProps = {
-  // asideWide: false,
-  asideFixed: true,
-  asideClassName: '',
-  headerFixed: true,
-  offScreen: false,
-  footer: false
-};
 
 export default themeable(Layout);

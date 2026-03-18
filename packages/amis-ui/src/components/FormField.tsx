@@ -8,7 +8,7 @@ import {
   Controller as ReactHookFormController,
   RegisterOptions
 } from 'react-hook-form';
-import {method} from 'lodash';
+import method from 'lodash/method';
 
 export interface FormFieldProps extends LocaleProps, ThemeProps {
   mode?: 'normal' | 'horizontal';
@@ -25,7 +25,7 @@ export interface FormFieldProps extends LocaleProps, ThemeProps {
   isRequired?: boolean;
   hasError?: boolean;
   errors?: string | Array<string>;
-  children?: JSX.Element;
+  children?: React.ReactNode | Array<React.ReactNode>;
 }
 
 function FormField(props: FormFieldProps) {
@@ -34,6 +34,7 @@ function FormField(props: FormFieldProps) {
     children,
     classnames: cx,
     className,
+    style,
     hasError,
     isRequired,
     label,
@@ -60,6 +61,7 @@ function FormField(props: FormFieldProps) {
           [`is-required`]: isRequired,
           'Form-item--horizontal-justify': horizontal.justify
         })}
+        // style={style}
       >
         {label !== false ? (
           <label
@@ -120,6 +122,7 @@ function FormField(props: FormFieldProps) {
         'is-error': hasError,
         [`is-required`]: isRequired
       })}
+      // style={style}
     >
       {label ? (
         <label className={cx(`Form-label`, labelClassName)}>
@@ -149,7 +152,7 @@ function FormField(props: FormFieldProps) {
   );
 }
 
-const ThemedFormField = themeable(localeable(FormField));
+const ThemedFormField = themeable(localeable(React.memo(FormField)));
 
 export default ThemedFormField;
 
@@ -163,6 +166,11 @@ export interface ControllerProps
     [propName: string]: any;
   };
 
+  // combo 里面有用
+  columnClassName?: string;
+
+  className?: string;
+
   /**
    * 配置成 false 则不包裹
    */
@@ -171,11 +179,14 @@ export interface ControllerProps
 export function Controller(props: ControllerProps) {
   const {render, name, shouldUnregister, defaultValue, control, wrap, ...rest} =
     props;
-  let rules = {...props.rules};
+  const rules = React.useMemo(() => {
+    const rules = {...props.rules};
 
-  if (rest.isRequired) {
-    rules.required = true;
-  }
+    if (props.isRequired) {
+      rules.required = true;
+    }
+    return rules;
+  }, [props.rules, props.isRequired]);
 
   return (
     <ReactHookFormController

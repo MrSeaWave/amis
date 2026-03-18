@@ -1,23 +1,23 @@
 import React from 'react';
 import {
+  ActionObject,
+  IScopedContext,
   Renderer,
   RendererProps,
-  generateIcon,
-  IconCheckedSchema
+  ScopedContext,
+  autobind,
+  resolveEventData,
+  isPureVariable,
+  AMISSchemaCollection,
+  setThemeClassName,
+  CustomStyle,
+  AMISSchemaBase
 } from 'amis-core';
-import {Collapse as BasicCollapse} from 'amis-ui';
-import {BaseSchema, SchemaCollection, SchemaTpl, SchemaObject} from '../Schema';
+import {Collapse as BasicCollapse, Icon} from 'amis-ui';
+import {BaseSchema, SchemaTpl, SchemaObject} from '../Schema';
+import classNames from 'classnames';
 
-/**
- * Collapse 折叠渲染器，格式说明。
- * 文档：https://baidu.gitee.io/amis/docs/components/collapse
- */
-export interface CollapseSchema extends BaseSchema {
-  /**
-   * 指定为折叠器类型
-   */
-  type: 'collapse';
-
+export interface AMISCollapseSchemaBase extends AMISSchemaBase {
   /**
    * 标识
    */
@@ -31,12 +31,7 @@ export interface CollapseSchema extends BaseSchema {
   /**
    * 标题
    */
-  header?: string | SchemaCollection;
-
-  /**
-   * 内容区域
-   */
-  body: SchemaCollection;
+  header?: string | AMISSchemaCollection;
 
   /**
    * 配置 Body 容器 className
@@ -89,19 +84,44 @@ export interface CollapseSchema extends BaseSchema {
   mountOnEnter?: boolean;
 
   /**
-   * 卡片隐藏就销毁内容。
+   * 卡片隐藏就销毁内容
    */
   unmountOnExit?: boolean;
+  /**
+   * 标题内容分割线
+   */
+  divideLine?: boolean;
+
+  /**
+   * 内容区域
+   */
+  body: AMISSchemaCollection;
+}
+
+/**
+ * Collapse 折叠渲染器，格式说明。
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/collapse
+ */
+/**
+ * 折叠面板组件，用于展开/收起内容区域。支持默认展开与禁用。
+ */
+export interface AMISCollapseSchema extends AMISCollapseSchemaBase {
+  /**
+   * 指定为折叠器类型
+   */
+  type: 'collapse';
 }
 
 export interface CollapseProps
   extends RendererProps,
-    Omit<CollapseSchema, 'type' | 'className'> {
+    Omit<AMISCollapseSchema, 'type' | 'className'> {
   wrapperComponent?: any;
   headingComponent?: any;
 
   // 内容口子
   children?: JSX.Element | ((props?: any) => JSX.Element);
+  /** 当Collapse作为Form组件的子元素时，开启该属性后组件样式设置为FieldSet组件的样式，默认开启 */
+  enableFieldSetStyle?: boolean;
 }
 
 export default class Collapse extends React.Component<CollapseProps, {}> {
@@ -117,6 +137,54 @@ export default class Collapse extends React.Component<CollapseProps, {}> {
     'size'
   ];
 
+  basicCollapse = React.createRef<any>();
+
+  @autobind
+  async handleCollapseChange(collapsed: boolean) {
+    const {dispatchEvent, onCollapse} = this.props;
+    const eventData = resolveEventData(this.props, {
+      collapsed
+    });
+
+    // 触发折叠器状态变更事件
+    const changeEvent = await dispatchEvent('change', eventData);
+
+    // 单独触发折叠 or 收起事件
+    const toggleEvent = await dispatchEvent(
+      collapsed ? 'collapse' : 'expand',
+      eventData
+    );
+
+    if (changeEvent?.prevented || toggleEvent?.prevented) {
+      return;
+    }
+
+    onCollapse?.(collapsed);
+  }
+
+  doAction(
+    action: ActionObject,
+    data: object,
+    throwErrors: boolean,
+    args: object
+  ): any {
+    if (this.props.disabled || this.props.collapsable === false) {
+      return;
+    }
+    if (['expand', 'collapse'].includes(action.actionType!)) {
+      const targetState = action.actionType === 'collapse';
+      /**
+       * 说明：changeCollapsedState 会执行 onCollapse 方法（间接执行handleCollapseChange）
+       * 所以这里不需要再重复调用。
+       */
+      // this.handleCollapseChange(targetState);
+      const collapseInstance = (
+        this.basicCollapse?.current as any
+      )?.getWrappedInstance?.();
+      collapseInstance?.changeCollapsedState?.(targetState);
+    }
+  }
+
   render() {
     const {
       id,
@@ -126,6 +194,7 @@ export default class Collapse extends React.Component<CollapseProps, {}> {
       wrapperComponent,
       headingComponent,
       className,
+      style,
       headingClassName,
       children,
       titlePosition,
@@ -146,54 +215,127 @@ export default class Collapse extends React.Component<CollapseProps, {}> {
       disabled,
       collapsed,
       propsUpdate,
-      onCollapse
+      mobileUI,
+      divideLine,
+      enableFieldSetStyle,
+      themeCss,
+      wrapperCustomStyle
     } = this.props;
+    const heading = title || header || '';
 
     return (
-      <BasicCollapse
-        id={id}
-        classnames={cx}
-        classPrefix={ns}
-        mountOnEnter={mountOnEnter}
-        unmountOnExit={unmountOnExit}
-        size={size}
-        wrapperComponent={wrapperComponent}
-        headingComponent={headingComponent}
-        className={className}
-        headingClassName={headingClassName}
-        bodyClassName={bodyClassName}
-        headerPosition={titlePosition || headerPosition}
-        collapsable={collapsable}
-        collapsed={collapsed}
-        showArrow={showArrow}
-        disabled={disabled}
-        propsUpdate={propsUpdate}
-        expandIcon={
-          expandIcon
-            ? typeof (expandIcon as any).icon === 'object'
-              ? generateIcon(cx, (expandIcon as any).icon)
-              : render('arrow-icon', expandIcon || '', {
+      <>
+        <BasicCollapse
+          id={id}
+          ref={this.basicCollapse}
+          classnames={cx}
+          classPrefix={ns}
+          mountOnEnter={mountOnEnter}
+          unmountOnExit={unmountOnExit}
+          size={size}
+          wrapperComponent={wrapperComponent}
+          headingComponent={headingComponent}
+          className={classNames(
+            className,
+            setThemeClassName({
+              ...this.props,
+              name: 'baseControlClassName',
+              id,
+              themeCss
+            }),
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            })
+          )}
+          style={style}
+          headingClassName={classNames(
+            headingClassName,
+            setThemeClassName({
+              ...this.props,
+              name: 'headerControlClassName',
+              id,
+              themeCss
+            })
+          )}
+          bodyClassName={classNames(
+            bodyClassName,
+            setThemeClassName({
+              ...this.props,
+              name: 'bodyControlClassName',
+              id,
+              themeCss
+            })
+          )}
+          headerPosition={titlePosition || headerPosition}
+          collapsable={collapsable}
+          collapsed={collapsed}
+          showArrow={showArrow}
+          disabled={disabled}
+          propsUpdate={propsUpdate}
+          expandIcon={
+            expandIcon ? (
+              typeof (expandIcon as any).icon === 'object' ? (
+                <Icon
+                  cx={cx}
+                  icon={(expandIcon as any).icon}
+                  className={cx('Collapse-icon-tranform')}
+                />
+              ) : (
+                render('arrow-icon', expandIcon || '', {
                   className: cx('Collapse-icon-tranform')
                 })
-            : null
-        }
-        collapseHeader={
-          collapseTitle || collapseHeader
-            ? render('heading', collapseTitle || collapseHeader)
-            : null
-        }
-        header={render('heading', title || header || '')}
-        body={
-          children
-            ? typeof children === 'function'
-              ? children(this.props)
-              : children
-            : body
-            ? render('body', body)
-            : null
-        }
-        onCollapse={onCollapse}
-      ></BasicCollapse>
+              )
+            ) : null
+          }
+          collapseHeader={
+            collapseTitle || collapseHeader
+              ? render('heading', collapseTitle || collapseHeader)
+              : null
+          }
+          header={heading ? render('heading', heading) : null}
+          body={
+            children
+              ? typeof children === 'function'
+                ? children(this.props)
+                : children
+              : body
+              ? render('body', body)
+              : null
+          }
+          mobileUI={mobileUI}
+          onCollapse={this.handleCollapseChange}
+          divideLine={divideLine}
+          enableFieldSetStyle={enableFieldSetStyle}
+        ></BasicCollapse>
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'baseControlClassName'
+              },
+              {
+                key: 'bodyControlClassName',
+                weights: {
+                  default: {
+                    inner: `.${ns}Collapse-content`
+                  }
+                }
+              },
+              {
+                key: 'headerControlClassName'
+              }
+            ]
+          }}
+          env={this.props.env}
+        />
+      </>
     );
   }
 }
@@ -201,4 +343,18 @@ export default class Collapse extends React.Component<CollapseProps, {}> {
 @Renderer({
   type: 'collapse'
 })
-export class CollapseRenderer extends Collapse {}
+export class CollapseRenderer extends Collapse {
+  static contextType = ScopedContext;
+
+  constructor(props: CollapseProps, context: IScopedContext) {
+    super(props);
+
+    const scoped = context;
+    scoped.registerComponent(this);
+  }
+
+  componentWillUnmount() {
+    const scoped = this.context as IScopedContext;
+    scoped.unRegisterComponent(this);
+  }
+}

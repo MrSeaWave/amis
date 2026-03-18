@@ -1,5 +1,4 @@
 import React from 'react';
-import extend from 'lodash/extend';
 import {Renderer, RendererProps} from '../factory';
 import {FormStore, IFormStore} from '../store/form';
 import {
@@ -11,7 +10,8 @@ import {
   ClassName,
   BaseApiObject,
   SchemaExpression,
-  SchemaClassName
+  SchemaClassName,
+  DataChangeReason
 } from '../types';
 import {filter, evalExpression} from '../utils/tpl';
 import getExprProperties from '../utils/filter-schema';
@@ -35,15 +35,44 @@ import {
 import debouce from 'lodash/debounce';
 import flatten from 'lodash/flatten';
 import find from 'lodash/find';
-import {ScopedContext, IScopedContext, ScopedComponentType} from '../Scoped';
+import {
+  ScopedContext,
+  IScopedContext,
+  ScopedComponentType,
+  filterTarget
+} from '../Scoped';
 
 import {IComboStore} from '../store/combo';
 import {dataMapping} from '../utils/tpl-builtin';
-import {isApiOutdated, isEffectiveApi} from '../utils/api';
+import {
+  isApiOutdated,
+  isEffectiveApi,
+  shouldBlockedBySendOnApi
+} from '../utils/api';
 import LazyComponent from '../components/LazyComponent';
 import {isAlive} from 'mobx-state-tree';
 
 import type {LabelAlign} from './Item';
+import {
+  CustomStyleClassName,
+  injectObjectChain,
+  setThemeClassName
+} from '../utils';
+import {reaction} from 'mobx';
+import groupBy from 'lodash/groupBy';
+import isEqual from 'lodash/isEqual';
+import CustomStyle from '../components/CustomStyle';
+import debounce from 'lodash/debounce';
+import {
+  AMISApi,
+  AMISButtonWithAction,
+  AMISClassName,
+  AMISDefaultData,
+  AMISExpression,
+  AMISSchemaCollection,
+  AMISSchemaBase,
+  AMISButtonSchema
+} from '../schema';
 
 export interface FormHorizontal {
   left?: number;
@@ -53,9 +82,10 @@ export interface FormHorizontal {
   labelAlign?: 'left' | 'right'; // label对齐方式
   /** label自定义宽度，默认单位为px */
   labelWidth?: number | string;
+  labelOverflow?: 'default' | 'ellipsis';
 }
 
-export interface FormSchemaBase {
+export interface AMISFormBase extends AMISSchemaBase {
   /**
    * 表单标题
    */
@@ -64,12 +94,14 @@ export interface FormSchemaBase {
   /**
    * 按钮集合，会固定在底部显示。
    */
-  actions?: Array<any>;
+  actions?: Array<AMISButtonSchema>;
 
   /**
    * 表单项集合
    */
-  body?: any;
+  body?: AMISSchemaCollection;
+
+  className?: AMISClassName;
 
   /**
    * @deprecated 请用类型 tabs
@@ -81,7 +113,7 @@ export interface FormSchemaBase {
    */
   fieldSet?: any;
 
-  data?: any;
+  data?: AMISDefaultData;
 
   /**
    * 是否开启调试，开启后会在顶部实时显示表单项数据。
@@ -121,17 +153,18 @@ export interface FormSchemaBase {
      * 设置字符串的最大展示长度，超出长度阈值的字符串将被截断，点击value可切换字符串展示方式，默认为120
      */
     ellipsisThreshold?: number | false;
+    labelOverflow?: 'default' | 'ellipsis';
   };
 
   /**
    * 用来初始化表单数据
    */
-  initApi?: string | BaseApiObject;
+  initApi?: AMISApi;
 
   /**
    * Form 用来获取初始数据的 api,与initApi不同的是，会一直轮询请求该接口，直到返回 finished 属性为 true 才 结束。
    */
-  initAsyncApi?: string | BaseApiObject;
+  initAsyncApi?: AMISApi;
 
   /**
    * 设置了initAsyncApi后，默认会从返回数据的data.finished来判断是否完成，也可以设置成其他的xxx，就会从data.xxx中获取
@@ -151,7 +184,7 @@ export interface FormSchemaBase {
   /**
    * 建议改成 api 的 sendOn 属性。
    */
-  initFetchOn?: string;
+  initFetchOn?: AMISExpression;
 
   /**
    * 设置后将轮询调用 initApi
@@ -166,7 +199,7 @@ export interface FormSchemaBase {
   /**
    * 配置停止轮询的条件
    */
-  stopAutoRefreshWhen?: string;
+  stopAutoRefreshWhen?: AMISExpression;
 
   /**
    * 是否开启本地缓存
@@ -186,9 +219,9 @@ export interface FormSchemaBase {
   /**
    * Form 用来保存数据的 api。
    *
-   * 详情：https://baidu.gitee.io/amis/docs/components/form/index#%E8%A1%A8%E5%8D%95%E6%8F%90%E4%BA%A4
+   * 详情：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/index#%E8%A1%A8%E5%8D%95%E6%8F%90%E4%BA%A4
    */
-  api?: string | BaseApiObject;
+  api?: AMISApi;
 
   /**
    * Form 也可以配置 feedback。
@@ -198,7 +231,7 @@ export interface FormSchemaBase {
   /**
    * 设置此属性后，表单提交发送保存接口后，还会继续轮询请求该接口，直到返回 finished 属性为 true 才 结束。
    */
-  asyncApi?: string | BaseApiObject;
+  asyncApi?: AMISApi;
 
   /**
    * 轮询请求的时间间隔，默认为 3秒。设置 asyncApi 才有效
@@ -223,7 +256,7 @@ export interface FormSchemaBase {
   /**
    * 配置表单项默认的展示方式。
    */
-  mode?: 'normal' | 'inline' | 'horizontal';
+  mode?: 'normal' | 'inline' | 'horizontal' | 'flex';
 
   /**
    * 表单项显示为几列
@@ -255,7 +288,7 @@ export interface FormSchemaBase {
   /**
    * 配置容器 panel className
    */
-  panelClassName?: ClassName;
+  panelClassName?: AMISClassName;
 
   /**
    * 设置主键 id, 当设置后，检测表单是否完成时（asyncApi），只会携带此数据。
@@ -337,8 +370,33 @@ export interface FormSchemaBase {
    * 展示态时的className
    */
   static?: boolean;
-  staticOn?: SchemaExpression;
-  staticClassName?: SchemaClassName;
+  staticOn?: AMISExpression;
+  staticClassName?: AMISClassName;
+
+  /**
+   * 是否可以访问上层数据，默认是会允许，这样顶层同名数据会自动赋值到同名表单项
+   * @default true
+   */
+  canAccessSuperData?: boolean;
+}
+
+export type FormSchemaBase = AMISFormBase;
+
+/**
+ * 表单容器组件，用于收集和提交用户输入数据。支持字段验证、数据提交、布局配置等。
+ */
+export interface AMISFormSchema extends AMISFormBase {
+  /**
+   * 指定为表单渲染器
+   */
+  type: 'form';
+}
+
+// 注册到 AMISSchemaRegistry 中
+declare module '../schema' {
+  interface AMISSchemaRegistry {
+    form: AMISFormSchema;
+  }
 }
 
 export type FormGroup = FormSchemaBase & {
@@ -363,8 +421,9 @@ export interface FormProps
   onSubmit?: (values: object, action: any) => any;
   onChange?: (values: object, diff: object, props: any) => any;
   onFailed?: (reason: string, errors: any) => any;
-  onFinished: (values: object, action: any) => any;
+  onFinished: (values: object, action: ActionObject, store: IFormStore) => any;
   onValidate: (values: object, form: any) => any;
+  onValidChange?: (valid: boolean, props: any) => void; // 表单数据合法性变更
   messages: {
     fetchSuccess?: string;
     fetchFailed?: string;
@@ -379,6 +438,11 @@ export interface FormProps
   }>;
   lazyChange?: boolean; // 表单项的
   formLazyChange?: boolean; // 表单的
+  // Spinner 配置
+  loadingConfig?: {
+    root?: string;
+    show?: boolean;
+  };
 }
 export default class Form extends React.Component<FormProps, object> {
   static defaultProps = {
@@ -432,6 +496,8 @@ export default class Form extends React.Component<FormProps, object> {
     'onChange',
     'onFailed',
     'onFinished',
+    'onValidate',
+    'onValidChange',
     'onSaved',
     'canAccessSuperData',
     'lazyChange',
@@ -446,11 +512,10 @@ export default class Form extends React.Component<FormProps, object> {
   ];
 
   hooks: {
-    [propName: string]: Array<() => Promise<any>>;
+    [propName: string]: Array<(...args: any) => Promise<any>>;
   } = {};
   asyncCancel: () => void;
-  disposeOnValidate: () => void;
-  disposeRulesValidate: () => void;
+  toDispose: Array<() => void> = [];
   shouldLoadInitApi: boolean = false;
   timer: ReturnType<typeof setTimeout>;
   mounted: boolean;
@@ -458,7 +523,17 @@ export default class Form extends React.Component<FormProps, object> {
     trailing: true,
     leading: false
   });
+  // 当有多次调用时，只需要跳一个
+  lazyJumpToErrorComponent = debouce(
+    this.jumpToErrorComponent.bind(this),
+    250,
+    {
+      trailing: false,
+      leading: true
+    }
+  );
   unBlockRouting?: () => void;
+  formRef = React.createRef<HTMLElement>();
   constructor(props: FormProps) {
     super(props);
 
@@ -481,10 +556,14 @@ export default class Form extends React.Component<FormProps, object> {
     this.reload = this.reload.bind(this);
     this.silentReload = this.silentReload.bind(this);
     this.initInterval = this.initInterval.bind(this);
+    this.dispatchInited = this.dispatchInited.bind(this);
     this.blockRouting = this.blockRouting.bind(this);
     this.beforePageUnload = this.beforePageUnload.bind(this);
+    this.dispatchEvent = this.dispatchEvent.bind(this);
+    this.flush = this.flush.bind(this);
 
-    const {store, canAccessSuperData, persistData, simpleMode} = props;
+    const {store, canAccessSuperData, persistData, simpleMode, formLazyChange} =
+      props;
 
     store.setCanAccessSuperData(canAccessSuperData !== false);
     store.setPersistData(persistData);
@@ -506,6 +585,22 @@ export default class Form extends React.Component<FormProps, object> {
         )
       );
     }
+
+    // withStore 里面与上层数据会做同步
+    // 这个时候变更的数据没有同步 onChange 出去，出现数据不一致的问题。
+    // https://github.com/baidu/amis/issues/8773
+    this.toDispose.push(
+      reaction(
+        () => store.initedAt,
+        () => {
+          store.inited &&
+            (formLazyChange === false ? this.emitChange : this.lazyEmitChange)(
+              !!this.props.submitOnChange,
+              true
+            );
+        }
+      )
+    );
   }
 
   componentDidMount() {
@@ -519,58 +614,72 @@ export default class Form extends React.Component<FormProps, object> {
       store,
       messages: {fetchSuccess, fetchFailed},
       onValidate,
+      onValidChange,
       promptPageLeave,
-      env,
-      rules
+      env
     } = this.props;
-
+    const rules = this.getNormalizedRules();
     this.mounted = true;
 
     if (onValidate) {
       const finalValidate = promisify(onValidate);
-      this.disposeOnValidate = this.addHook(async () => {
-        const result = await finalValidate(store.data, store);
+      this.toDispose.push(
+        this.addHook(async () => {
+          const result = await finalValidate(store.data, store);
 
-        if (result && isObject(result)) {
-          Object.keys(result).forEach(key => {
-            let msg = result[key];
-            const items = store.getItemsByPath(key);
+          if (result && isObject(result)) {
+            Object.keys(result).forEach(key => {
+              let msg = result[key];
+              const items = store.getItemsByPath(key);
 
-            // 没有找到
-            if (!Array.isArray(items) || !items.length) {
-              return;
-            }
+              // 没有找到
+              if (!Array.isArray(items) || !items.length) {
+                return;
+              }
 
-            // 在setError之前，提前把残留的error信息清除掉，否则每次onValidate后都会一直把报错 append 上去
-            items.forEach(item => item.clearError());
+              // 在setError之前，提前把残留的error信息清除掉，否则每次onValidate后都会一直把报错 append 上去
+              items.forEach(item => item.clearError());
 
-            if (msg) {
-              msg = Array.isArray(msg) ? msg : [msg];
-              items.forEach(item => item.addError(msg));
-            }
+              if (msg) {
+                msg = Array.isArray(msg) ? msg : [msg];
+                items.forEach(item => item.addError(msg));
+              }
 
-            delete result[key];
-          });
+              delete result[key];
+            });
 
-          isEmpty(result)
-            ? store.clearRestError()
-            : store.setRestError(Object.keys(result).map(key => result[key]));
-        }
-      });
+            isEmpty(result)
+              ? store.clearRestError()
+              : store.setRestError(Object.keys(result).map(key => result[key]));
+          }
+        })
+      );
     }
 
-    if (Array.isArray(rules) && rules.length) {
-      this.disposeRulesValidate = this.addHook(() => {
-        if (!store.valid) {
-          return;
-        }
+    // 表单校验结果发生变化时，触发 onValidChange
+    if (onValidChange) {
+      this.toDispose.push(
+        reaction(
+          () => store.valid,
+          valid => onValidChange(valid, this.props)
+        )
+      );
+    }
 
-        rules.forEach(
-          item =>
-            !evalExpression(item.rule, store.data) &&
-            store.addRestError(item.message, item.name)
-        );
-      });
+    if (rules.length) {
+      this.toDispose.push(
+        this.addHook(() => {
+          if (!store.valid) {
+            return;
+          }
+
+          rules.forEach(
+            item =>
+              !evalExpression(item.rule, store.data) &&
+              store.addRestError(item.message, item.name)
+          );
+        })
+      );
     }
 
     if (isEffectiveApi(initApi, store.data, initFetch, initFetchOn)) {
@@ -578,7 +687,11 @@ export default class Form extends React.Component<FormProps, object> {
         .fetchInitData(initApi as any, store.data, {
           successMessage: fetchSuccess,
           errorMessage: fetchFailed,
-          onSuccess: () => {
+          onSuccess: (json: Payload, data: any) => {
+            store.setValues(data, undefined, undefined, undefined, {
+              type: 'api'
+            });
+
             if (
               !isEffectiveApi(initAsyncApi, store.data) ||
               store.data[initFinishedField || 'finished']
@@ -595,6 +708,14 @@ export default class Form extends React.Component<FormProps, object> {
           }
         })
         .then(this.initInterval)
+        .then(() =>
+          this.props.dispatchEvent(
+            'initApiFinished',
+            injectObjectChain(store.data, {
+              __trigger: 'init'
+            })
+          )
+        )
         .then(this.onInit);
     } else {
       setTimeout(this.onInit.bind(this), 4);
@@ -627,7 +748,9 @@ export default class Form extends React.Component<FormProps, object> {
           successMessage: fetchSuccess,
           errorMessage: fetchFailed
         }
-      ).then(this.initInterval);
+      )
+        .then(this.initInterval)
+        .then(this.dispatchInited);
     }
   }
 
@@ -636,11 +759,51 @@ export default class Form extends React.Component<FormProps, object> {
     clearTimeout(this.timer);
     // this.lazyHandleChange.flush();
     this.lazyEmitChange.cancel();
+    this.lazyJumpToErrorComponent.cancel();
     this.asyncCancel && this.asyncCancel();
-    this.disposeOnValidate && this.disposeOnValidate();
-    this.disposeRulesValidate && this.disposeRulesValidate();
+    this.toDispose.forEach(fn => fn());
+    this.toDispose = [];
     window.removeEventListener('beforeunload', this.beforePageUnload);
     this.unBlockRouting?.();
+  }
+
+  /** 获取表单联合校验的规则 */
+  getNormalizedRules() {
+    const {rules, translate: __} = this.props;
+
+    if (!Array.isArray(rules) || rules.length < 1) {
+      return [];
+    }
+
+    return rules
+      .map(item => ({
+        ...item,
+        ...(!item.message || typeof item.message !== 'string'
+          ? {message: __('Form.rules.message')}
+          : {})
+      }))
+      .filter(item => item.rule && typeof item.rule === 'string');
+  }
+
+  async dispatchInited(value: any) {
+    const {data, store, dispatchEvent} = this.props;
+
+    if (!isAlive(store) || store.fetching) {
+      return value;
+    }
+
+    // 派发init事件，参数为初始化数据
+    const result = await dispatchEvent(
+      'inited',
+      createObject(data, {
+        ...value?.data, // 保留，兼容历史
+        responseData: value?.data ?? {},
+        responseStatus: store.error ? 1 : 0,
+        responseMsg: store.msg
+      })
+    );
+
+    return result;
   }
 
   blockRouting(): any {
@@ -675,8 +838,28 @@ export default class Form extends React.Component<FormProps, object> {
     const initedAt = store.initedAt;
 
     store.setInited(true);
-    const hooks: Array<(data: any) => Promise<any>> = this.hooks['init'] || [];
-    await Promise.all(hooks.map(hook => hook(data)));
+    // 等待 formInited 属性下发成功
+    // 因为 hooks 里面可以能有读取 props 的操作
+    await new Promise<void>(resolve => this.forceUpdate(resolve));
+    const hooks = this.hooks['init'] || [];
+    const groupedHooks = groupBy(hooks, item =>
+      (item as any).__enforce === 'prev'
+        ? 'prev'
+        : (item as any).__enforce === 'post'
+        ? 'post'
+        : 'normal'
+    );
+
+    await Promise.all((groupedHooks.prev || []).map(hook => hook(data)));
+    //  有可能在前面的步骤中删除了钩子，所以需要重新验证一下
+    await Promise.all(
+      (groupedHooks.normal || []).map(
+        hook => hooks.includes(hook) && hook(data)
+      )
+    );
+    await Promise.all(
+      (groupedHooks.post || []).map(hook => hooks.includes(hook) && hook(data))
+    );
 
     if (!isAlive(store)) {
       return;
@@ -698,14 +881,16 @@ export default class Form extends React.Component<FormProps, object> {
       data = cloneObject(store.data);
     }
 
-    // 派发init事件，参数为初始化数据
-    const dispatcher = await dispatchEvent(
-      'inited',
-      createObject(this.props.data, data)
-    );
-    if (!dispatcher?.prevented) {
-      onInit && onInit(data, this.props);
+    onInit && onInit(data, this.props);
+
+    // 派发初始化事件
+    const dispatch = await this.dispatchInited({data});
+
+    if (dispatch?.prevented) {
+      return;
     }
+
+    // submitOnInit
     submitOnInit &&
       this.handleAction(
         undefined,
@@ -716,7 +901,12 @@ export default class Form extends React.Component<FormProps, object> {
       );
   }
 
-  reload(subPath?: string, query?: any, ctx?: any, silent?: boolean) {
+  async reload(
+    subPath?: string,
+    query?: any,
+    ctx?: any,
+    silent?: boolean
+  ): Promise<any> {
     if (query) {
       return this.receive(query);
     }
@@ -734,52 +924,67 @@ export default class Form extends React.Component<FormProps, object> {
         [initFinishedField || 'finished']: false
       });
 
-    isEffectiveApi(initApi, store.data)
-      ? store
-          .fetchInitData(initApi, store.data, {
-            successMessage: fetchSuccess,
-            errorMessage: fetchFailed,
-            silent,
-            onSuccess: () => {
-              if (
-                !isEffectiveApi(initAsyncApi, store.data) ||
-                store.data[initFinishedField || 'finished']
-              ) {
-                return;
-              }
+    let result: Payload | undefined = undefined;
 
-              return until(
-                () => store.checkRemote(initAsyncApi, store.data),
-                (ret: any) => ret && ret[initFinishedField || 'finished'],
-                cancel => (this.asyncCancel = cancel)
-              );
-            }
+    if (isEffectiveApi(initApi, store.data)) {
+      result = await store.fetchInitData(initApi, store.data, {
+        successMessage: fetchSuccess,
+        errorMessage: fetchFailed,
+        silent,
+        onSuccess: (json: Payload, data: any) => {
+          store.setValues(data);
+
+          if (
+            !isEffectiveApi(initAsyncApi, store.data) ||
+            store.data[initFinishedField || 'finished']
+          ) {
+            return;
+          }
+
+          return until(
+            () => store.checkRemote(initAsyncApi, store.data),
+            (ret: any) => ret && ret[initFinishedField || 'finished'],
+            cancel => (this.asyncCancel = cancel)
+          );
+        }
+      });
+
+      if (result?.ok) {
+        this.initInterval(result);
+        store.reset(undefined, false);
+        await this.props.dispatchEvent(
+          'initApiFinished',
+          injectObjectChain(store.data, {
+            __trigger: 'reload'
           })
-          .then((result: Payload) => {
-            if (result?.ok) {
-              this.initInterval(result);
-              store.reset(undefined, false);
-            }
-          })
-      : store.reset(undefined, false);
+        );
+      }
+    } else {
+      store.reset(undefined, false);
+    }
+
+    // 派发初始化接口请求完成事件
+    this.dispatchInited(result);
+    return store.data;
   }
 
   receive(values: object, name?: string, replace?: boolean) {
     const {store} = this.props;
 
     store.updateData(values, undefined, replace);
-    this.reload();
+    return this.reload();
   }
 
   silentReload(target?: string, query?: any) {
-    this.reload(target, query, undefined, true);
+    return this.reload(target, query, undefined, true);
   }
 
   initInterval(value: any) {
     const {interval, silentPolling, stopAutoRefreshWhen, data} = this.props;
 
     clearTimeout(this.timer);
-    interval &&
+    value?.ok &&
+      interval &&
       this.mounted &&
       (!stopAutoRefreshWhen || !evalExpression(stopAutoRefreshWhen, data)) &&
       (this.timer = setTimeout(
@@ -793,20 +998,35 @@ export default class Form extends React.Component<FormProps, object> {
     return this.props.store.validated;
   }
 
-  validate(forceValidate?: boolean): Promise<boolean> {
-    const {store, dispatchEvent, data} = this.props;
+  async validate(
+    forceValidate?: boolean,
+    throwErrors: boolean = false,
+    toastErrors: boolean = true,
+    skipFlush = false
+  ): Promise<boolean> {
+    const {store, dispatchEvent, data, messages, translate: __} = this.props;
 
-    this.flush();
-    return store
-      .validate(this.hooks['validate'] || [], forceValidate)
-      .then((result: boolean) => {
-        if (result) {
-          dispatchEvent('validateSucc', data);
-        } else {
-          dispatchEvent('validateError', data);
-        }
-        return result;
-      });
+    if (!skipFlush) {
+      await this.flush();
+    }
+    const result = await store.validate(
+      this.hooks['validate'] || [],
+      forceValidate,
+      throwErrors,
+      toastErrors === false
+        ? ''
+        : typeof messages?.validateFailed === 'string'
+        ? __(filter(messages.validateFailed, store.data))
+        : undefined
+    );
+
+    dispatchEvent(result ? 'validateSucc' : 'validateError', data);
+    return result;
+  }
+
+  setErrors(errors: {[propName: string]: string}, tag = 'remote') {
+    const {store} = this.props;
+    store.setFormItemErrors(errors, tag);
   }
 
   clearErrors() {
@@ -824,26 +1044,52 @@ export default class Form extends React.Component<FormProps, object> {
   setValues(value: any, replace?: boolean) {
     const {store} = this.props;
     this.flush();
-    store.setValues(value, undefined, replace);
+    store.setValues(value, undefined, replace, undefined, {
+      type: 'action'
+    });
   }
 
-  submit(fn?: (values: object) => Promise<any>): Promise<any> {
+  async submit(
+    fn?: (values: object) => Promise<any>,
+    throwErrors: boolean = false,
+    skipFlush = false
+  ): Promise<any> {
     const {store, messages, translate: __, dispatchEvent, data} = this.props;
-    this.flush();
+    if (!skipFlush) {
+      await this.flush();
+    }
     const validateErrCb = () => dispatchEvent('validateError', data);
     return store.submit(
       fn,
       this.hooks['validate'] || [],
-      __(messages && messages.validateFailed),
-      validateErrCb
+      typeof messages?.validateFailed === 'string'
+        ? __(filter(messages.validateFailed, store.data))
+        : undefined,
+      validateErrCb,
+      throwErrors
     );
   }
 
   // 如果开启了 lazyChange，需要一个 flush 方法把队列中值应用上。
-  flush() {
-    const hooks = this.hooks['flush'] || [];
-    hooks.forEach(fn => fn());
-    this.lazyEmitChange.flush();
+  flushing = false;
+  async flush() {
+    try {
+      if (this.flushing) {
+        return;
+      }
+
+      this.flushing = true;
+      const hooks = this.hooks['flush'] || [];
+      // 得有顺序，有些可能依赖上一个的结果
+      for (let hook of hooks) {
+        await hook();
+      }
+      if (!this.emitting) {
+        await this.lazyEmitChange.flush();
+      }
+    } finally {
+      this.flushing = false;
+    }
   }
 
   reset() {
@@ -851,9 +1097,15 @@ export default class Form extends React.Component<FormProps, object> {
     store.reset(onReset);
   }
 
-  addHook(fn: () => any, type: 'validate' | 'init' | 'flush' = 'validate') {
+  addHook(
+    fn: () => any,
+    type: 'validate' | 'init' | 'flush' = 'validate',
+    enforce?: 'prev' | 'post'
+  ) {
     this.hooks[type] = this.hooks[type] || [];
-    this.hooks[type].push(type === 'flush' ? fn : promisify(fn));
+    const hook = type === 'flush' ? fn : promisify(fn);
+    (hook as any).__enforce = enforce;
+    this.hooks[type].push(hook);
     return () => {
       this.removeHook(fn, type);
       fn = noop;
@@ -882,14 +1134,24 @@ export default class Form extends React.Component<FormProps, object> {
     value: any,
     name: string,
     submit: boolean,
-    changePristine = false
+    changePristine = false,
+    changeReason?: DataChangeReason
   ) {
     const {store, formLazyChange, persistDataKeys} = this.props;
     if (typeof name !== 'string') {
       return;
     }
-    store.changeValue(name, value, changePristine);
-    if (!changePristine) {
+    store.changeValue(
+      name,
+      value,
+      changePristine,
+      undefined,
+      undefined,
+      changeReason || {
+        type: 'input'
+      }
+    );
+    if (!changePristine || typeof value !== 'undefined') {
       (formLazyChange === false ? this.emitChange : this.lazyEmitChange)(
         submit
       );
@@ -899,64 +1161,132 @@ export default class Form extends React.Component<FormProps, object> {
       store.setLocalPersistData(persistDataKeys);
     }
   }
-  formItemDispatchEvent(dispatchEvent: any) {
-    return (type: string, data: any) => {
-      dispatchEvent(type, data);
-    };
+
+  jumpToErrorComponent(renderer: any) {
+    // 当表单校验错误是，优先调用组件的 focus
+    // 如果没有 focus 方法，则滚动到错误信息的位置
+    if (typeof renderer?.focus === 'function') {
+      renderer.focus();
+    } else {
+      this.formRef.current
+        ?.querySelector(`.${this.props.classPrefix}Form-feedback`)
+        ?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+    }
   }
 
-  async emitChange(submit: boolean) {
-    const {onChange, store, submitOnChange, dispatchEvent, data} = this.props;
-
-    if (!isAlive(store)) {
-      return;
-    }
-    const dispatcher = await dispatchEvent(
-      'change',
-      createObject(data, store.data)
-    );
-    if (!dispatcher?.prevented) {
-      onChange &&
-        onChange(
-          store.data,
-          difference(store.data, store.pristine),
-          this.props
-        );
-    }
-
-    store.clearRestError();
-    (submit || (submitOnChange && store.inited)) &&
-      this.handleAction(
-        undefined,
-        {
-          type: 'submit'
-        },
-        store.data
-      );
-  }
-
-  handleBulkChange(values: Object, submit: boolean) {
-    const {onChange, store, formLazyChange} = this.props;
-
-    store.updateData(values);
-
-    store.items.forEach(formItem => {
-      const updatedValue = getVariable(values, formItem.name, false);
-
-      if (updatedValue !== undefined) {
-        // 更新验证状态但保留错误信息
-        formItem.reset(true);
-        // 这里需要更新value，否则提交时不会使用新的字段值校验
-        formItem.changeTmpValue(updatedValue);
-        formItem.validateOnChange && formItem.validate(values);
+  dispatchEvent(
+    e: React.MouseEvent<any> | string,
+    data: any,
+    renderer?: React.Component<RendererProps>, // for didmount
+    scoped?: IScopedContext
+  ) {
+    // 把这两个事件转到 form 组件上，让 form 组件来处理
+    if (
+      (e === 'formItemValidateSucc' || e === 'formItemValidateError') &&
+      renderer?.props.type !== 'form'
+    ) {
+      if (e === 'formItemValidateError') {
+        this.lazyJumpToErrorComponent(renderer);
       }
-    });
 
+      // 如果事件是 formItemValidateSucc 或者 formItemValidateError 转成当前组件触发的，
+      // 所以 onEvent 是配置在 form 层的而不是表单项层
+      renderer = undefined;
+      scoped = undefined;
+    }
+
+    return this.props.dispatchEvent(e, data, renderer, scoped);
+  }
+
+  emittedData: any = null;
+  emitting = false;
+  async emitChange(submit: boolean, emitedFromWatch: boolean = false) {
+    try {
+      this.emitting = true;
+
+      const {onChange, store, submitOnChange, dispatchEvent, data, originData} =
+        this.props;
+
+      if (!isAlive(store)) {
+        return;
+      }
+
+      const diff = difference(store.data, originData ?? store.upStreamData);
+      if (
+        emitedFromWatch &&
+        (!Object.keys(diff).length || isEqual(store.data, this.emittedData))
+      ) {
+        return;
+      }
+
+      this.emittedData = store.data;
+      // 提前准备好 onChange 的参数。
+      // 因为 store.data 会在 await 期间被 WithStore.componentDidUpdate 中的 store.initData 改变。导致数据丢失
+      const changeProps = [store.data, diff, this.props];
+      const dispatcher = await dispatchEvent(
+        'change',
+        createObject(data, store.data)
+      );
+      if (!dispatcher?.prevented) {
+        onChange && onChange.apply(null, changeProps);
+      }
+
+      isAlive(store) && store.clearRestError();
+
+      // 只有主动修改表单项触发的 change 才会触发 submit
+      if (!emitedFromWatch && (submit || (submitOnChange && store.inited))) {
+        await this.handleAction(
+          undefined,
+          {
+            type: 'submit',
+            // 如果这里不跳过，会相互依赖死循环，flush 会 让 emiteChange 立即执行
+            // handleAction 里面又会调用 flush
+            skipFormFlush: true
+          },
+          store.data
+        );
+      }
+    } finally {
+      this.emitting = false;
+    }
+  }
+
+  handleBulkChange(
+    values: Object,
+    submit: boolean,
+    changeReason?: DataChangeReason
+  ) {
+    const {onChange, store, formLazyChange} = this.props;
+    store.setValues(
+      values,
+      undefined,
+      undefined,
+      undefined,
+      changeReason || {
+        type: 'input'
+      }
+    );
+    // store.updateData(values);
+
+    // store.items.forEach(formItem => {
+    //   const updatedValue = getVariable(values, formItem.name, false);
+
+    //   if (updatedValue !== undefined) {
+    //     // 更新验证状态但保留错误信息
+    //     formItem.reset(true);
+    //     // 这里需要更新value，否则提交时不会使用新的字段值校验
+    //     formItem.changeTmpValue(updatedValue);
+    //     formItem.validateOnChange && formItem.validate(values);
+    //   }
+    // });
     (formLazyChange === false ? this.emitChange : this.lazyEmitChange)(submit);
   }
 
   handleFormSubmit(e: React.UIEvent<any>) {
-    const {preventEnterSubmit, onActionSensor} = this.props;
+    const {preventEnterSubmit, onActionSensor, close} = this.props;
 
     e.preventDefault();
     if (preventEnterSubmit) {
@@ -966,7 +1296,8 @@ export default class Form extends React.Component<FormProps, object> {
     const sensor: any = this.handleAction(
       e,
       {
-        type: 'submit'
+        type: 'submit',
+        close
       },
       this.props.store.data
     );
@@ -1018,7 +1349,13 @@ export default class Form extends React.Component<FormProps, object> {
     } = this.props;
 
     // 做动作之前，先把数据同步一下。
-    this.flush();
+    if (!action.skipFormFlush) {
+      await this.flush();
+    }
+
+    if (!isAlive(store)) {
+      return;
+    }
 
     if (trimValues) {
       store.trimValues();
@@ -1028,6 +1365,7 @@ export default class Form extends React.Component<FormProps, object> {
     if (data === this.props.data) {
       data = store.data;
     }
+
     if (Array.isArray(action.required) && action.required.length) {
       /** 如果是按钮指定了required，则校验前先清空一下遗留的校验报错 */
       store.clearErrors();
@@ -1061,7 +1399,15 @@ export default class Form extends React.Component<FormProps, object> {
       action.actionType === 'reset-and-submit' ||
       action.actionType === 'clear-and-submit'
     ) {
-      store.setCurrentAction(action);
+      // 配了submit事件的表示将提交逻辑全部托管给事件
+      const {dispatchEvent, onEvent} = this.props;
+      const submitEvent = onEvent?.submit?.actions?.length;
+      const dispatcher = await dispatchEvent('submit', this.props.data);
+      if (dispatcher?.prevented || submitEvent) {
+        return;
+      }
+
+      store.setCurrentAction(action, this.props.resolveDefinitions);
 
       if (action.actionType === 'reset-and-submit') {
         store.reset(this.handleReset(action));
@@ -1069,102 +1415,157 @@ export default class Form extends React.Component<FormProps, object> {
         store.clear(this.handleReset(action));
       }
 
-      return this.submit((values): any => {
-        if (onSubmit && onSubmit(values, action) === false) {
-          return Promise.resolve(false);
-        }
-        // 走到这里代表校验成功了
-        dispatchEvent('validateSucc', this.props.data);
+      return this.submit(
+        async values => {
+          if (onSubmit) {
+            const result = await onSubmit(values, action);
+            if (result === false) {
+              return Promise.resolve(false);
+            }
+          }
 
-        if (target) {
-          this.submitToTarget(target, values);
-          dispatchEvent('submitSucc', createObject(this.props.data, values));
-        } else if (action.actionType === 'reload') {
-          action.target && this.reloadTarget(action.target, values);
-        } else if (action.actionType === 'dialog') {
-          store.openDialog(data);
-        } else if (action.actionType === 'drawer') {
-          store.openDrawer(data);
-        } else if (isEffectiveApi(action.api || api, values)) {
-          let finnalAsyncApi = action.asyncApi || asyncApi;
+          // 走到这里代表校验成功了
+          dispatchEvent('validateSucc', createObject(this.props.data, values));
 
-          isEffectiveApi(finnalAsyncApi, store.data) &&
-            store.updateData({
-              [finishedField || 'finished']: false
+          if (target) {
+            this.submitToTarget(filterTarget(target, values), values);
+            /** 可能配置页面跳转事件，页面路由变化导致persistKey不一致，无法清除持久化数据，所以提交成功事件之前先清理一下 */
+            clearPersistDataAfterSubmit && store.clearLocalPersistData();
+            dispatchEvent('submitSucc', createObject(this.props.data, values));
+          } else if (action.actionType === 'reload') {
+            action.target &&
+              this.reloadTarget(filterTarget(action.target, values), values);
+          } else if (action.actionType === 'dialog') {
+            return new Promise<any>(resolve => {
+              store.openDialog(
+                data,
+                undefined,
+                (confirmed: any, value: any) => {
+                  action.callback?.(confirmed, value);
+                  resolve({
+                    confirmed,
+                    value
+                  });
+                },
+                delegate || (this.context as any)
+              );
             });
+          } else if (action.actionType === 'drawer') {
+            return new Promise<any>(resolve => {
+              store.openDrawer(
+                data,
+                undefined,
+                (confirmed: any, value: any) => {
+                  action.callback?.(confirmed, value);
+                  resolve({
+                    confirmed,
+                    value
+                  });
+                }
+              );
+            });
+          } else if (isEffectiveApi(action.api || api, values)) {
+            let finnalAsyncApi = action.asyncApi || asyncApi;
+            isEffectiveApi(finnalAsyncApi, store.data) &&
+              store.updateData({
+                [finishedField || 'finished']: false
+              });
 
-          return store
-            .saveRemote(action.api || (api as Api), values, {
-              successMessage: saveSuccess,
-              errorMessage: saveFailed,
-              onSuccess: async (result: Payload) => {
-                // result为提交接口返回的内容
-                const dispatcher = await dispatchEvent(
-                  'submitSucc',
-                  createObject(this.props.data, {result})
-                );
-                if (
-                  !isEffectiveApi(finnalAsyncApi, store.data) ||
-                  store.data[finishedField || 'finished']
-                ) {
+            return store
+              .saveRemote(action.api || (api as Api), values, {
+                successMessage:
+                  typeof saveSuccess === 'string'
+                    ? filter(saveSuccess, store.data)
+                    : undefined,
+                errorMessage:
+                  typeof saveFailed === 'string'
+                    ? filter(saveFailed, store.data)
+                    : undefined,
+                onSuccess: async (result: Payload) => {
+                  clearPersistDataAfterSubmit && store.clearLocalPersistData();
+                  // result为提交接口返回的内容
+                  const dispatcher = await dispatchEvent(
+                    'submitSucc',
+                    createObject(this.props.data, {result})
+                  );
+                  if (
+                    !isEffectiveApi(finnalAsyncApi, store.data) ||
+                    store.data[finishedField || 'finished']
+                  ) {
+                    return {
+                      cbResult: null,
+                      dispatcher
+                    };
+                  }
+                  const cbResult = until(
+                    () => store.checkRemote(finnalAsyncApi as Api, store.data),
+                    (ret: any) => ret && ret[finishedField || 'finished'],
+                    cancel => (this.asyncCancel = cancel),
+                    checkInterval
+                  ).then((value: any) => {
+                    // 派发asyncApiFinished事件
+                    dispatchEvent('asyncApiFinished', store.data);
+                  });
                   return {
-                    cbResult: null,
+                    cbResult,
+                    dispatcher
+                  };
+                },
+                onFailed: async (result: Payload) => {
+                  const dispatcher = await dispatchEvent(
+                    'submitFail',
+                    createObject(this.props.data, {error: result})
+                  );
+                  return {
                     dispatcher
                   };
                 }
-                const cbResult = until(
-                  () => store.checkRemote(finnalAsyncApi as Api, store.data),
-                  (ret: any) => ret && ret[finishedField || 'finished'],
-                  cancel => (this.asyncCancel = cancel),
-                  checkInterval
-                );
-                return {
-                  cbResult,
-                  dispatcher
-                };
-              },
-              onFailed: async (result: Payload) => {
-                const dispatcher = await dispatchEvent(
-                  'submitFail',
-                  createObject(this.props.data, {error: result})
-                );
-                return {
-                  dispatcher
-                };
-              }
-            })
-            .then(async response => {
-              onSaved && onSaved(values, response);
-              const feedback = action.feedback || this.props.feedback;
+              })
+              .then(async response => {
+                onSaved && onSaved(values, response);
+                const feedback = action.feedback || this.props.feedback;
 
-              // submit 也支持 feedback
-              if (feedback && isVisible(feedback, store.data)) {
-                const confirmed = await this.openFeedback(feedback, store.data);
+                // submit 也支持 feedback
+                if (feedback && isVisible(feedback, store.data)) {
+                  const confirmed = await this.openFeedback(
+                    feedback,
+                    store.data
+                  );
 
-                // 如果 feedback 配置了，取消就跳过原有逻辑。
-                if (feedback.skipRestOnCancel && !confirmed) {
-                  throw new SkipOperation();
-                } else if (feedback.skipRestOnConfirm && confirmed) {
-                  throw new SkipOperation();
+                  // 如果 feedback 配置了，取消就跳过原有逻辑。
+                  if (feedback.skipRestOnCancel && !confirmed) {
+                    throw new SkipOperation();
+                  } else if (feedback.skipRestOnConfirm && confirmed) {
+                    throw new SkipOperation();
+                  }
                 }
-              }
 
-              // return values;
-            });
-        } else {
-          // type为submit，但是没有配api以及target时，只派发事件
-          dispatchEvent('submitSucc', createObject(this.props.data, values));
-        }
+                return injectObjectChain(store.data, {
+                  __payload: values,
+                  __response: response
+                });
+              });
+          } else if (shouldBlockedBySendOnApi(action.api || api, values)) {
+            // api存在，但是不满足sendOn时，走这里，不派发submitSucc事件
+            return;
+          } else {
+            clearPersistDataAfterSubmit && store.clearLocalPersistData();
+            // type为submit，但是没有配api以及target时，只派发事件
+            dispatchEvent('submitSucc', createObject(this.props.data, values));
+          }
 
-        return Promise.resolve(null);
-      })
+          return Promise.resolve(null);
+        },
+        throwErrors,
+        true
+      )
         .then(values => {
           // 有可能 onSubmit return false 了，那么后面的就不应该再执行了。
           if (values === false) {
             return store.data;
           }
 
-          if (onFinished && onFinished(values, action) === false) {
+          if (onFinished && onFinished(values, action, store) === false) {
             return values;
           }
 
@@ -1177,19 +1578,18 @@ export default class Form extends React.Component<FormProps, object> {
               action.redirect || redirect,
               store.data
             );
-            finalRedirect && env.jumpTo(finalRedirect, action);
+            finalRedirect && env.jumpTo(finalRedirect, action, store.data);
           } else if (action.reload || reload) {
-            this.reloadTarget(action.reload || reload!, store.data);
+            this.reloadTarget(
+              filterTarget(action.reload || reload!, store.data),
+              store.data
+            );
           }
 
           action.close && this.closeTarget(action.close);
           return values;
         })
         .catch(reason => {
-          if (reason instanceof SkipOperation) {
-            return;
-          }
-
           onFailed && onFailed(reason, store.errors);
 
           if (throwErrors) {
@@ -1197,33 +1597,61 @@ export default class Form extends React.Component<FormProps, object> {
           }
         });
     } else if (action.type === 'reset' || action.actionType === 'reset') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       store.reset(onReset);
     } else if (action.actionType === 'clear') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       store.clear(onReset);
     } else if (action.actionType === 'validate') {
-      store.setCurrentAction(action);
-      this.validate(true);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return this.validate(true, throwErrors, true, true);
     } else if (action.actionType === 'dialog') {
-      store.setCurrentAction(action);
-      store.openDialog(data);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDialog(
+          data,
+          undefined,
+          (confirmed: any, value: any) => {
+            action.callback?.(confirmed, value);
+            resolve({
+              confirmed,
+              value
+            });
+          },
+          delegate || (this.context as any)
+        );
+      });
     } else if (action.actionType === 'drawer') {
-      store.setCurrentAction(action);
-      store.openDrawer(data);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDrawer(data, undefined, (confirmed: any, value: any) => {
+          action.callback?.(confirmed, value);
+          resolve({
+            confirmed,
+            value
+          });
+        });
+      });
     } else if (action.actionType === 'ajax') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       if (!isEffectiveApi(action.api)) {
         return env.alert(__(`当 actionType 为 ajax 时，请设置 api 属性`));
       }
+      let successMsg =
+        (action.messages && action.messages.success) || saveSuccess;
+      let failMsg = (action.messages && action.messages.failed) || saveFailed;
 
       return store
         .saveRemote(action.api as Api, data, {
           successMessage: __(
-            (action.messages && action.messages.success) || saveSuccess
+            typeof successMsg === 'string'
+              ? filter(successMsg, store.data)
+              : undefined
           ),
           errorMessage: __(
-            (action.messages && action.messages.failed) || saveFailed
+            typeof failMsg === 'string'
+              ? filter(failMsg, store.data)
+              : undefined
           )
         })
         .then(async response => {
@@ -1244,9 +1672,13 @@ export default class Form extends React.Component<FormProps, object> {
 
           const redirect =
             action.redirect && filter(action.redirect, store.data);
-          redirect && env.jumpTo(redirect, action);
+          redirect && env.jumpTo(redirect, action, store.data);
 
-          action.reload && this.reloadTarget(action.reload, store.data);
+          action.reload &&
+            this.reloadTarget(
+              filterTarget(action.reload, store.data),
+              store.data
+            );
           action.close && this.closeTarget(action.close);
         })
         .catch(e => {
@@ -1256,13 +1688,13 @@ export default class Form extends React.Component<FormProps, object> {
           }
         });
     } else if (action.actionType === 'reload') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       if (action.target) {
-        this.reloadTarget(action.target, data);
+        this.reloadTarget(filterTarget(action.target, data), data);
       } else {
         this.receive(data);
       }
-      // action.target && this.reloadTarget(action.target, data);
+      // action.target && this.reloadTarget(filterTarget(action.target, data), data);
     } else if (onAction) {
       // 不识别的丢给上层去处理。
       return onAction(e, action, data, throwErrors, delegate || this.context);
@@ -1271,9 +1703,28 @@ export default class Form extends React.Component<FormProps, object> {
 
   handleQuery(query: any) {
     if (this.props.initApi) {
+      // 如果是分页动作，则看接口里面有没有用，没用则  return false
+      // 让组件自己去排序
+      if (
+        query?.hasOwnProperty('orderBy') &&
+        !isApiOutdated(
+          this.props.initApi,
+          this.props.initApi,
+          this.props.store.data,
+          createObject(this.props.store.data, query)
+        )
+      ) {
+        return false;
+      }
+
       this.receive(query);
+      return;
+    }
+
+    if (this.props.onQuery) {
+      return this.props.onQuery(query);
     } else {
-      this.props.onQuery?.(query);
+      return false;
     }
   }
 
@@ -1294,7 +1745,7 @@ export default class Form extends React.Component<FormProps, object> {
       this.handleBulkChange(values[0], false);
     }
 
-    store.closeDialog(true);
+    store.closeDialog(true, values);
   }
 
   handleDialogClose(confirmed = false) {
@@ -1325,7 +1776,7 @@ export default class Form extends React.Component<FormProps, object> {
         );
     }
 
-    store.closeDrawer(true);
+    store.closeDrawer(true, values);
   }
 
   handleDrawerClose() {
@@ -1348,28 +1799,50 @@ export default class Form extends React.Component<FormProps, object> {
   openFeedback(dialog: any, ctx: any) {
     return new Promise(resolve => {
       const {store} = this.props;
-      store.setCurrentAction({
-        type: 'button',
-        actionType: 'dialog',
-        dialog: dialog
-      });
-      store.openDialog(ctx, undefined, confirmed => {
-        resolve(confirmed);
-      });
+      store.setCurrentAction(
+        {
+          type: 'button',
+          actionType: 'dialog',
+          dialog: dialog
+        },
+        this.props.resolveDefinitions
+      );
+      store.openDialog(
+        ctx,
+        undefined,
+        confirmed => {
+          resolve(confirmed);
+        },
+        this.context as any
+      );
     });
   }
 
   buildActions() {
-    const {actions, submitText, body, translate: __} = this.props;
+    const {
+      actions,
+      submitText,
+      body,
+      translate: __,
+      loadingConfig,
+      wrapWithPanel
+    } = this.props;
 
     if (
+      wrapWithPanel === false ||
       typeof actions !== 'undefined' ||
       !submitText ||
       (Array.isArray(body) &&
         body.some(
           item =>
             item &&
-            !!~['submit', 'button', 'button-group', 'reset'].indexOf(
+            !!~[
+              'submit',
+              'button',
+              'button-group',
+              'reset',
+              'button-toolbar'
+            ].indexOf(
               (item as any)?.body?.[0]?.type ||
                 (item as any)?.body?.type ||
                 (item as any).type
@@ -1383,7 +1856,8 @@ export default class Form extends React.Component<FormProps, object> {
       {
         type: 'submit',
         label: __(submitText),
-        primary: true
+        primary: true,
+        loadingConfig
       }
     ];
   }
@@ -1424,6 +1898,7 @@ export default class Form extends React.Component<FormProps, object> {
     otherProps: Partial<FormProps> = {}
   ): React.ReactNode {
     children = children || [];
+    const {classnames: cx} = this.props;
 
     if (!Array.isArray(children)) {
       children = [children];
@@ -1454,30 +1929,96 @@ export default class Form extends React.Component<FormProps, object> {
         return null;
       }
 
-      const {classnames: cx} = this.props;
-
       return (
         <div className={cx('Form-row')}>
-          {children.map((control, key) =>
-            ~['hidden', 'formula'].indexOf((control as any).type) ||
-            (control as any).mode === 'inline' ? (
+          {children.map((control, key) => {
+            const split = control.colSize?.split('/');
+            const colSize =
+              split?.[0] && split?.[1]
+                ? (split[0] / split[1]) * 100 + '%'
+                : control.colSize;
+            return ~['hidden', 'formula'].indexOf((control as any).type) ||
+              (control as any).mode === 'inline' ? (
               this.renderChild(control, key, otherProps)
             ) : (
               <div
                 key={key}
                 className={cx(`Form-col`, (control as Schema).columnClassName)}
+                style={{
+                  flex:
+                    colSize && !['1', 'auto'].includes(colSize)
+                      ? `0 0 ${colSize}`
+                      : '1'
+                }}
               >
                 {this.renderChild(control, '', {
                   ...otherProps,
                   mode: 'row'
                 })}
               </div>
-            )
-          )}
+            );
+          })}
         </div>
       );
     }
 
+    if (this.props.mode === 'flex') {
+      let rows: any = [];
+      children.forEach(child => {
+        if (typeof child.row === 'number') {
+          if (rows[child.row]) {
+            rows[child.row].push(child);
+          } else {
+            rows[child.row] = [child];
+          }
+        } else {
+          // 没有 row 的，就单启一行
+          rows.push([child]);
+        }
+      });
+      return (
+        <>
+          {rows.map((children: any, index: number) => {
+            return (
+              <div className={cx('Form-flex')} role="flex-row" key={index}>
+                {children.map((control: any, key: number) => {
+                  const split = control.colSize?.split('/');
+                  const colSize =
+                    split?.[0] && split?.[1]
+                      ? (split[0] / split[1]) * 100 + '%'
+                      : control.colSize;
+                  return ~['hidden', 'formula'].indexOf(
+                    (control as any).type
+                  ) ? (
+                    this.renderChild(control, key, otherProps)
+                  ) : (
+                    <div
+                      key={control.id || key}
+                      className={cx(
+                        `Form-flex-col`,
+                        (control as Schema).columnClassName
+                      )}
+                      style={{
+                        flex:
+                          colSize && !['1', 'auto'].includes(colSize)
+                            ? `0 0 ${colSize}`
+                            : ''
+                      }}
+                      role="flex-col"
+                    >
+                      {this.renderChild(control, '', {
+                        ...otherProps,
+                        mode: 'flex'
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </>
+      );
+    }
     return children.map((control, key) =>
       this.renderChild(control, key, otherProps, region)
     );
@@ -1516,7 +2057,9 @@ export default class Form extends React.Component<FormProps, object> {
       dispatchEvent,
       labelAlign,
       labelWidth,
-      static: isStatic = false
+      labelOverflow,
+      static: isStatic,
+      canAccessSuperData
     } = props;
 
     const subProps = {
@@ -1529,8 +2072,12 @@ export default class Form extends React.Component<FormProps, object> {
       formSubmited: form.submited,
       formMode: mode,
       formHorizontal: horizontal,
-      formLabelAlign: labelAlign !== 'left' ? 'right' : labelAlign,
+      formLabelAlign:
+        !labelAlign || !['left', 'right', 'top'].includes(labelAlign)
+          ? 'right'
+          : labelAlign,
       formLabelWidth: labelWidth,
+      formLabelOverflow: labelOverflow,
       controlWidth,
       /**
        * form.loading有为true时才下发disabled属性，否则不显性设置disbaled为false
@@ -1540,13 +2087,6 @@ export default class Form extends React.Component<FormProps, object> {
         disabled ||
         (control as Schema).disabled ||
         (form.loading ? true : undefined),
-      /**
-       * 静态展示 优先级逻辑
-       * 1. 表单子项 static: true 始终保持静态
-       * 2. 表单子项 static: false 或 不配置，跟随父表单
-       * 3. 动作控制 表单子项 时，无视配置，优先级最高
-       */
-      static: (control as Schema).static || isStatic,
       btnDisabled: disabled || form.loading || form.validating,
       onAction: this.handleAction,
       onQuery: this.handleQuery,
@@ -1555,8 +2095,9 @@ export default class Form extends React.Component<FormProps, object> {
       addHook: this.addHook,
       removeHook: this.removeHook,
       renderFormItems: this.renderFormItems,
-      formItemDispatchEvent: this.formItemDispatchEvent(dispatchEvent),
-      formPristine: form.pristine
+      dispatchEvent: this.dispatchEvent,
+      formPristine: form.pristine,
+      onFlushForm: this.flush
       // value: (control as any)?.name
       //   ? getVariable(form.data, (control as any)?.name, canAccessSuperData)
       //   : (control as any)?.value,
@@ -1591,7 +2132,14 @@ export default class Form extends React.Component<FormProps, object> {
       columnCount,
       render,
       staticClassName,
-      static: isStatic = false
+      static: isStatic = false,
+      loadingConfig,
+      themeCss,
+      id,
+      wrapperCustomStyle,
+      env,
+      wrapWithPanel,
+      testid
     } = this.props;
 
     const {restError} = store;
@@ -1602,7 +2150,7 @@ export default class Form extends React.Component<FormProps, object> {
 
     const padDom = repeatCount(
       columnCount && Array.isArray(body)
-        ? columnCount - (body.length % columnCount)
+        ? (columnCount - (body.length % columnCount)) % columnCount
         : 0,
       index => (
         <div
@@ -1614,12 +2162,31 @@ export default class Form extends React.Component<FormProps, object> {
 
     return (
       <WrapperComponent
+        ref={this.formRef}
         className={cx(
           `Form`,
           `Form--${mode || 'normal'}`,
           columnCount ? `Form--column Form--column-${columnCount}` : null,
           staticClassName && isStatic ? staticClassName : className,
-          isStatic ? 'Form--isStatic' : null
+          isStatic ? 'Form--isStatic' : null,
+          setThemeClassName({
+            ...this.props,
+            name: [
+              'formControlClassName',
+              'itemClassName',
+              'staticClassName',
+              'itemLabelClassName'
+            ],
+            id,
+            themeCss
+          }),
+          !wrapWithPanel &&
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            })
         )}
         onSubmit={this.handleFormSubmit}
         noValidate
@@ -1628,19 +2195,13 @@ export default class Form extends React.Component<FormProps, object> {
         <input type="submit" style={{display: 'none'}} />
 
         {debug
-          ? render(
-              'form-debug-json',
-              extend(
-                {
-                  type: 'json',
-                  value: store.data,
-                  ellipsisThreshold: 120,
-                  className: cx('Form--debug')
-                },
-                /** 定制debug输出格式 */
-                isObject(debugConfig) ? debugConfig : {}
-              )
-            )
+          ? render('form-debug-json', {
+              type: 'json',
+              value: store.data,
+              ellipsisThreshold: 120,
+              className: cx('Form--debug'),
+              ...debugConfig
+            })
           : null}
 
         {render(
@@ -1648,7 +2209,8 @@ export default class Form extends React.Component<FormProps, object> {
           {type: 'spinner'},
           {
             overlay: true,
-            show: store.loading
+            show: store.loading,
+            loadingConfig
           }
         )}
 
@@ -1670,8 +2232,7 @@ export default class Form extends React.Component<FormProps, object> {
         {render(
           'modal',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).dialog as object)),
+            ...store.dialogSchema,
             type: 'dialog'
           },
           {
@@ -1686,8 +2247,7 @@ export default class Form extends React.Component<FormProps, object> {
         {render(
           'modal',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).drawer as object)),
+            ...store.drawerSchema,
             type: 'drawer'
           },
           {
@@ -1698,6 +2258,74 @@ export default class Form extends React.Component<FormProps, object> {
             show: store.drawerOpen
           }
         )}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss,
+            classNames: [
+              wrapWithPanel && {
+                key: 'panelClassName'
+              },
+              !wrapWithPanel && {
+                key: 'formControlClassName'
+              },
+              {
+                key: 'headerControlClassName',
+                weights: {
+                  default: {
+                    parent: `.${cx('Panel')}`
+                  }
+                }
+              },
+              wrapWithPanel && {
+                key: 'headerTitleControlClassName',
+                weights: {
+                  default: {
+                    important: true
+                  }
+                }
+              },
+              wrapWithPanel && {
+                key: 'bodyControlClassName'
+              },
+              wrapWithPanel && {
+                key: 'actionsControlClassName',
+                weights: {
+                  default: {
+                    parent: `.${cx('Panel--form')}`
+                  }
+                }
+              },
+              {
+                key: 'itemClassName',
+                weights: {
+                  default: {
+                    inner: `.${cx('Form-item')}`
+                  }
+                }
+              },
+              {
+                key: 'staticClassName',
+                weights: {
+                  default: {
+                    inner: `.${cx('Form-static')}`
+                  }
+                }
+              },
+              {
+                key: 'itemLabelClassName',
+                weights: {
+                  default: {
+                    inner: `.${cx('Form-label')}`
+                  }
+                }
+              }
+            ].filter(n => n) as CustomStyleClassName[],
+            wrapperCustomStyle,
+            id
+          }}
+          env={env}
+        />
       </WrapperComponent>
     );
   }
@@ -1717,10 +2345,14 @@ export default class Form extends React.Component<FormProps, object> {
       actionsClassName,
       bodyClassName,
       classnames: cx,
+      style,
       affixFooter,
       lazyLoad,
       translate: __,
-      footer
+      footer,
+      id,
+      wrapperCustomStyle,
+      themeCss
     } = this.props;
 
     let body: JSX.Element = this.renderBody();
@@ -1733,7 +2365,23 @@ export default class Form extends React.Component<FormProps, object> {
           title: __(title)
         },
         {
-          className: cx(panelClassName, 'Panel--form'),
+          className: cx(
+            panelClassName,
+            'Panel--form',
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            }),
+            setThemeClassName({
+              ...this.props,
+              name: 'panelClassName',
+              id,
+              themeCss
+            })
+          ),
+          style: style,
           formStore: this.props.store,
           children: body,
           actions: this.buildActions(),
@@ -1742,11 +2390,35 @@ export default class Form extends React.Component<FormProps, object> {
           disabled: store.loading,
           btnDisabled: store.loading || store.validating,
           headerClassName,
+          headerControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'headerControlClassName',
+            id,
+            themeCss
+          }),
+          headerTitleControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'headerTitleControlClassName',
+            id,
+            themeCss
+          }),
           footer,
           footerClassName,
           footerWrapClassName,
           actionsClassName,
+          actionsControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'actionsControlClassName',
+            id,
+            themeCss
+          }),
           bodyClassName,
+          bodyControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'bodyControlClassName',
+            id,
+            themeCss
+          }),
           affixFooter
         }
       ) as JSX.Element;
@@ -1760,30 +2432,7 @@ export default class Form extends React.Component<FormProps, object> {
   }
 }
 
-@Renderer({
-  type: 'form',
-  storeType: FormStore.name,
-  isolateScope: true,
-  storeExtendsData: (props: any) => props.inheritData,
-  shouldSyncSuperStore: (store, props, prevProps) => {
-    // 如果是 QuickEdit，让 store 同步 __super 数据。
-    if (
-      props.quickEditFormRef &&
-      props.onQuickChange &&
-      (isObjectShallowModified(prevProps.data, props.data) ||
-        isObjectShallowModified(prevProps.data.__super, props.data.__super) ||
-        isObjectShallowModified(
-          prevProps.data.__super?.__super,
-          props.data.__super?.__super
-        ))
-    ) {
-      return true;
-    }
-
-    return undefined;
-  }
-})
-export class FormRenderer extends Form {
+export class FormRendererBase extends Form {
   static contextType = ScopedContext;
 
   constructor(props: FormProps, context: IScopedContext) {
@@ -1797,13 +2446,7 @@ export class FormRenderer extends Form {
     super.componentDidMount();
 
     if (this.props.autoFocus) {
-      const scoped = this.context as IScopedContext;
-      const inputs = scoped.getComponents();
-      let focuableInput = find(
-        inputs,
-        input => input.focus
-      ) as ScopedComponentType;
-      focuableInput && setTimeout(() => focuableInput.focus!(), 200);
+      this.focus();
     }
   }
 
@@ -1814,6 +2457,16 @@ export class FormRenderer extends Form {
     super.componentWillUnmount();
   }
 
+  focus() {
+    const scoped = this.context as IScopedContext;
+    const inputs = scoped.getComponents();
+    let focuableInput = find(
+      inputs,
+      input => input.focus
+    ) as ScopedComponentType;
+    focuableInput && setTimeout(() => focuableInput.focus!(), 200);
+  }
+
   doAction(
     action: ActionObject,
     data: object = this.props.store.data,
@@ -1822,7 +2475,7 @@ export class FormRenderer extends Form {
     return this.handleAction(undefined, action, data, throwErrors);
   }
 
-  handleAction(
+  async handleAction(
     e: React.UIEvent<any> | undefined,
     action: ActionObject,
     ctx: object,
@@ -1833,6 +2486,7 @@ export class FormRenderer extends Form {
     // if (this.props.disabled) {
     //   return;
     // }
+
     if (action.target && action.actionType !== 'reload') {
       const scoped = this.context as IScopedContext;
 
@@ -1853,6 +2507,8 @@ export class FormRenderer extends Form {
           );
         })
       );
+    } else if (action.actionType === 'clearError') {
+      return super.clearErrors();
     } else {
       return super.handleAction(e, action, ctx, throwErrors, delegate);
     }
@@ -1891,13 +2547,13 @@ export class FormRenderer extends Form {
     scoped.close(target);
   }
 
-  reload(
+  async reload(
     target?: string,
     query?: any,
     ctx?: any,
     silent?: boolean,
     replace?: boolean
-  ) {
+  ): Promise<any> {
     if (query) {
       return this.receive(query, undefined, replace);
     }
@@ -1927,18 +2583,22 @@ export class FormRenderer extends Form {
     ) {
       component.reload(subPath, subQuery, ctx);
     } else if (target === '*') {
-      super.reload(target, query, ctx, silent);
+      await super.reload(target, query, ctx, silent);
       const components = scoped.getComponents();
       components.forEach(
         (component: any) =>
           component.reload && component.reload('', subQuery, ctx)
       );
     } else {
-      super.reload(target, query, ctx, silent);
+      return super.reload(target, query, ctx, silent);
     }
   }
 
-  receive(values: object, name?: string, replace?: boolean) {
+  async receive(
+    values: object,
+    name?: string,
+    replace?: boolean
+  ): Promise<any> {
     if (name) {
       const scoped = this.context as IScopedContext;
       const idx = name.indexOf('.');
@@ -1959,9 +2619,39 @@ export class FormRenderer extends Form {
 
   setData(values: object, replace?: boolean) {
     const {onChange, store} = this.props;
-    super.setValues(values);
+    super.setValues(values, replace);
     // 触发表单change
     onChange &&
       onChange(store.data, difference(store.data, store.pristine), this.props);
   }
+
+  getData() {
+    return this.getValues();
+  }
 }
+
+@Renderer({
+  type: 'form',
+  storeType: FormStore.name,
+  isolateScope: true,
+  storeExtendsData: (props: any) => props.inheritData,
+  shouldSyncSuperStore: (store, props, prevProps) => {
+    // 如果是 QuickEdit，让 store 同步 __super 数据。
+    if (
+      props.quickEditFormRef &&
+      props.onQuickChange &&
+      (isObjectShallowModified(prevProps.data, props.data) ||
+        isObjectShallowModified(prevProps.data.__super, props.data.__super) ||
+        isObjectShallowModified(
+          prevProps.data.__super?.__super,
+          props.data.__super?.__super
+        ))
+    ) {
+      return true;
+    }
+
+    return undefined;
+  }
+})
+// 装饰器装饰后的类无法继承父类上的方法，所以多包了一层FormRendererBase用来继承
+export class FormRenderer extends FormRendererBase {}

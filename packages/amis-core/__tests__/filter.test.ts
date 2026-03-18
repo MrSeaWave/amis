@@ -36,7 +36,7 @@ test(`filter:complex`, () => {
         a: '<br />'
       }
     })
-  ).toEqual('&lt;br &#x2F;&gt;');
+  ).toEqual('&lt;br /&gt;');
 });
 
 test(`filter:json`, () => {
@@ -132,6 +132,15 @@ test(`filter:bytes`, () => {
     })
   ).toBe('234 KB');
 });
+
+test(`filter:bytes:step`, () => {
+  expect(
+    resolveVariableAndFilter('${a|bytes:1024}', {
+      a: 234343
+    })
+  ).toBe('229 KB');
+});
+
 test(`filter:round`, () => {
   expect(
     resolveVariableAndFilter('${a|round}', {
@@ -264,6 +273,12 @@ test('filter:isMatch', () => {
       status: 2
     })
   ).toBe(1);
+
+  expect(
+    resolveVariableAndFilter('${status | isMatch:2:1|isMatch:5:1:4}', {
+      status: 1
+    })
+  ).toBe(4);
 });
 
 test('filter:filter:isMatch', () => {

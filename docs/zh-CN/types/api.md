@@ -589,20 +589,17 @@ amis 的 API 配置，如果无法配置出你想要的请求结构，那么可�
 - **api**：当前请求的 api 对象，一般包含下面几个属性：
   - url：当前接口 Api 地址
   - method：当前请求的方式
-  - data：请求的数据体
+  - data：请求的数据体, 注意当请求方式为 `get` 时，`data` 在传入适配器时会被删除，请通过 query 读取，或者修改
+  - query：请求的查询参数，所有请求参数都会被合并到 query 中，包含 data 参数和 url 参数
   - headers：请求的头部信息
+  - context: 发送请求时的上下文数据
+- **context** 发送请求时的上下文数据
+
+> 6.5.0 版本开始支持在发送适配中修改 query 参数，之前的版本只能修改 url 参数。
 
 ##### 字符串形式
 
 如果在 JSON 文件中配置的话，`requestAdaptor`只支持字符串形式。
-
-字符串形式实际上可以认为是外层包裹了一层函数，你需要补充内部的函数实现，并将修改好的 `api` 对象 `return` 出去：
-
-```js
-function (api) {
-  // 你的适配器代码
-}
-```
 
 用法示例：
 
@@ -612,7 +609,7 @@ function (api) {
     "api": {
         "method": "post",
         "url": "/api/mock2/form/saveForm",
-        "requestAdaptor": "return {\n    ...api,\n    data: {\n        ...api.data,    // 获取暴露的 api 中的 data 变量\n        foo: 'bar'      // 新添加数据\n    }\n}"
+        "requestAdaptor": "console.log(context); // 打印上下文数据\nreturn {\n    ...api,\n    data: {\n        ...api.data,    // 获取暴露的 api 中的 data 变量\n        foo: 'bar'      // 新添加数据\n    }\n}"
     },
     "body": [
       {
@@ -634,6 +631,8 @@ function (api) {
 ```js
 // 进行一些操作
 
+console.log(context); // 打印上下文数据
+
 // 一定要将调整后的 api 对象 return 出去
 return {
   ...api,
@@ -642,6 +641,14 @@ return {
     foo: 'bar' // 新添加数据
   }
 };
+```
+
+字符串形式的适配器代码最后会自动包裹成函数，你只需要补充内部的函数实现，并将修改好的 `api` 对象 `return` 出去：
+
+```js
+function (api, context) {
+  // 你的适配器代码在这里
+}
 ```
 
 ##### 函数形式
@@ -654,7 +661,9 @@ const schema = {
   api: {
     method: 'post',
     url: '/api/mock2/form/saveForm',
-    requestAdaptor: function (api) {
+    requestAdaptor: function (api, context) {
+      console.log(context); // 打印上下文数据
+
       return {
         ...api,
         data: {
@@ -683,6 +692,47 @@ const schema = {
 
 你也可以使用`debugger`自行进行调试。
 
+#### 拦截请求
+
+如果 api 发送适配器中，修改 api 对象，在 api 对象里面放入 `mockResponse` 属性，则会拦截请求发送，amis 内部会直接使用 `mockResponse` 的结果返回。
+
+```js
+const schema = {
+  type: 'form',
+  api: {
+    method: 'post',
+    url: '/api/mock2/form/saveForm',
+    requestAdaptor: function (api, context) {
+      return {
+        // 模拟 http 请求返回
+        mockResponse: {
+          status: 200, // http 返回状态
+          data: {
+            // http 返回结果
+            status: 0, // amis 返回数据的状态
+            data: {
+              name: '模拟返回的值'
+            }
+          }
+        }
+      };
+    }
+  },
+  body: [
+    {
+      type: 'input-text',
+      name: 'name',
+      label: '姓名：'
+    },
+    {
+      name: 'text',
+      type: 'input-email',
+      label: '邮箱：'
+    }
+  ]
+};
+```
+
 ### 配置接收适配器
 
 同样的，如果后端返回的响应结构不符合 amis 的[接口格式要求](#%E6%8E%A5%E5%8F%A3%E8%BF%94%E5%9B%9E%E6%A0%BC%E5%BC%8F-%E9%87%8D%E8%A6%81-)，而后端不方便调整时，可以配置`adaptor`实现接收适配器
@@ -698,28 +748,21 @@ const schema = {
 - **payload**：当前请求的响应 payload，即 response.data
 - **response**：当前请求的原始响应
 - **api**：api 上的配置项，还可以通过 `api.data` 获得数据域里的内容
+- **context** 发送请求时的上下文数据
 
 ##### 字符串形式
 
 如果在 JSON 文件中配置的话，`adaptor`只支持字符串形式。
 
-字符串形式实际上可以认为是外层包裹了一层函数，你需要补充内部的函数实现，并将修改好的 `payload` 对象 `return` 出去：
-
-```js
-function (payload, response, api) {
-  // 你的适配器代码
-}
-```
-
 用法示例：
 
-```json
+```schema: scope="body"
 {
   "type": "form",
   "api": {
     "method": "post",
     "url": "/api/mock2/form/saveForm",
-    "adaptor": "return {\n    ...payload,\n    status: payload.code === 200 ? 0 : payload.code\n}"
+    "adaptor": "console.log(context); // 打印上下文数据 \nreturn {\n    ...payload,\n    status: payload.code === 200 ? 0 : payload.code\n}"
   },
   "body": [
     {
@@ -749,6 +792,14 @@ return {
 };
 ```
 
+字符串形式的适配器代码最后会自动包裹成函数，你只需要补充内部的函数实现，并将修改好的 `payload` 对象 `return` 出去：
+
+```js
+function (payload, response, api, context) {
+  // 你的适配器代码在这里
+}
+```
+
 ##### 函数形式
 
 如果你的使用环境为 js 文件，则可以直接传入函数，如下：
@@ -759,7 +810,8 @@ const schema = {
   api: {
     method: 'post',
     url: '/api/mock2/form/saveForm',
-    adaptor: function (payload, response) {
+    adaptor: function (payload, response, api, context) {
+      console.log(context); // 打印上下文数据
       return {
         ...payload,
         status: payload.code === 200 ? 0 : payload.code
@@ -821,6 +873,48 @@ Content-Disposition: attachment; filename="download.pdf"
 
 ```
 Access-Control-Expose-Headers: Content-Disposition
+```
+
+如果自己覆盖了 `fetcher` 函数，需要有类似如下代码，具体可以参考 `embed.tsx` 里的实现
+
+```javascript
+let response = await axios(config);
+response = await attachmentAdpator(response, __);
+```
+
+### 配置提示信息
+
+可以通过`messages`自定义接口请求提示信息。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "api": {
+        "method": "post",
+        "url": "/api/mock2/form/saveForm",
+        "data": {
+            "myName": "${name}",
+            "myEmail": "${email}"
+        },
+        "messages": {
+          "success": '好耶，成功了！',
+          "failed": '糟糕，失败了！'
+        }
+
+    },
+    "body": [
+      {
+        "type": "input-text",
+        "name": "name",
+        "label": "姓名："
+      },
+      {
+        "name": "email",
+        "type": "input-email",
+        "label": "邮箱："
+      }
+    ]
+}
 ```
 
 ### replaceData
@@ -898,6 +992,8 @@ Access-Control-Expose-Headers: Content-Disposition
 
 之前的版本，配置的 api 默认就会具备自动刷新功能，除非显式的配置 `autoRefresh: false` 来关闭。自动刷新主要通过跟踪 api 的 url 属性来完成的，如果 url 中了使用了某个变量，而这个变量发生变化则会触发自动刷新。
 也就说这个 url 地址，既能控制 api 请求的 query 参数，同时又起到跟踪变量重新刷新接口的作用。这个设定大部分情况下都是合理的，但是有时候想要跟踪 url 参数以外的变量就做不到了。所以新增了此属性 `trackExpression`，显式的配置需要跟踪的变量如：
+
+> 如果`trackExpression` 追踪的数据是**对象数据**，可以使用[数据映射](../../docs/concepts/data-mapping)的`json`方法将数据序列化之后再比较，例如`"trackExpression": "${fieldToTrack|json}"`
 
 ```schema: scope="body"
 {
@@ -1056,3 +1152,4 @@ Access-Control-Expose-Headers: Content-Disposition
 | autoRefresh     | 是否自动刷新 | 布尔                                                                                                 | 配置是否需要自动刷新接口。                                                                                                                                                                    |
 | responseData    | 配置返回数据 | 对象                                                                                                 | 对返回结果做个映射                                                                                                                                                                            |
 | trackExpression | 跟踪变量     | 字符串                                                                                               | 配置跟踪变量表达式                                                                                                                                                                            |
+| messages        | 提示信息     | 对象                                                                                                 | 配置接口请求的提示信息，messages.success 表示请求成功提示信息、messages.failed 表示请求失败提示信息，2.4.1 及以上版本                                                                         |

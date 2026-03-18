@@ -12,6 +12,7 @@
   word-wrap: break-word;
   background: var(--Tooltip-bg);
   box-shadow: var(--Tooltip-boxShadow);
+  border: var(--common-popover-border);
 
   &-arrow {
     position: absolute;

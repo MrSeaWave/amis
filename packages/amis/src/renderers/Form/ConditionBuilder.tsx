@@ -5,7 +5,10 @@ import {
   FormBaseControl,
   Schema,
   isPureVariable,
-  resolveVariableAndFilter
+  resolveVariableAndFilter,
+  createObject,
+  evalExpression,
+  AMISConditionRule
 } from 'amis-core';
 import {
   FormBaseControlSchema,
@@ -23,27 +26,30 @@ import {
   ConditionBuilder
 } from 'amis-ui';
 
-import {IconSchema} from '../Icon';
+import {AMISIconSchema} from '../Icon';
+import {isMobile} from 'amis-core';
+import type {AMISInputFormulaSchemaBase} from './InputFormula';
+import {AMISFormItem} from 'amis-core';
 
 /**
  * 条件组合控件
- * 文档：https://baidu.gitee.io/amis/docs/components/form/condition-builder
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/condition-builder
  */
-export interface ConditionBuilderControlSchema extends FormBaseControlSchema {
+export interface AMISConditionBuilderSchema extends AMISFormItem {
   /**
-   * 指定为
+   * 指定为 condition-builder 组件
    */
   type: 'condition-builder';
 
   /**
-   * 内嵌模式，默认为 true
+   * 内嵌模式
    */
   embed?: boolean;
 
   /**
-   * 非内嵌模式时 弹窗触发icon
+   * 非内嵌模式时弹窗触发icon
    */
-  pickerIcon?: IconSchema;
+  pickerIcon?: AMISIconSchema;
 
   /**
    * 函数集合
@@ -54,6 +60,11 @@ export interface ConditionBuilderControlSchema extends FormBaseControlSchema {
    * 字段集合
    */
   fields: ConditionBuilderFields;
+
+  /**
+   * 是否限制字段唯一
+   */
+  uniqueFields?: boolean;
 
   /**
    * 其他配置
@@ -71,25 +82,54 @@ export interface ConditionBuilderControlSchema extends FormBaseControlSchema {
   builderMode?: 'simple' | 'full';
 
   /**
-   * 是否显示并或切换键按钮，只在简单模式下有用
+   * 是否显示并或切换键按钮
    */
   showANDOR?: boolean;
+
+  /**
+   * 是否可拖拽
+   */
+  draggable?: boolean;
+
+  /*
+   * 表达式：控制按钮"添加条件"的显示
+   */
+  addBtnVisibleOn?: string;
+
+  /**
+   * 表达式：控制按钮"添加条件组"的显示
+   */
+  addGroupBtnVisibleOn?: string;
+
+  /**
+   * 将字段输入控件变成公式编辑器。
+   */
+  formula?: AMISInputFormulaSchemaBase;
+
+  /**
+   * if 里面公式编辑器配置
+   */
+  formulaForIf?: any;
 }
 
 export interface ConditionBuilderProps
   extends FormControlProps,
     Omit<
-      ConditionBuilderControlSchema,
+      AMISConditionBuilderSchema,
       'type' | 'className' | 'descriptionClassName' | 'inputClassName'
     > {}
 
 export default class ConditionBuilderControl extends React.PureComponent<ConditionBuilderProps> {
   @autobind
-  renderEtrValue(schema: Schema, data: any) {
+  renderEtrValue(schema: Schema, props: any) {
     return this.props.render(
       'inline',
-      Object.assign(schema, {label: false}),
-      data
+      Object.assign({}, schema, {
+        label: false,
+        inputOnly: true,
+        changeImmediately: true
+      }),
+      props
     );
   }
 
@@ -98,8 +138,62 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
     return pickerIcon ? render('picker-icon', pickerIcon) : undefined;
   }
 
+  @autobind
+  getAddBtnVisible(param: {depth: number; breadth: number}) {
+    const {data, addBtnVisibleOn} = this.props;
+    if (typeof addBtnVisibleOn === 'string' && addBtnVisibleOn) {
+      return evalExpression(addBtnVisibleOn, createObject(data, param));
+    }
+    return;
+  }
+
+  @autobind
+  getAddGroupBtnVisible(param: {depth: number; breadth: number}) {
+    const {data, addGroupBtnVisibleOn} = this.props;
+    if (typeof addGroupBtnVisibleOn === 'string' && addGroupBtnVisibleOn) {
+      return evalExpression(addGroupBtnVisibleOn, createObject(data, param));
+    }
+    return;
+  }
+
+  validate(): any {
+    const {value, required, translate: __} = this.props;
+    // 校验必填
+    // 只要存在不为空条件即可通过校验
+    if (required) {
+      if (!value || !value.children) {
+        return __('Condition.isRequired');
+      }
+
+      let isEmpty = true;
+      const allowRightEmpty = ['is_empty', 'is_not_empty'];
+      value?.children?.forEach((item: AMISConditionRule) => {
+        // 如果左侧、操作符为空，必填不通过
+        if (
+          item.op &&
+          (item.right || !!~allowRightEmpty.indexOf(item.op as string))
+        ) {
+          isEmpty = false;
+          return;
+        }
+      });
+      return isEmpty ? __('Condition.isRequired') : null;
+    }
+
+    return;
+  }
+
   render() {
-    const {className, classnames: cx, pickerIcon, ...rest} = this.props;
+    const {
+      className,
+      classnames: cx,
+      style,
+      pickerIcon,
+      env,
+      popOverContainer,
+      mobileUI,
+      ...rest
+    } = this.props;
 
     // 处理一下formula类型值的变量列表
     let formula = this.props.formula ? {...this.props.formula} : undefined;
@@ -113,12 +207,22 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
     }
 
     return (
-      <div className={cx(`ConditionBuilderControl`, className)}>
+      <div
+        className={cx(
+          `ConditionBuilderControl`,
+          {'is-mobile': mobileUI},
+          className
+        )}
+      >
         <ConditionBuilderWithRemoteOptions
           renderEtrValue={this.renderEtrValue}
           pickerIcon={this.renderPickerIcon()}
+          isAddBtnVisibleOn={this.getAddBtnVisible}
+          isAddGroupBtnVisibleOn={this.getAddGroupBtnVisible}
+          popOverContainer={popOverContainer || env.getModalContainer}
           {...rest}
-          formula={formula}
+          placeholder={rest.placeholder as string}
+          formula={formula as any}
         />
       </div>
     );

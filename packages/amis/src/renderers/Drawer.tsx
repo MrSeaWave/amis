@@ -1,8 +1,19 @@
 import React from 'react';
-import {ScopedContext, IScopedContext} from 'amis-core';
+import {
+  ScopedContext,
+  IScopedContext,
+  filterTarget,
+  isPureVariable,
+  resolveVariableAndFilter,
+  setThemeClassName,
+  ValidateError,
+  RendererEvent,
+  AMISSchema,
+  AMISButtonSchema
+} from 'amis-core';
 import {Renderer, RendererProps} from 'amis-core';
 import {SchemaNode, Schema, ActionObject} from 'amis-core';
-import {Drawer as DrawerContainer} from 'amis-ui';
+import {Drawer as DrawerContainer, SpinnerExtraProps} from 'amis-ui';
 import {
   guid,
   isVisible,
@@ -11,136 +22,31 @@ import {
   isObjectShallowModified
 } from 'amis-core';
 import {reaction} from 'mobx';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {IModalStore, ModalStore} from 'amis-core';
 import {filter} from 'amis-core';
 import {Spinner} from 'amis-ui';
-import {IServiceStore} from 'amis-core';
-import {
-  BaseSchema,
-  SchemaClassName,
-  SchemaCollection,
-  SchemaName
-} from '../Schema';
+import {IServiceStore, CustomStyle} from 'amis-core';
+import {BaseSchema, AMISClassName, SchemaName} from '../Schema';
 import {ActionSchema} from './Action';
 import {isAlive} from 'mobx-state-tree';
+import {AMISDrawerSchemaBase, AMISSchemaCollection} from 'amis-core';
 
 /**
- * Drawer 抽出式弹框。
- * 文档：https://baidu.gitee.io/amis/docs/components/drawer
+ * 抽屉组件，用于侧边弹窗展示内容。支持从左右两侧滑出、自定义内容等。
  */
-export interface DrawerSchema extends BaseSchema {
+export interface AMISDrawerSchema extends AMISDrawerSchemaBase {
+  /**
+   * 指定为 drawer 组件
+   */
   type: 'drawer';
-
-  /**
-   * 默认不用填写，自动会创建确认和取消按钮。
-   */
-  actions?: Array<ActionSchema>;
-
-  /**
-   * 内容区域
-   */
-  body?: SchemaCollection;
-
-  /**
-   * 配置 外层 className
-   */
-  className?: SchemaClassName;
-
-  /**
-   * 配置 Body 容器 className
-   */
-  bodyClassName?: SchemaClassName;
-
-  /**
-   * 配置 头部 容器 className
-   */
-  headerClassName?: SchemaClassName;
-
-  /**
-   * 配置 头部 容器 className
-   */
-  footerClassName?: SchemaClassName;
-
-  /**
-   * 是否支持按 ESC 关闭 Dialog
-   */
-  closeOnEsc?: boolean;
-
-  name?: SchemaName;
-
-  /**
-   * Dialog 大小
-   */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
-
-  /**
-   * 请通过配置 title 设置标题
-   */
-  title?: SchemaCollection;
-
-  /**
-   * 从什么位置弹出
-   */
-  position?: 'left' | 'right' | 'top' | 'bottom';
-
-  /**
-   * 是否展示关闭按钮
-   * 当值为false时，默认开启closeOnOutside
-   */
-  showCloseButton?: boolean;
-
-  /**
-   * 抽屉的宽度 （当position为left | right时生效）
-   */
-  width?: number | string;
-
-  /**
-   * 抽屉的高度 （当position为top | bottom时生效）
-   */
-  height?: number | string;
-
-  /**
-   * 头部
-   */
-  header?: SchemaCollection;
-
-  /**
-   * 底部
-   */
-  footer?: SchemaCollection;
-
-  /**
-   * 影响自动生成的按钮，如果自己配置了按钮这个配置无效。
-   */
-  confirm?: boolean;
-
-  /**
-   * 是否可以拖动弹窗大小
-   */
-  resizable?: boolean;
-
-  /**
-   * 是否显示蒙层
-   */
-  overlay?: boolean;
-
-  /**
-   * 点击外部的时候是否关闭弹框。
-   */
-  closeOnOutside?: boolean;
-
-  /**
-   * 是否显示错误信息
-   */
-  showErrorMsg?: boolean;
 }
-
-export type DrawerSchemaBase = Omit<DrawerSchema, 'type'>;
+export type DrawerSchema = AMISDrawerSchema;
 
 export interface DrawerProps
   extends RendererProps,
-    Omit<DrawerSchema, 'className'> {
+    Omit<AMISDrawerSchema, 'className' | 'data'>,
+    SpinnerExtraProps {
   onClose: () => void;
   onConfirm: (
     values: Array<object>,
@@ -150,7 +56,7 @@ export interface DrawerProps
   ) => void;
   children?: React.ReactNode | ((props?: any) => React.ReactNode);
   wrapperComponent: React.ElementType;
-  lazySchema?: (props: DrawerProps) => SchemaCollection;
+  lazySchema?: (props: DrawerProps) => AMISSchemaCollection;
   store: IModalStore;
   show?: boolean;
   drawerContainer?: () => HTMLElement;
@@ -159,6 +65,7 @@ export interface DrawerProps
 export interface DrawerState {
   entered: boolean;
   resizeCoord: number;
+
   [propName: string]: any;
 }
 
@@ -206,6 +113,8 @@ export default class Drawer extends React.Component<DrawerProps> {
   reaction: any;
   $$id: string = guid();
   drawer: any;
+  clearErrorTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor(props: DrawerProps) {
     super(props);
 
@@ -243,18 +152,20 @@ export default class Drawer extends React.Component<DrawerProps> {
 
   componentWillUnmount() {
     this.reaction && this.reaction();
+    clearTimeout(this.clearErrorTimer);
   }
 
-  buildActions(): Array<ActionSchema> {
-    const {actions, confirm, translate: __} = this.props;
+  buildActions(): Array<AMISButtonSchema> {
+    const {actions, confirm, translate: __, testIdBuilder} = this.props;
 
     if (typeof actions !== 'undefined') {
       return actions;
     }
 
-    let ret: Array<ActionSchema> = [];
+    let ret: Array<AMISButtonSchema> = [];
     ret.push({
       type: 'button',
+      testIdBuilder: testIdBuilder?.getChild('cancel'),
       actionType: 'close',
       label: __('cancel')
     });
@@ -263,6 +174,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       ret.push({
         type: 'button',
         actionType: 'confirm',
+        testIdBuilder: testIdBuilder?.getChild('confirm'),
         label: __('confirm'),
         primary: true
       });
@@ -282,6 +194,9 @@ export default class Drawer extends React.Component<DrawerProps> {
     const rendererEvent = await dispatchEvent('cancel', this.props.data);
     if (rendererEvent?.prevented) {
       return;
+    }
+    if (rendererEvent?.pendingPromise.length) {
+      await rendererEvent.allDone();
     }
     // clear error
     store.updateMessage();
@@ -334,7 +249,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       return;
     }
 
-    store.closeDrawer();
+    store.closeDrawer(true, values);
   }
 
   handleDrawerClose(...args: Array<any>) {
@@ -347,7 +262,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       return;
     }
 
-    store.closeDrawer();
+    store.closeDrawer(...args);
   }
 
   handleDialogConfirm(
@@ -371,7 +286,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       return;
     }
 
-    store.closeDialog(true);
+    store.closeDialog(true, values);
   }
 
   handleDialogClose(...args: Array<any>) {
@@ -400,12 +315,11 @@ export default class Drawer extends React.Component<DrawerProps> {
   handleFormChange(data: any, name?: string) {
     const {store} = this.props;
 
+    // 如果 drawer 里面不放 form，而是直接放表单项就会进到这里来。
     if (typeof name === 'string') {
-      data = {
-        [name]: data
-      };
+      store.changeValue(name, data);
+      return;
     }
-
     store.setFormData(data);
   }
 
@@ -422,15 +336,20 @@ export default class Drawer extends React.Component<DrawerProps> {
     const {lazySchema, store} = this.props;
 
     store.setEntered(true);
+    // 可能还没来得及关闭，事件动作又打开了这个弹窗，这时候需要重置 busying 状态
+    store.markBusying(false);
     if (typeof lazySchema === 'function') {
       store.setSchema(lazySchema(this.props));
     }
   }
 
   handleExited() {
-    const {lazySchema, store} = this.props;
+    const {lazySchema, store, statusStore} = this.props;
+    statusStore && isAlive(statusStore) && statusStore.resetAll();
     if (isAlive(store)) {
       store.reset();
+      store.clearMessage();
+      store.markBusying(false);
       store.setEntered(false);
       if (typeof lazySchema === 'function') {
         store.setSchema('');
@@ -445,14 +364,14 @@ export default class Drawer extends React.Component<DrawerProps> {
     );
   }
 
-  renderBody(body: SchemaNode, key?: any): React.ReactNode {
+  renderBody(body: AMISSchemaCollection, key?: any): React.ReactNode {
     let {render, store} = this.props;
 
     if (Array.isArray(body)) {
       return body.map((body, key) => this.renderBody(body, key));
     }
 
-    let schema: Schema = body as Schema;
+    let schema = body as AMISSchema;
     let subProps: any = {
       key,
       disabled: store.loading,
@@ -463,6 +382,8 @@ export default class Drawer extends React.Component<DrawerProps> {
       onInit: this.handleFormInit,
       onSaved: this.handleFormSaved,
       onActionSensor: this.handleActionSensor,
+      btnDisabled: store.loading,
+      inDragging: store.inDragging,
       syncLocation: false
     };
 
@@ -470,7 +391,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       schema = {
         mode: 'horizontal',
         wrapWithPanel: false,
-        submitText: null,
+        submitText: undefined,
         ...schema
       };
     }
@@ -480,25 +401,39 @@ export default class Drawer extends React.Component<DrawerProps> {
 
   renderFooter() {
     const actions = this.buildActions();
-
-    if (!actions || !actions.length) {
+    let {hideActions} = this.props;
+    if (!actions || !actions.length || hideActions) {
       return null;
     }
 
     const {
       store,
       render,
+      env,
       classnames: cx,
       showErrorMsg,
-      footerClassName
+      footerClassName,
+      id,
+      themeCss
     } = this.props;
 
     return (
-      <div className={cx('Drawer-footer', footerClassName)}>
+      <div
+        className={cx(
+          'Drawer-footer',
+          footerClassName,
+          setThemeClassName({
+            ...this.props,
+            name: 'drawerFooterClassName',
+            id,
+            themeCss
+          })
+        )}
+      >
         {store.loading || store.error ? (
           <div className={cx('Drawer-info')}>
             <Spinner size="sm" key="info" show={store.loading} />
-            {showErrorMsg && store.error ? (
+            {!env.forceSilenceInsideError && showErrorMsg && store.error ? (
               <span className={cx('Drawer-error')}>{store.msg}</span>
             ) : null}
           </div>
@@ -506,6 +441,8 @@ export default class Drawer extends React.Component<DrawerProps> {
         {actions.map((action, key) =>
           render(`action/${key}`, action, {
             onAction: this.handleAction,
+            onActionSensor: undefined,
+            btnDisabled: store.loading,
             data: store.formData,
             key,
             disabled: action.disabled || store.loading
@@ -518,14 +455,22 @@ export default class Drawer extends React.Component<DrawerProps> {
   openFeedback(dialog: any, ctx: any) {
     return new Promise(resolve => {
       const {store} = this.props;
-      store.setCurrentAction({
-        type: 'button',
-        actionType: 'dialog',
-        dialog: dialog
-      });
-      store.openDialog(ctx, undefined, confirmed => {
-        resolve(confirmed);
-      });
+      store.setCurrentAction(
+        {
+          type: 'button',
+          actionType: 'dialog',
+          dialog: dialog
+        },
+        this.props.resolveDefinitions
+      );
+      store.openDialog(
+        ctx,
+        undefined,
+        confirmed => {
+          resolve(confirmed);
+        },
+        this.context as any
+      );
     });
   }
 
@@ -533,6 +478,7 @@ export default class Drawer extends React.Component<DrawerProps> {
     const store = this.props.store;
     const {
       className,
+      style,
       size,
       closeOnEsc,
       position,
@@ -553,19 +499,38 @@ export default class Drawer extends React.Component<DrawerProps> {
       closeOnOutside,
       classPrefix: ns,
       classnames: cx,
-      drawerContainer
+      drawerContainer,
+      loadingConfig,
+      popOverContainer,
+      themeCss,
+      id,
+      ...rest
     } = {
       ...this.props,
       ...store.schema
-    } as any;
+    } as DrawerProps;
 
     const Container = wrapperComponent || DrawerContainer;
 
     return (
       <Container
+        {...rest}
         resizable={resizable}
         classPrefix={ns}
         className={className}
+        style={style}
+        drawerClassName={setThemeClassName({
+          ...this.props,
+          name: 'drawerClassName',
+          id,
+          themeCss
+        })}
+        drawerMaskClassName={setThemeClassName({
+          ...this.props,
+          name: 'drawerMaskClassName',
+          id,
+          themeCss
+        })}
         size={size}
         onHide={this.handleSelfClose}
         disabled={store.loading}
@@ -577,46 +542,120 @@ export default class Drawer extends React.Component<DrawerProps> {
         overlay={overlay}
         onEntered={this.handleEntered}
         onExited={this.handleExited}
+        onDragging={store.setDragging}
         closeOnEsc={closeOnEsc}
         closeOnOutside={
           !store.drawerOpen && !store.dialogOpen && closeOnOutside
         }
-        container={
-          drawerContainer
-            ? drawerContainer
-            : env && env.getModalContainer
-            ? env.getModalContainer
-            : undefined
-        }
+        container={drawerContainer ? drawerContainer : env?.getModalContainer}
       >
-        <div className={cx('Drawer-header', headerClassName)}>
-          {title ? (
-            <div className={cx('Drawer-title')}>
-              {render('title', title, {
-                data: store.formData,
-                onConfirm: this.handleDrawerConfirm,
-                onClose: this.handleDrawerClose,
-                onAction: this.handleAction
-              })}
-            </div>
-          ) : null}
-          {header
-            ? render('header', header, {
-                data: store.formData,
-                onConfirm: this.handleDrawerConfirm,
-                onClose: this.handleDrawerClose,
-                onAction: this.handleAction
+        {title || header ? (
+          <div
+            className={cx(
+              'Drawer-header',
+              headerClassName,
+              setThemeClassName({
+                ...this.props,
+                name: 'drawerHeaderClassName',
+                id,
+                themeCss
               })
-            : null}
-        </div>
+            )}
+          >
+            {title ? (
+              <div
+                className={cx(
+                  'Drawer-title',
+                  setThemeClassName({
+                    ...this.props,
+                    name: 'drawerTitleClassName',
+                    id,
+                    themeCss
+                  })
+                )}
+              >
+                {render('title', title, {
+                  data: store.formData,
+                  onConfirm: this.handleDrawerConfirm,
+                  onClose: this.handleDrawerClose,
+                  onAction: this.handleAction,
+                  onActionSensor: undefined,
+                  btnDisabled: store.loading
+                })}
+              </div>
+            ) : null}
+            {header
+              ? render('header', header, {
+                  data: store.formData,
+                  onConfirm: this.handleDrawerConfirm,
+                  onClose: this.handleDrawerClose,
+                  onAction: this.handleAction,
+                  onActionSensor: undefined,
+                  btnDisabled: store.loading
+                })
+              : null}
+          </div>
+        ) : null}
 
         {!store.entered ? (
-          <div className={cx('Drawer-body', bodyClassName)}>
-            <Spinner overlay show size="lg" />
+          <div
+            className={cx(
+              'Drawer-body',
+              bodyClassName,
+              setThemeClassName({
+                ...this.props,
+                name: 'drawerBodyClassName',
+                id,
+                themeCss
+              })
+            )}
+          >
+            <Spinner overlay show size="lg" loadingConfig={loadingConfig} />
           </div>
         ) : body ? (
-          <div className={cx('Drawer-body', bodyClassName)}>
+          // dialog-body 用于在 editor 中定位元素
+          <div
+            className={cx(
+              'Drawer-body',
+              bodyClassName,
+              setThemeClassName({
+                ...this.props,
+                name: 'drawerBodyClassName',
+                id,
+                themeCss
+              })
+            )}
+            role="dialog-body"
+          >
             {this.renderBody(body, 'body')}
+            <CustomStyle
+              {...this.props}
+              config={{
+                themeCss: themeCss,
+                classNames: [
+                  {
+                    key: 'drawerClassName'
+                  },
+                  {
+                    key: 'drawerMaskClassName'
+                  },
+                  {
+                    key: 'drawerHeaderClassName'
+                  },
+                  {
+                    key: 'drawerTitleClassName'
+                  },
+                  {
+                    key: 'drawerBodyClassName'
+                  },
+                  {
+                    key: 'drawerFooterClassName'
+                  }
+                ],
+                id: id
+              }}
+              env={env}
+            />
           </div>
         ) : null}
 
@@ -626,8 +665,7 @@ export default class Drawer extends React.Component<DrawerProps> {
           ? render(
               'dialog',
               {
-                ...((store.action as ActionObject) &&
-                  ((store.action as ActionObject).dialog as object)),
+                ...store.dialogSchema,
                 type: 'dialog'
               },
               {
@@ -645,8 +683,7 @@ export default class Drawer extends React.Component<DrawerProps> {
           ? render(
               'drawer',
               {
-                ...((store.action as ActionObject) &&
-                  ((store.action as ActionObject).drawer as object)),
+                ...store.drawerSchema,
                 type: 'drawer'
               },
               {
@@ -711,7 +748,8 @@ export class DrawerRenderer extends Drawer {
       );
     }
 
-    if (!targets.length) {
+    /** 如果为隔离动作, 则不做联动处理, 继续交给handleAction */
+    if (action?.isolateScope !== true && !targets.length) {
       let components = scoped
         .getComponents()
         .filter(item => !~['drawer', 'dialog'].indexOf(item.props.type));
@@ -766,6 +804,14 @@ export class DrawerRenderer extends Drawer {
         .catch(reason => {
           store.updateMessage(reason.message, true);
           store.markBusying(false);
+
+          // 通常都是数据错误，过 3 秒自动清理错误信息
+          // if (reason.constructor?.name === ValidateError.name) {
+          clearTimeout(this.clearErrorTimer);
+          this.clearErrorTimer = setTimeout(() => {
+            store.updateMessage('');
+          }, 3000);
+          // }
         });
 
       return true;
@@ -783,14 +829,21 @@ export class DrawerRenderer extends Drawer {
     action: ActionObject,
     data: object,
     throwErrors: boolean = false,
-    delegate?: IScopedContext
+    delegate?: IScopedContext,
+    rendererEvent?: RendererEvent<any>
   ) {
-    const {onClose, onAction, store, env, dispatchEvent} = this.props;
+    const {onClose, onAction, store, env, dispatchEvent, show} = this.props;
 
-    if (action.from === this.$$id) {
+    if (action.from === this.$$id || !show) {
+      // 如果是从 children 里面委托过来的，那就直接向上冒泡。
+      // 或者自己已经关闭了，那就不处理。
       return onAction
         ? onAction(e, action, data, throwErrors, delegate || this.context)
         : false;
+    }
+
+    if (rendererEvent?.pendingPromise.length) {
+      await rendererEvent.allDone();
     }
 
     const scoped = this.context as IScopedContext;
@@ -803,9 +856,16 @@ export class DrawerRenderer extends Drawer {
       if (rendererEvent?.prevented) {
         return;
       }
-      store.setCurrentAction(action);
+      if (rendererEvent?.pendingPromise.length) {
+        await rendererEvent.allDone();
+      }
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       onClose();
-      action.close && this.closeTarget(action.close);
+      if (action.close) {
+        action.close === true
+          ? this.handleSelfClose()
+          : this.closeTarget(action.close);
+      }
     } else if (action.actionType === 'confirm') {
       const rendererEvent = await dispatchEvent(
         'confirm',
@@ -814,25 +874,52 @@ export class DrawerRenderer extends Drawer {
       if (rendererEvent?.prevented) {
         return;
       }
-      store.setCurrentAction(action);
+      if (rendererEvent?.pendingPromise.length) {
+        await rendererEvent.allDone();
+      }
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       this.tryChildrenToHandle(action, data) || onClose();
     } else if (action.actionType === 'drawer') {
-      store.setCurrentAction(action);
-      store.openDrawer(data);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDrawer(data, undefined, (confirmed: any, value: any) => {
+          action.callback?.(confirmed, value);
+          resolve({
+            confirmed,
+            value
+          });
+        });
+      });
     } else if (action.actionType === 'dialog') {
-      store.setCurrentAction(action);
-      store.openDialog(data);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDialog(
+          data,
+          undefined,
+          (confirmed: any, value: any) => {
+            action.callback?.(confirmed, value);
+            resolve({
+              confirmed,
+              value
+            });
+          },
+          delegate || (this.context as any)
+        );
+      });
     } else if (action.actionType === 'reload') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       action.target && scoped.reload(action.target, data);
+
       if (action.close) {
-        this.handleSelfClose();
-        this.closeTarget(action.close);
+        action.close === true
+          ? this.handleSelfClose()
+          : this.closeTarget(action.close);
       }
-    } else if (this.tryChildrenToHandle(action, data)) {
+    } else if (!action.from && this.tryChildrenToHandle(action, data)) {
+      // 如果有 from 了，说明是从子节点冒泡上来的，那就不再走让子节点处理的逻辑。
       // do nothing
     } else if (action.actionType === 'ajax') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       store
         .saveRemote(action.api as string, data, {
           successMessage: action.messages && action.messages.success,
@@ -845,11 +932,17 @@ export class DrawerRenderer extends Drawer {
 
           const redirect =
             action.redirect && filter(action.redirect, store.data);
-          redirect && env.jumpTo(redirect, action);
-          action.reload && this.reloadTarget(action.reload, store.data);
+          redirect && env.jumpTo(redirect, action, store.data);
+          action.reload &&
+            this.reloadTarget(
+              filterTarget(action.reload, store.data),
+              store.data
+            );
+
           if (action.close) {
-            this.handleSelfClose();
-            this.closeTarget(action.close);
+            action.close === true
+              ? this.handleSelfClose()
+              : this.closeTarget(action.close);
           }
         })
         .catch(e => {
@@ -858,17 +951,13 @@ export class DrawerRenderer extends Drawer {
           }
         });
     } else if (onAction) {
-      let ret = onAction(
-        e,
-        action,
-        data,
-        throwErrors,
-        delegate || this.context
-      );
-      action.close &&
-        (ret && ret.then
-          ? ret.then(this.handleSelfClose)
-          : setTimeout(this.handleSelfClose, 200));
+      await onAction(e, action, data, throwErrors, delegate || this.context);
+
+      if (action.close) {
+        action.close === true
+          ? this.handleSelfClose()
+          : this.closeTarget(action.close);
+      }
     }
   }
 
@@ -903,16 +992,19 @@ export class DrawerRenderer extends Drawer {
     ...rest: Array<any>
   ) {
     super.handleDialogConfirm(values, action, ...rest);
-    const scoped = this.context as IScopedContext;
+
     const store = this.props.store;
+    const scoped = store.getDialogScoped() || (this.context as IScopedContext);
     const dialogAction = store.action as ActionObject;
     const reload = action.reload ?? dialogAction.reload;
 
     if (reload) {
       scoped.reload(reload, store.data);
+    } else if (scoped.component !== this && scoped.component?.reload) {
+      scoped.component.reload();
     } else {
       // 没有设置，则自动让页面中 crud 刷新。
-      scoped
+      (this.context as IScopedContext)
         .getComponents()
         .filter((item: any) => item.props.type === 'crud')
         .forEach((item: any) => item.reload && item.reload());
@@ -925,19 +1017,20 @@ export class DrawerRenderer extends Drawer {
     ...rest: Array<any>
   ) {
     super.handleDrawerConfirm(values, action);
-    const scoped = this.context as IScopedContext;
     const store = this.props.store;
+    const scoped = store.getDialogScoped() || (this.context as IScopedContext);
     const drawerAction = store.action as ActionObject;
+    const reload = action.reload ?? drawerAction.reload;
 
     // 稍等会，等动画结束。
     setTimeout(() => {
-      if (drawerAction.reload) {
-        scoped.reload(drawerAction.reload, store.data);
-      } else if (action.reload) {
-        scoped.reload(action.reload, store.data);
+      if (reload) {
+        scoped.reload(reload, store.data);
+      } else if (scoped.component !== this && scoped.component?.reload) {
+        scoped.component.reload();
       } else {
         // 没有设置，则自动让页面中 crud 刷新。
-        scoped
+        (this.context as IScopedContext)
           .getComponents()
           .filter((item: any) => item.props.type === 'crud')
           .forEach((item: any) => item.reload && item.reload());
@@ -955,7 +1048,12 @@ export class DrawerRenderer extends Drawer {
     scoped.close(target);
   }
 
-  setData(values: object) {
-    return this.props.store.updateData(values);
+  setData(values: object, replace?: boolean) {
+    return this.props.store.updateData(values, undefined, replace);
+  }
+
+  getData() {
+    const {store} = this.props;
+    return store.data;
   }
 }

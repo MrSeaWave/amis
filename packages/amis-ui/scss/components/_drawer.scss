@@ -50,9 +50,10 @@
   }
 
   &-title {
-    font-size: var(--Drawer-title-fontSize);
-    font-weight: 500;
-    color: var(--Drawer-title-fontColor);
+    font-size: var(--drawer-header-fontSize);
+    font-weight: var(--drawer-header-fontWeight);
+    color: var(--drawer-header-color);
+    height: var(--drawer-header-height);
   }
 
   &-close {
@@ -63,9 +64,14 @@
 
     svg {
       margin-top: px2rem(2px);
-      width: var(--Drawer-close-size);
-      height: var(--Drawer-close-size);
+      width: var(--drawer-header-icon-size);
+      height: var(--drawer-header-icon-size);
       fill: var(--Drawer-close-color);
+      color: var(--drawer-header-icon-color);
+    }
+
+    .Drawer-close {
+      content: var(--drawer-header-icon-icon);
     }
 
     &:not(.is-disabled) {
@@ -83,15 +89,26 @@
   }
 
   &-body {
-    padding: var(--Drawer-body-padding);
+    padding: 0 var(--drawer-content-paddingRight)
+      var(--drawer-content-paddingBottom) var(--drawer-content-paddingLeft);
     flex-basis: 0;
     flex-grow: 1;
     overflow: auto;
+
+    // 因为如果成员里面有 position:sticky 的内容
+    // 用 padding 会导致位置不正确
+    // 所以改成这种写法
+    &:before {
+      content: '';
+      display: block;
+      height: var(--drawer-content-paddingTop);
+    }
   }
 
   &-footer {
     display: flex;
     align-items: flex-end;
+    height: var(--drawer-footer-height);
     justify-content: flex-end;
     padding: var(--Drawer-footer-padding);
     border-top: var(--Drawer-content-borderWidth) solid
@@ -140,27 +157,27 @@
   }
 
   .#{$ns}Drawer--xs .#{$ns}Drawer-content {
-    width: var(--Drawer-widthXs);
+    width: var(--drawer-size-xs-width);
     height: var(--Drawer-widthXs);
   }
 
   .#{$ns}Drawer--sm .#{$ns}Drawer-content {
-    width: var(--Drawer-widthSm);
+    width: var(--drawer-size-sm-width);
     height: var(--Drawer-widthSm);
   }
 
   .#{$ns}Drawer--md .#{$ns}Drawer-content {
-    width: var(--Drawer-widthMd);
+    width: var(--drawer-size-md-width);
     height: var(--Drawer-widthMd);
   }
 
   .#{$ns}Drawer--lg .#{$ns}Drawer-content {
-    width: var(--Drawer-widthLg);
+    width: var(--drawer-size-lg-width);
     height: var(--Drawer-widthLg);
   }
 
   .#{$ns}Drawer--xl .#{$ns}Drawer-content {
-    width: var(--Drawer-widthXl);
+    width: var(--drawer-size-xl-width);
     height: var(--Drawer-widthXl);
   }
 
@@ -249,6 +266,7 @@
     transform: translate3d(0, -100%, 0);
     box-shadow: 0 10px 10px -10px rgba(0, 0, 0, 0.2);
     min-height: 120px;
+    border-bottom: var(--common-popover-border);
   }
 
   .#{$ns}Drawer-resizeCtrl {
@@ -277,13 +295,14 @@
     transform: translate3d(100%, 0, 0);
     box-shadow: -10px 0 10px -10px rgba(0, 0, 0, 0.2);
     min-width: 120px;
+    border-left: var(--common-popover-border);
   }
 
   .#{$ns}Drawer-footer {
     justify-content: flex-end;
 
     .#{$ns}Button {
-      margin-left: var(--Drawer-footer-margin);
+      margin-left: var(--drawer-footer-margin-left);
       margin-right: var(--gap-xs);
     }
 
@@ -326,6 +345,7 @@
     transform: translate3d(0, 100%, 0);
     box-shadow: 0 -10px 10px -10px rgba(0, 0, 0, 0.2);
     min-height: 120px;
+    border-top: var(--common-popover-border);
   }
 
   .#{$ns}Drawer-resizeCtrl {
@@ -355,6 +375,7 @@
     box-shadow: 10px 0 10px -10px rgba(0, 0, 0, 0.2);
     border-width: 0 var(--Drawer-content-borderWidth) 0 0;
     min-width: 120px;
+    border-right: var(--common-popover-border);
   }
 
   .#{$ns}Drawer-resizeCtrl {

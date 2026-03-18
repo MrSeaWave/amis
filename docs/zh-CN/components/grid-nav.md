@@ -20,19 +20,19 @@ order: 54
     "data": {
         "items": [
           {
-            "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+            "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
             "text": "导航1"
           },
           {
-            "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+            "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
             "text": "导航2"
           },
           {
-            "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+            "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
             "text": "导航3"
           },
           {
-            "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+            "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
             "text": "导航4"
           }
         ]
@@ -62,19 +62,19 @@ order: 54
         "type": "grid-nav",
         "options": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "导航1"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "导航2"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "导航3"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
                 "text": "导航4"
             }
         ]
@@ -92,15 +92,15 @@ order: 54
     "data": {
         "items": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "导航1"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "导航2"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "导航3"
             }
         ]
@@ -123,19 +123,19 @@ order: 54
     "data": {
         "items": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "导航1"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "导航2"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "导航3"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
                 "text": "导航4"
             }
         ]
@@ -158,19 +158,19 @@ order: 54
     "data": {
         "items": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "导航1"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "导航2"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "导航3"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
                 "text": "导航4"
             }
         ]
@@ -193,19 +193,19 @@ order: 54
     "data": {
         "items": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "导航1"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "导航2"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "导航3"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
                 "text": "导航4"
             }
         ]
@@ -228,19 +228,19 @@ order: 54
     "data": {
         "items": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "导航1"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "导航2"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "导航3"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
                 "text": "导航4"
             }
         ]
@@ -263,7 +263,7 @@ order: 54
     "data": {
         "items": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "导航1",
                 "badge": {
                     "mode": "text",
@@ -271,14 +271,14 @@ order: 54
                 }
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "导航2",
                 "badge": {
                     "mode": "dot"
                 }
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "导航3",
                 "badge": {
                     "mode": "ribbon",
@@ -286,7 +286,7 @@ order: 54
                 }
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
                 "text": "导航4"
             }
         ]
@@ -309,13 +309,13 @@ order: 54
     "data": {
         "items": [
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-1.png",
                 "text": "外部跳转",
                 "link": "https://www.baidu.com",
                 "blank": true
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-2.png",
                 "text": "弹框",
                 "clickAction": {
                     "actionType": "dialog",
@@ -326,12 +326,12 @@ order: 54
                 }
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-3.png",
                 "text": "内部跳转",
                 "link": "/docs/index"
             },
             {
-                "icon": "https://internal-amis-res.cdn.bcebos.com/images/icon-1.png",
+                "icon": "https://aisuda-public-images.bj.bcebos.com/amis/icon-4.png",
                 "text": "导航4"
             }
         ]
@@ -351,6 +351,7 @@ order: 54
 | type                | `string`        | `grid-nav` |                                                          |
 | className           | `string`        |            | 外层 CSS 类名                                            |
 | itemClassName       | `string`        |            | 列表项 css 类名                                          |
+| contentClassName    | `string`        |            | 列表项内容 css 类名                                      |
 | value               | `Array<object>` |            | 图片数组                                                 |
 | source              | `string`        |            | 数据源                                                   |
 | square              | `boolean`       |            | 是否将列表项固定为正方形                                 |
@@ -367,7 +368,3 @@ order: 54
 | options.link        | `string`        |            | 内部页面路径或外部跳转 URL 地址，优先级高于 clickAction  |
 | options.blank       | `boolean`       |            | 是否新页面打开，link 为 url 时有效                       |
 | options.clickAction | `ActionSchema`  |            | 列表项点击交互 详见 [Action](./action)                   |
-
-```
-
-```

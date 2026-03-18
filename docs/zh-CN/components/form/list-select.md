@@ -52,22 +52,22 @@ ListSelect 一般用来实现选择，可以单选也可以多选，和 Radio/Ch
           {
             "label": "OptionA",
             "value": "a",
-            "image": "https://ss0.bdstatic.com/70cFvHSh_Q1YnxGkpoWK1HF6hhy/it/u=3893101144,2877209892&fm=23&gp=0.jpg"
+            "image": "https://suda.cdn.bcebos.com/amis/images/alice-macaw.jpg"
           },
           {
             "label": "OptionB",
             "value": "b",
-            "image": "https://ss0.bdstatic.com/70cFvHSh_Q1YnxGkpoWK1HF6hhy/it/u=3893101144,2877209892&fm=23&gp=0.jpg"
+            "image": "https://suda.cdn.bcebos.com/amis/images/alice-macaw.jpg"
           },
           {
             "label": "OptionC",
             "value": "c",
-            "image": "https://ss0.bdstatic.com/70cFvHSh_Q1YnxGkpoWK1HF6hhy/it/u=3893101144,2877209892&fm=23&gp=0.jpg"
+            "image": "https://suda.cdn.bcebos.com/amis/images/alice-macaw.jpg"
           },
           {
             "label": "OptionD",
             "value": "d",
-            "image": "https://ss0.bdstatic.com/70cFvHSh_Q1YnxGkpoWK1HF6hhy/it/u=3893101144,2877209892&fm=23&gp=0.jpg"
+            "image": "https://suda.cdn.bcebos.com/amis/images/alice-macaw.jpg"
           }
         ]
       }
@@ -93,13 +93,52 @@ ListSelect 一般用来实现选择，可以单选也可以多选，和 Radio/Ch
 
 ## 事件表
 
-当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`来获取事件产生的数据（`< 2.3.2 及以下版本 为 ${event.data.[事件参数名]}`），详细请查看[事件动作](../../docs/concepts/event-action)。
+当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`或`${event.data.[事件参数名]}`来获取事件产生的数据，详细请查看[事件动作](../../docs/concepts/event-action)。
 
 > `[name]`表示当前组件绑定的名称，即`name`属性，如果没有配置`name`属性，则通过`value`取值。
 
 | 事件名称 | 事件参数                  | 说明             |
 | -------- | ------------------------- | ---------------- |
 | change   | `[name]: string` 组件的值 | 选中值变化时触发 |
+
+### change
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+      {
+        "type": "list-select",
+        "name": "select",
+        "label": "单选",
+        "clearable": true,
+        "options": [
+          {
+            "label": "Option A",
+            "value": "a"
+          },
+          {
+            "label": "Option B",
+            "value": "b"
+          }
+        ],
+        "onEvent": {
+            "change": {
+                "actions": [
+                    {
+                      "actionType": "toast",
+                      "args": {
+                          "msg": "${event.data.value|json}"
+                      }
+                    }
+                ]
+            }
+        }
+      }
+    ]
+  }
+```
 
 ## 动作表
 
@@ -108,6 +147,176 @@ ListSelect 一般用来实现选择，可以单选也可以多选，和 Radio/Ch
 | 动作名称 | 动作配置                               | 说明                                                                                    |
 | -------- | -------------------------------------- | --------------------------------------------------------------------------------------- |
 | clear    | -                                      | 清空                                                                                    |
-| reset    | -                                      | 将值重置为`resetValue`，若没有配置`resetValue`，则清空                                  |
+| reset    | -                                      | 将值重置为初始值。6.3.0 及以下版本为`resetValue`                                        |
 | reload   | -                                      | 重新加载，调用 `source`，刷新数据域数据刷新（重新加载）                                 |
 | setValue | `value: string` \| `string[]` 更新的值 | 更新数据，开启`multiple`支持设置多项，开启`joinValues`时，多值用`,`分隔，否则多值用数组 |
+
+### clear
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "list-select",
+          "name": "select",
+          "label": "单选",
+          "clearable": true,
+          "options": [
+            {
+              "label": "Option A",
+              "value": "a"
+            },
+            {
+              "label": "Option B",
+              "value": "b"
+            }
+          ],
+          "value": "a",
+          "id": "clear_text"
+        },
+        {
+            "type": "button",
+            "label": "清空",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "clear",
+                            "componentId": "clear_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### reset
+
+如果配置了`resetValue`，则重置时使用`resetValue`的值，否则使用初始值。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "list-select",
+          "name": "select",
+          "label": "单选",
+          "clearable": true,
+          "options": [
+            {
+              "label": "Option A",
+              "value": "a"
+            },
+            {
+              "label": "Option B",
+              "value": "b"
+            }
+          ],
+          "value": "a",
+          "id": "reset_text"
+        },
+        {
+            "type": "button",
+            "label": "重置",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "reset",
+                            "componentId": "reset_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### reload
+
+只有选择器模式支持，即配置`source`，用于重新加载选择器的数据源。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "list-select",
+          "name": "select",
+          "label": "单选",
+          "clearable": true,
+          "id": "reload_type",
+          "source": "/api/mock2/form/getOptions?waitSeconds=1",
+          "value": "a"
+        },
+        {
+            "type": "button",
+            "label": "重新加载",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "reload",
+                            "componentId": "reload_type"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### setValue
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "list-select",
+          "name": "select",
+          "label": "单选",
+          "clearable": true,
+          "options": [
+            {
+              "label": "Option A",
+              "value": "a"
+            },
+            {
+              "label": "Option B",
+              "value": "b"
+            }
+          ],
+          "value": "a",
+          "id": "setvalue_text"
+        },
+        {
+            "type": "button",
+            "label": "赋值",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "setValue",
+                            "componentId": "setvalue_text",
+                            "args": {
+                                "value": "b"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```

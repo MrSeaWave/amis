@@ -4,6 +4,9 @@
   &-clear {
     position: absolute;
     right: var(--Form-input-paddingX);
+    svg {
+      top: 0;
+    }
   }
 
   &-Modal {
@@ -15,6 +18,11 @@
       display: inline-block;
       vertical-align: baseline;
       margin-left: var(--IconSelect-base-margin);
+    }
+
+    &-func {
+      display: inline-block;
+      margin-left: 12px;
     }
 
     &-content {
@@ -33,6 +41,8 @@
       }
 
       &-main {
+        min-width: 0;
+        min-height: 0;
         flex: 1;
         overflow: auto;
       }
@@ -41,13 +51,30 @@
 
   &-input {
     overflow: hidden;
+    height: px2rem(32px);
 
     &-area {
-      min-height: var(--IconSelect-preivew-icon-size);
+      min-height: var(--IconSelect-preview-icon-size);
       display: flex;
       align-items: center;
       justify-content: flex-start;
       overflow: hidden;
+
+      img.icon {
+        height: var(--sizes-size-7);
+        margin-right: var(--sizes-size-4);
+      }
+
+      &-str-svg {
+        height: var(--fontSizeBase);
+        svg {
+          width: 100%;
+          height: 100%;
+        }
+      }
+      &-iconfont {
+        margin-right: var(--sizes-size-4);
+      }
     }
 
     &-wrapper {
@@ -56,21 +83,22 @@
 
     &-icon {
       &-show {
-        width: var(--IconSelect-preivew-icon-size);
-        height: var(--IconSelect-preivew-icon-size);
-        margin-right: var(--IconSelect-xs-margin);
-
         & > svg {
-          width: 100%;
-          height: 100%;
+          width: var(--IconSelect-preview-icon-size);
+          height: var(--IconSelect-preview-icon-size);
+          margin-right: var(--IconSelect-xs-margin);
+          top: px2rem(3px);
         }
       }
 
       &-id {
+        min-width: 0;
+        min-height: 0;
         flex: 1;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        font-size: 12px;
       }
 
       &-placeholder {
@@ -189,6 +217,8 @@
       &-info {
         margin-left: var(--IconSelect-base-margin);
         overflow: hidden;
+        min-width: 0;
+        min-height: 0;
         flex: 1;
 
         > p {
@@ -200,7 +230,6 @@
 
         &-name {
           margin: 0;
-          margin-bottom: var(--IconSelect-xs-margin);
           font-size: var(--IconSelect-type-font-size);
           color: var(--IconSelect-icon-name-color);
         }

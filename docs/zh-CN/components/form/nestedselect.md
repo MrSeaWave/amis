@@ -599,33 +599,183 @@ order: 31
 }
 ```
 
+## 选项搜索
+
+配置`"searchable": true`后，输入框内输入内容时，下拉数据源会进行前端过滤，过滤的关键字段默认为`value`或`label`。如果通过[`valueField`](./options#选项值字段-valuefield)或[`labelField`](./options#选项标签字段-labelfield)属性，则会选择对应的字段进行过滤。
+
+```schema: scope="body"
+{
+  type: 'form',
+  api: '/api/mock2/form/saveForm',
+  body: [
+    {
+      type: 'nested-select',
+      name: 'nestedSelect1',
+      label: '级联选择器（单选）',
+      options: [
+        {
+          label: 'A',
+          value: 'a'
+        },
+        {
+          label: 'B',
+          value: 'b',
+          children: [
+            {
+              label: 'B-1',
+              value: 'b1'
+            },
+            {
+              label: 'B-2',
+              value: 'b2'
+            },
+            {
+              label: 'B-3',
+              value: 'b3'
+            }
+          ]
+        },
+        {
+          label: 'C',
+          value: 'c'
+        }
+      ],
+      searchable: true,
+      multiple: false,
+      joinValues: true,
+      clearable: true
+    },
+    {
+      type: 'nested-select',
+      name: 'nestedSelect2',
+      label: '级联选择器（多选）',
+      options: [
+        {
+          label: 'A',
+          value: 'a'
+        },
+        {
+          label: 'B',
+          value: 'b',
+          children: [
+            {
+              label: 'B-1',
+              value: 'b1'
+            },
+            {
+              label: 'B-2',
+              value: 'b2'
+            },
+            {
+              label: 'B-3',
+              value: 'b3'
+            }
+          ]
+        },
+        {
+          label: 'C',
+          value: 'c'
+        }
+      ],
+      searchable: true,
+      multiple: true,
+      joinValues: true,
+      clearable: true
+    }
+  ]
+}
+```
+
+## 限制标签最大展示数量
+
+> 3.3.0 及以上版本
+
+`maxTagCount`可以限制标签的最大展示数量，超出数量的部分会收纳到 Popover 中，可以通过`overflowTagPopover`配置 Popover 相关的[属性](../tooltip#属性表)，注意该属性仅在多选模式开启后生效。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "body": [
+        {
+            "type": "nested-select",
+            "name": "nestedSelect",
+            "label": "级联选择器",
+            "multiple": true,
+            "maxTagCount": 3,
+            "overflowTagPopover": {
+              "title": "已选项"
+            },
+            "value": "Apple,Banana,Blackberry,Blueberry,Cherry,Carambola,Coconut,Kiwifruit,Lemon,Pineapple,Vegetables,Wheat,Rice",
+            "options": [
+              {
+                "label": "水果",
+                "value": "Fruits",
+                "children" : [
+                  {"label": "苹果", "value": "Apple"},
+                  {"label": "香蕉", "value": "Banana"},
+                  {"label": "黑莓", "value": "Blackberry"},
+                  {"label": "蓝莓", "value": "Blueberry"},
+                  {"label": "樱桃", "value": "Cherry"},
+                  {"label": "杨桃", "value": "Carambola"},
+                  {"label": "椰子", "value": "Coconut"},
+                  {"label": "猕猴桃", "value": "Kiwifruit"},
+                  {"label": "柠檬", "value": "Lemon"},
+                  {"label": "菠萝", "value": "Pineapple"}
+                ]
+              },
+              {
+                "label": "蔬菜",
+                "value": "Vegetables",
+                "children": [
+                  {"label": "西兰花", "value": "Broccoli"},
+                  {"label": "菠菜", "value": "Spinach"},
+                  {"label": "南瓜", "value": "Pumpkin"}
+                ]
+              },
+              {
+                "label": "谷物",
+                "value": "Grain",
+                "children": [
+                  {"label": "小麦", "value": "Wheat"},
+                  {"label": "水稻", "value": "Rice"},
+                  {"label": "燕麦", "value": "Oats"}
+                ]
+              }
+            ]
+        }
+    ]
+}
+```
+
 ## 属性表
 
 当做选择器表单项使用时，除了支持 [普通表单项属性表](./formitem#%E5%B1%9E%E6%80%A7%E8%A1%A8) 中的配置以外，还支持下面一些配置
 
-| 属性名            | 类型                                      | 默认值               | 说明                                                                                        |
-| ----------------- | ----------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------- |
-| options           | `Array<object>`或`Array<string>`          |                      | [选项组](./options#%E9%9D%99%E6%80%81%E9%80%89%E9%A1%B9%E7%BB%84-options)                   |
-| source            | `string`或 [API](../../../docs/types/api) |                      | [动态选项组](./options#%E5%8A%A8%E6%80%81%E9%80%89%E9%A1%B9%E7%BB%84-source)                |
-| delimiter         | `boolean`                                 | `false`              | [拼接符](./options#%E6%8B%BC%E6%8E%A5%E7%AC%A6-delimiter)                                   |
-| labelField        | `boolean`                                 | `"label"`            | [选项标签字段](./options#%E9%80%89%E9%A1%B9%E6%A0%87%E7%AD%BE%E5%AD%97%E6%AE%B5-labelfield) |
-| valueField        | `boolean`                                 | `"value"`            | [选项值字段](./options#%E9%80%89%E9%A1%B9%E5%80%BC%E5%AD%97%E6%AE%B5-valuefield)            |
-| joinValues        | `boolean`                                 | `true`               | [拼接值](./options#%E6%8B%BC%E6%8E%A5%E5%80%BC-joinvalues)                                  |
-| extractValue      | `boolean`                                 | `false`              | [提取值](./options#%E6%8F%90%E5%8F%96%E5%A4%9A%E9%80%89%E5%80%BC-extractvalue)              |
-| autoFill          | `object`                                  |                      | [自动填充](./options#%E8%87%AA%E5%8A%A8%E5%A1%AB%E5%85%85-autofill)                         |
-| cascade           | `boolean`                                 | `false`              | 设置 `true`时，当选中父节点时不自动选择子节点。                                             |
-| withChildren      | `boolean`                                 | `false`              | 设置 `true`时，选中父节点时，值里面将包含子节点的值，否则只会保留父节点的值。               |
-| onlyChildren      | `boolean`                                 | `false`              | 多选时，选中父节点时，是否只将其子节点加入到值中。                                          |
-| searchable        | `boolean`                                 | `false`              | 可否搜索                                                                                    |
-| searchPromptText  | `string`                                  | `"输入内容进行检索"` | 搜索框占位文本                                                                              |
-| noResultsText     | `string`                                  | `"未找到任何结果"`   | 无结果时的文本                                                                              |
-| multiple          | `boolean`                                 | `false`              | 可否多选                                                                                    |
-| hideNodePathLabel | `boolean`                                 | `false`              | 是否隐藏选择框中已选择节点的路径 label 信息                                                 |
-| onlyLeaf          | `boolean`                                 | `false`              | 只允许选择叶子节点                                                                          |
+| 属性名             | 类型                                      | 默认值                                                                             | 说明                                                                                        | 版本    |
+| ------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------- |
+| options            | `Array<object>`或`Array<string>`          |                                                                                    | [选项组](./options#%E9%9D%99%E6%80%81%E9%80%89%E9%A1%B9%E7%BB%84-options)                   |
+| source             | `string`或 [API](../../../docs/types/api) |                                                                                    | [动态选项组](./options#%E5%8A%A8%E6%80%81%E9%80%89%E9%A1%B9%E7%BB%84-source)                |
+| delimiter          | `boolean`                                 | `false`                                                                            | [拼接符](./options#%E6%8B%BC%E6%8E%A5%E7%AC%A6-delimiter)                                   |
+| labelField         | `boolean`                                 | `"label"`                                                                          | [选项标签字段](./options#%E9%80%89%E9%A1%B9%E6%A0%87%E7%AD%BE%E5%AD%97%E6%AE%B5-labelfield) |
+| valueField         | `boolean`                                 | `"value"`                                                                          | [选项值字段](./options#%E9%80%89%E9%A1%B9%E5%80%BC%E5%AD%97%E6%AE%B5-valuefield)            |
+| joinValues         | `boolean`                                 | `true`                                                                             | [拼接值](./options#%E6%8B%BC%E6%8E%A5%E5%80%BC-joinvalues)                                  |
+| extractValue       | `boolean`                                 | `false`                                                                            | [提取值](./options#%E6%8F%90%E5%8F%96%E5%A4%9A%E9%80%89%E5%80%BC-extractvalue)              |
+| autoFill           | `object`                                  |                                                                                    | [自动填充](./options#%E8%87%AA%E5%8A%A8%E5%A1%AB%E5%85%85-autofill)                         |
+| cascade            | `boolean`                                 | `false`                                                                            | 设置 `true`时，当选中父节点时不自动选择子节点。                                             |
+| withChildren       | `boolean`                                 | `false`                                                                            | 设置 `true`时，选中父节点时，值里面将包含子节点的值，否则只会保留父节点的值。               |
+| onlyChildren       | `boolean`                                 | `false`                                                                            | 多选时，选中父节点时，是否只将其子节点加入到值中。                                          |
+| searchable         | `boolean`                                 | `false`                                                                            | 可否搜索                                                                                    |
+| searchPromptText   | `string`                                  | `"输入内容进行检索"`                                                               | 搜索框占位文本                                                                              |
+| noResultsText      | `string`                                  | `"未找到任何结果"`                                                                 | 无结果时的文本                                                                              |
+| multiple           | `boolean`                                 | `false`                                                                            | 可否多选                                                                                    |
+| hideNodePathLabel  | `boolean`                                 | `false`                                                                            | 是否隐藏选择框中已选择节点的路径 label 信息                                                 |
+| onlyLeaf           | `boolean`                                 | `false`                                                                            | 只允许选择叶子节点                                                                          |
+| maxTagCount        | `number`                                  |                                                                                    | 标签的最大展示数量，超出数量后以收纳浮层的方式展示，仅在多选模式开启后生效                  | `3.3.0` |
+| overflowTagPopover | `TooltipObject`                           | `{"placement": "top", "trigger": "hover", "showArrow": false, "offset": [0, -10]}` | 收纳浮层的配置属性，详细配置参考[Tooltip](../tooltip#属性表)                                | `3.3.0` |
 
 ## 事件表
 
-当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`来获取事件产生的数据（`< 2.3.2 及以下版本 为 ${event.data.[事件参数名]}`），详细请查看[事件动作](../../docs/concepts/event-action)。
+当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`或`${event.data.[事件参数名]}`来获取事件产生的数据，详细请查看[事件动作](../../docs/concepts/event-action)。
 
 > `[name]`表示当前组件绑定的名称，即`name`属性，如果没有配置`name`属性，则通过`value`取值。
 
@@ -635,6 +785,58 @@ order: 31
 | blur     | `[name]: string` 组件的值 | 输入框失去焦点时触发 |
 | focus    | `[name]: string` 组件的值 | 输入框获取焦点时触发 |
 
+### change
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+      {
+        "type": "nested-select",
+        "name": "nestedSelect",
+        "label": "级联选择器",
+        "options": [
+          {
+            "label": "A",
+            "value": "a"
+          },
+          {
+            "label": "B",
+            "value": "b",
+            "children": [
+              {
+                "label": "B-1",
+                "value": "b-1"
+              },
+              {
+                "label": "B-2",
+                "value": "b-2"
+              }
+            ]
+          },
+          {
+            "label": "C",
+            "value": "c"
+          }
+        ],
+        "onEvent": {
+            "change": {
+                "actions": [
+                    {
+                      "actionType": "toast",
+                      "args": {
+                          "msg": "${event.data.value|json}"
+                      }
+                    }
+                ]
+            }
+        }
+      }
+    ]
+  }
+```
+
 ## 动作表
 
 当前组件对外暴露以下特性动作，其他组件可以通过指定`actionType: 动作名称`、`componentId: 该组件id`来触发这些动作，动作配置可以通过`args: {动作配置项名称: xxx}`来配置具体的参数，详细请查看[事件动作](../../docs/concepts/event-action#触发其他组件的动作)。
@@ -642,6 +844,226 @@ order: 31
 | 动作名称 | 动作配置                 | 说明                                                    |
 | -------- | ------------------------ | ------------------------------------------------------- |
 | clear    | -                        | 清空                                                    |
-| reset    | -                        | 将值重置为`resetValue`，若没有配置`resetValue`，则清空  |
+| reset    | -                        | 将值重置为初始值。6.3.0 及以下版本为`resetValue`        |
 | reload   | -                        | 重新加载，调用 `source`，刷新数据域数据刷新（重新加载） |
 | setValue | `value: string` 更新的值 | 更新数据，开启`multiple`时，多个值用`,`分隔             |
+
+### clear
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "nested-select",
+          "name": "nestedSelect",
+          "label": "级联选择器",
+          "options": [
+            {
+              "label": "A",
+              "value": "a"
+            },
+            {
+              "label": "B",
+              "value": "b",
+              "children": [
+                {
+                  "label": "B-1",
+                  "value": "b-1"
+                },
+                {
+                  "label": "B-2",
+                  "value": "b-2"
+                },
+                {
+                  "label": "B-3",
+                  "value": "b-3"
+                }
+              ]
+            },
+            {
+              "label": "C",
+              "value": "c"
+            }
+          ],
+          "value": "a",
+          "id": "clear_text"
+        },
+        {
+            "type": "button",
+            "label": "清空",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "clear",
+                            "componentId": "clear_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### reset
+
+如果配置了`resetValue`，则重置时使用`resetValue`的值，否则使用初始值。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "nested-select",
+          "name": "nestedSelect",
+          "label": "级联选择器",
+          "options": [
+            {
+              "label": "A",
+              "value": "a"
+            },
+            {
+              "label": "B",
+              "value": "b",
+              "children": [
+                {
+                  "label": "B-1",
+                  "value": "b-1"
+                },
+                {
+                  "label": "B-2",
+                  "value": "b-2"
+                },
+                {
+                  "label": "B-3",
+                  "value": "b-3"
+                }
+              ]
+            },
+            {
+              "label": "C",
+              "value": "c"
+            }
+          ],
+          "value": "a",
+          "id": "reset_text"
+        },
+        {
+            "type": "button",
+            "label": "重置",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "reset",
+                            "componentId": "reset_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### reload
+
+只有选择器模式支持，即配置`source`，用于重新加载选择器的数据源。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "nested-select",
+          "name": "nestedSelect",
+          "label": "级联选择器",
+          "id": "reload_type",
+          "source": "/api/mock2/form/getTreeOptions",
+          "value": "a"
+        },
+        {
+            "type": "button",
+            "label": "重新加载",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "reload",
+                            "componentId": "reload_type"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### setValue
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "nested-select",
+          "name": "nestedSelect",
+          "label": "级联选择器",
+          "options": [
+            {
+              "label": "A",
+              "value": "a"
+            },
+            {
+              "label": "B",
+              "value": "b",
+              "children": [
+                {
+                  "label": "B-1",
+                  "value": "b-1"
+                },
+                {
+                  "label": "B-2",
+                  "value": "b-2"
+                },
+                {
+                  "label": "B-3",
+                  "value": "b-3"
+                }
+              ]
+            },
+            {
+              "label": "C",
+              "value": "c"
+            }
+          ],
+          "value": "a",
+          "id": "setvalue_text"
+        },
+        {
+            "type": "button",
+            "label": "赋值",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "setValue",
+                            "componentId": "setvalue_text",
+                            "args": {
+                                "value": "b"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```

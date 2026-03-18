@@ -5,29 +5,40 @@ import {
   OptionsControlProps,
   Option,
   FormOptionsControl,
-  resolveEventData
+  resolveEventData,
+  getVariable,
+  setThemeClassName,
+  CustomStyle,
+  AMISFormItemWithOptions
 } from 'amis-core';
-import {Select} from 'amis-ui';
-import {Api} from 'amis-core';
+import {Select, Spinner} from 'amis-ui';
+import {Api, ApiObject} from 'amis-core';
 import {isEffectiveApi} from 'amis-core';
 import {isMobile, createObject} from 'amis-core';
 import {ActionObject} from 'amis-core';
 import {FormOptionsSchema} from '../../Schema';
 import {supportStatic} from './StaticHoc';
 import find from 'lodash/find';
+import isEmpty from 'lodash/isEmpty';
 
 /**
  * 链式下拉框
- * 文档：https://baidu.gitee.io/amis/docs/components/form/chained-select
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/chain-select
  */
-export interface ChainedSelectControlSchema extends FormOptionsSchema {
+/**
+ * 链式下拉框组件，用于根据前一次选择动态加载和展示下一级选项，支持多级联动选择，常用于省市区等多层级数据选择场景。
+ */
+export interface AMISChainedSelectSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 chained-select 组件
+   */
   type: 'chained-select';
 }
 
 export interface ChainedSelectProps
   extends OptionsControlProps,
     Omit<
-      ChainedSelectControlSchema,
+      AMISChainedSelectSchema,
       | 'options'
       | 'type'
       | 'source'
@@ -36,13 +47,15 @@ export interface ChainedSelectProps
       | 'inputClassName'
     > {}
 
+export interface StackItem {
+  options: Array<Option>;
+  parentId: any;
+  loading: boolean;
+  visible?: boolean;
+}
+
 export interface SelectState {
-  stack: Array<{
-    options: Array<Option>;
-    parentId: any;
-    loading: boolean;
-    visible?: boolean;
-  }>;
+  stack: Array<StackItem>;
 }
 
 export default class ChainedSelectControl extends React.Component<
@@ -86,18 +99,20 @@ export default class ChainedSelectControl extends React.Component<
   }
 
   doAction(action: ActionObject, data: object, throwErrors: boolean) {
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name} = this.props;
     const actionType = action?.actionType as string;
 
     if (actionType === 'clear') {
       onChange('');
     } else if (actionType === 'reset') {
-      onChange(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange(pristineVal ?? '');
     }
   }
 
   array2value(arr: Array<any>, isExtracted: boolean = false) {
-    const {delimiter, joinValues, extractValue} = this.props;
+    const {delimiter, joinValues, extractValue, valueField} = this.props;
     // 判断arr的项是否已抽取
     return isExtracted
       ? joinValues
@@ -106,7 +121,7 @@ export default class ChainedSelectControl extends React.Component<
       : joinValues
       ? arr.join(delimiter || ',')
       : extractValue
-      ? arr.map(item => item.value || item)
+      ? arr.map(item => item[valueField || 'value'] || item)
       : arr;
   }
 
@@ -117,6 +132,7 @@ export default class ChainedSelectControl extends React.Component<
       onChange,
       joinValues,
       extractValue,
+      valueField,
       source,
       data,
       env,
@@ -134,7 +150,9 @@ export default class ChainedSelectControl extends React.Component<
       idx < len &&
       arr[idx] &&
       this.state.stack[idx].parentId ==
-        (joinValues || extractValue ? arr[idx] : arr[idx].value)
+        (joinValues || extractValue
+          ? arr[idx]
+          : arr[idx][valueField || 'value'])
     ) {
       idx++;
     }
@@ -143,7 +161,8 @@ export default class ChainedSelectControl extends React.Component<
       return;
     }
 
-    const parentId = joinValues || extractValue ? arr[idx] : arr[idx].value;
+    const parentId =
+      joinValues || extractValue ? arr[idx] : arr[idx][valueField || 'value'];
     const stack = this.state.stack.concat();
     stack.splice(idx, stack.length - idx);
     stack.push({
@@ -169,7 +188,9 @@ export default class ChainedSelectControl extends React.Component<
             // todo 没有检测 response.ok
 
             const stack = this.state.stack.concat();
-            const remoteValue = ret.data ? ret.data.value : undefined;
+            const remoteValue = ret.data
+              ? ret.data[valueField || 'value']
+              : undefined;
             let options =
               ret?.data?.options ||
               ret?.data?.items ||
@@ -187,7 +208,7 @@ export default class ChainedSelectControl extends React.Component<
 
               const rendererEvent = await dispatchEvent(
                 'change',
-                resolveEventData(this.props, {value: valueRes}, 'value')
+                resolveEventData(this.props, {value: valueRes})
               );
 
               if (rendererEvent?.prevented) {
@@ -201,7 +222,7 @@ export default class ChainedSelectControl extends React.Component<
               options,
               parentId,
               loading: false,
-              visible: !!options
+              visible: Array.isArray(options) && !isEmpty(options)
             });
 
             this.setState(
@@ -212,7 +233,7 @@ export default class ChainedSelectControl extends React.Component<
             );
           })
           .catch(e => {
-            env.notify('error', e.message);
+            !(source as ApiObject)?.silent && env.notify('error', e.message);
           });
       }
     );
@@ -226,6 +247,7 @@ export default class ChainedSelectControl extends React.Component<
       joinValues,
       extractValue,
       dispatchEvent,
+      valueField,
       data
     } = this.props;
 
@@ -235,13 +257,19 @@ export default class ChainedSelectControl extends React.Component<
       ? value.split(delimiter || ',')
       : [];
     arr.splice(index, arr.length - index);
-    arr.push(joinValues ? currentValue.value : currentValue);
+
+    const pushValue = joinValues
+      ? currentValue[valueField || 'value']
+      : currentValue;
+    if (pushValue !== undefined) {
+      arr.push(pushValue);
+    }
 
     const valueRes = this.array2value(arr);
 
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value: valueRes}, 'value')
+      resolveEventData(this.props, {value: valueRes})
     );
 
     if (rendererEvent?.prevented) {
@@ -251,16 +279,16 @@ export default class ChainedSelectControl extends React.Component<
     onChange(valueRes);
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     const reload = this.props.reloadOptions;
-    reload && reload();
+    reload && reload(subpath, query);
   }
 
   renderStatic(displayValue = '-') {
     const {
       options = [],
-      labelField = 'label',
-      valueField = 'value',
+      labelField,
+      valueField,
       classPrefix,
       classnames: cx,
       className,
@@ -268,16 +296,13 @@ export default class ChainedSelectControl extends React.Component<
       delimiter
     } = this.props;
 
-    const allOptions = [
-      {options, visible: true},
-      ...(this.state.stack || [])
-    ];
+    const allOptions = [{options, visible: true}, ...(this.state.stack || [])];
     const valueArr = Array.isArray(value)
       ? value.concat()
       : value && typeof value === 'string'
       ? value.split(delimiter || ',')
       : [];
-  
+
     if (valueArr?.length > 0) {
       displayValue = valueArr
         .map((value: any, index) => {
@@ -288,14 +313,19 @@ export default class ChainedSelectControl extends React.Component<
           if (!options || !options.length) {
             return value;
           }
-          const selectedOption = find(options, (o) => value === o[valueField]) || {};
-          return selectedOption[labelField] ?? value;
+          const selectedOption =
+            find(options, o => value === o[valueField || 'value']) || {};
+          return selectedOption[labelField || 'label'] ?? value;
         })
         .filter(v => v != null)
         .join(' > ');
     }
-  
-    return <div className={cx(`${classPrefix}SelectStaticControl`, className)}>{displayValue}</div>;
+
+    return (
+      <div className={cx(`${classPrefix}SelectStaticControl`, className)}>
+        {displayValue}
+      </div>
+    );
   }
 
   @supportStatic()
@@ -304,6 +334,7 @@ export default class ChainedSelectControl extends React.Component<
       options,
       classPrefix: ns,
       className,
+      style,
       inline,
       loading,
       value,
@@ -311,8 +342,11 @@ export default class ChainedSelectControl extends React.Component<
       joinValues,
       extractValue,
       multiple,
-      useMobileUI,
+      mobileUI,
       env,
+      testIdBuilder,
+      popoverClassName,
+      placeholder,
       ...rest
     } = this.props;
     const arr = Array.isArray(value)
@@ -321,19 +355,42 @@ export default class ChainedSelectControl extends React.Component<
       ? value.split(delimiter || ',')
       : [];
 
-    const mobileUI = useMobileUI && isMobile();
+    const {themeCss, id} = this.props;
+
+    const hasStackLoading = this.state.stack.find((a: StackItem) => a.loading);
+
     return (
       <div className={cx(`${ns}ChainedSelectControl`, className)}>
         <Select
           {...rest}
-          useMobileUI={useMobileUI}
+          placeholder={placeholder as string}
+          mobileUI={mobileUI}
           popOverContainer={
-            mobileUI && env && env.getModalContainer
-              ? env.getModalContainer
-              : rest.popOverContainer
+            mobileUI
+              ? env?.getModalContainer
+              : rest.popOverContainer || env?.getModalContainer
           }
+          className={cx(
+            setThemeClassName({
+              ...this.props,
+              name: 'chainedSelectControlClassName',
+              id,
+              themeCss: themeCss
+            })
+          )}
+          popoverClassName={cx(
+            popoverClassName,
+            setThemeClassName({
+              ...this.props,
+              name: 'chainedSelectPopoverClassName',
+              id,
+              themeCss: themeCss
+            })
+          )}
+          controlStyle={style}
           classPrefix={ns}
           key="base"
+          testIdBuilder={testIdBuilder?.getChild('base')}
           options={Array.isArray(options) ? options : []}
           value={arr[0]}
           onChange={this.handleChange.bind(this, 0)}
@@ -342,25 +399,86 @@ export default class ChainedSelectControl extends React.Component<
         />
 
         {this.state.stack.map(({options, loading, visible}, index) =>
-          visible === false ? null : (
+          // loading 中的选项不展示，避免没值再隐藏造成的闪烁，改用一个 Spinner 来展示 loading 状态
+          visible === false || loading ? null : (
             <Select
               {...rest}
-              useMobileUI={useMobileUI}
+              mobileUI={mobileUI}
               popOverContainer={
-                mobileUI && env && env.getModalContainer
+                mobileUI
                   ? env.getModalContainer
-                  : rest.popOverContainer
+                  : rest.popOverContainer || env?.getModalContainer
               }
               classPrefix={ns}
               key={`x-${index + 1}`}
+              testIdBuilder={testIdBuilder?.getChild(`x-${index + 1}`)}
               options={Array.isArray(options) ? options : []}
               value={arr[index + 1]}
               onChange={this.handleChange.bind(this, index + 1)}
-              loading={loading}
               inline
+              controlStyle={style}
+              className={cx(
+                setThemeClassName({
+                  ...this.props,
+                  name: 'chainedSelectControlClassName',
+                  id,
+                  themeCss: themeCss
+                })
+              )}
+              popoverClassName={cx(
+                popoverClassName,
+                setThemeClassName({
+                  ...this.props,
+                  name: 'chainedSelectPopoverClassName',
+                  id,
+                  themeCss: themeCss
+                })
+              )}
             />
           )
         )}
+
+        {hasStackLoading && (
+          <Spinner
+            size="sm"
+            className={cx(`${ns}ChainedSelectControl-spinner`)}
+          />
+        )}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss,
+            classNames: [
+              {
+                key: 'chainedSelectControlClassName',
+                weights: {
+                  focused: {
+                    suf: '.is-opened:not(.is-mobile)'
+                  },
+                  disabled: {
+                    suf: '.is-disabled'
+                  }
+                }
+              },
+              {
+                key: 'chainedSelectPopoverClassName',
+                weights: {
+                  default: {
+                    suf: ` .${ns}Select-option`
+                  },
+                  hover: {
+                    suf: ` .${ns}Select-option.is-highlight`
+                  },
+                  focused: {
+                    inner: `.${ns}Select-option.is-active`
+                  }
+                }
+              }
+            ],
+            id: id
+          }}
+          env={env}
+        />
       </div>
     );
   }

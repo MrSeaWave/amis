@@ -1,16 +1,16 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
-import {BaseSchema, SchemaCollection} from '../Schema';
-import {resolveVariable} from 'amis-core';
-import {SchemaNode} from 'amis-core';
-import mapValues from 'lodash/mapValues';
+import {Renderer, RendererProps, AMISSchemaCollection} from 'amis-core';
 import {buildStyle} from 'amis-core';
+import {AMISSchemaBase} from 'amis-core';
 
 /**
  * Wrapper 容器渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/wrapper
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/wrapper
  */
-export interface WrapperSchema extends BaseSchema {
+/**
+ * 包装器组件，为子组件提供统一样式与容器结构。
+ */
+export interface AMISWrapperSchema extends AMISSchemaBase {
   /**
    * 指定为 container 类型
    */
@@ -19,23 +19,19 @@ export interface WrapperSchema extends BaseSchema {
   /**
    * 内容
    */
-  body: SchemaCollection;
+  body: AMISSchemaCollection;
 
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'none';
 
-  wrap?: boolean;
-
   /**
-   * 自定义样式
+   * 是否包裹内容 默认 true
    */
-  style?: {
-    [propName: string]: any;
-  };
+  wrap?: boolean;
 }
 
 export interface WrapperProps
   extends RendererProps,
-    Omit<WrapperSchema, 'className'> {
+    Omit<AMISWrapperSchema, 'className'> {
   children?: JSX.Element | ((props?: any) => JSX.Element);
 }
 
@@ -59,7 +55,7 @@ export default class Wrapper extends React.Component<WrapperProps, object> {
   }
 
   render() {
-    const {className, size, classnames: cx, style, data, wrap} = this.props;
+    const {className, size, classnames: cx, style, data, wrap, id} = this.props;
 
     // 期望不要使用，给 form controls 用法自动转换时使用的。
     if (wrap === false) {
@@ -74,6 +70,7 @@ export default class Wrapper extends React.Component<WrapperProps, object> {
           className
         )}
         style={buildStyle(style, data)}
+        data-id={id}
       >
         {this.renderBody()}
       </div>

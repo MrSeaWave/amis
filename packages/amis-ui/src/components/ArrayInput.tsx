@@ -7,7 +7,7 @@ import Button from './Button';
 import {autobind, guid} from 'amis-core';
 import {uncontrollable} from 'amis-core';
 import Sortable from 'sortablejs';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 
 export interface ArrayInputProps extends ThemeProps, LocaleProps {
   value?: Array<any>;
@@ -105,13 +105,13 @@ export class ArrayInput extends React.Component<ArrayInputProps> {
 
           // 换回来
           const parent = e.to as HTMLElement;
-          if (
-            e.newIndex < e.oldIndex &&
-            e.oldIndex < parent.childNodes.length - 1
-          ) {
-            parent.insertBefore(e.item, parent.childNodes[e.oldIndex + 1]);
-          } else if (e.oldIndex < parent.childNodes.length - 1) {
-            parent.insertBefore(e.item, parent.childNodes[e.oldIndex]);
+          if (e.oldIndex < parent.childNodes.length - 1) {
+            parent.insertBefore(
+              e.item,
+              parent.childNodes[
+                e.oldIndex > e.newIndex ? e.oldIndex + 1 : e.oldIndex
+              ]
+            );
           } else {
             parent.appendChild(e.item);
           }

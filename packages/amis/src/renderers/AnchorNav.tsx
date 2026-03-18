@@ -1,17 +1,16 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {Renderer, RendererProps, BaseSchemaWithoutType} from 'amis-core';
 import {AnchorNav as CAnchorNav, AnchorNavSection} from 'amis-ui';
 import {isVisible, autobind} from 'amis-core';
-import {filter} from 'amis-core';
-import find from 'lodash/find';
-import {BaseSchema, SchemaClassName, SchemaCollection} from '../Schema';
+import {filter, AMISSchemaCollection, AMISSchemaBase} from 'amis-core';
+import {BaseSchema, AMISClassName} from '../Schema';
 
 /**
  * AnchorNavSection 锚点区域渲染器
- * 文档：https://baidu.gitee.io/amis/docs/components/anchor-nav
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/anchor-nav
  */
 
-export type AnchorNavSectionSchema = {
+export interface AnchorNavSectionSchema extends AMISSchemaBase {
   /**
    * 导航文字说明
    */
@@ -25,16 +24,20 @@ export type AnchorNavSectionSchema = {
   /**
    * 内容
    */
-  body?: SchemaCollection;
-} & Omit<BaseSchema, 'type'>;
+  body?: AMISSchemaCollection;
+
+  /**
+   * 子节点
+   */
+  children?: Array<AnchorNavSectionSchema>;
+}
 
 /**
- * AnchorNav 锚点导航渲染器
- * 文档：https://baidu.gitee.io/amis/docs/components/anchor-nav
+ * 锚点导航组件，用于页面内导航跳转。支持吸顶、自动高亮对应区域。
  */
-export interface AnchorNavSchema extends BaseSchema {
+export interface AMISAnchorNavSchema extends AMISSchemaBase {
   /**
-   * 指定为 AnchorNav 锚点导航渲染器
+   * 指定为 anchor-nav 组件
    */
   type: 'anchor-nav';
 
@@ -51,29 +54,32 @@ export interface AnchorNavSchema extends BaseSchema {
   /**
    * 样式名
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
 
   /**
    * 导航样式名
    */
-  linkClassName?: SchemaClassName;
+  linkClassName?: AMISClassName;
 
   /**
    * 楼层样式名
    */
-  sectionClassName?: SchemaClassName;
+  sectionClassName?: AMISClassName;
 
   direction?: 'vertical' | 'horizontal';
 }
 
 export interface AnchorNavProps
   extends RendererProps,
-    Omit<AnchorNavSchema, 'className' | 'linkClassName' | 'sectionClassName'> {
+    Omit<
+      AMISAnchorNavSchema,
+      'className' | 'linkClassName' | 'sectionClassName'
+    > {
   active?: string | number;
   sectionRender?: (
     section: AnchorNavSectionSchema,
     props: AnchorNavProps,
-    index: number
+    index: number | string
   ) => JSX.Element;
 }
 
@@ -94,7 +100,7 @@ export default class AnchorNav extends React.Component<
   renderSection?: (
     section: AnchorNavSectionSchema,
     props: AnchorNavProps,
-    index: number
+    index: number | string
   ) => JSX.Element;
 
   constructor(props: AnchorNavProps) {
@@ -107,19 +113,41 @@ export default class AnchorNav extends React.Component<
     if (typeof props.active !== 'undefined') {
       active = props.active;
     } else {
-      const section: AnchorNavSectionSchema = find(
+      let section: AnchorNavSectionSchema | null = this.getActiveSection(
         links,
-        section => section.href === props.active
-      ) as AnchorNavSectionSchema;
+        props.active,
+        null
+      );
+
       active =
         section && section.href
           ? section.href
           : (links[0] && links[0].href) || 0;
     }
-
     this.state = {
       active
     };
+  }
+
+  // 获取激活的内容区
+  getActiveSection(
+    links: Array<AnchorNavSectionSchema>,
+    active: string | number | undefined,
+    section: AnchorNavSectionSchema | null
+  ) {
+    if (section) {
+      return section;
+    }
+    links.forEach(link => {
+      if (link.href === active) {
+        section = link;
+      } else {
+        if (link.children) {
+          this.getActiveSection(link.children, active, section);
+        }
+      }
+    });
+    return section;
   }
 
   @autobind
@@ -132,7 +160,6 @@ export default class AnchorNav extends React.Component<
   @autobind
   locateTo(index: number) {
     const {links} = this.props;
-
     Array.isArray(links) &&
       links[index] &&
       this.setState({
@@ -140,11 +167,52 @@ export default class AnchorNav extends React.Component<
       });
   }
 
+  renderSections(links: AnchorNavSectionSchema[], parentIdx?: string | number) {
+    const {
+      classnames: cx,
+      classPrefix: ns,
+      sectionRender,
+      render,
+      data
+    } = this.props;
+
+    links = Array.isArray(links) ? links : [links];
+    let children: Array<JSX.Element | null> = [];
+
+    links.forEach((section, index) => {
+      if (isVisible(section, data)) {
+        // 若有子节点，key为parentIdx-index
+        let curIdx = (parentIdx ? parentIdx + '-' : '') + index;
+
+        children.push(
+          /** 内容区 */
+          <AnchorNavSection
+            {...(section as any)}
+            title={filter(section.title, data)}
+            key={curIdx}
+            name={section.href || curIdx}
+          >
+            {this.renderSection
+              ? this.renderSection(section, this.props, curIdx)
+              : sectionRender
+              ? sectionRender(section, this.props, curIdx)
+              : render(`section/${curIdx}`, section.body || '')}
+          </AnchorNavSection>
+        );
+        if (section.children) {
+          children.push(...this.renderSections(section.children, curIdx));
+        }
+      }
+    });
+    return children.filter(item => !!item);
+  }
+
   render() {
     const {
       classnames: cx,
       classPrefix: ns,
       className,
+      style,
       linkClassName,
       sectionClassName,
       direction,
@@ -158,31 +226,14 @@ export default class AnchorNav extends React.Component<
       return null;
     }
 
-    links = Array.isArray(links) ? links : [links];
-    let children: Array<JSX.Element | null> = [];
-
-    children = links.map((section, index) =>
-      isVisible(section, data) ? (
-        <AnchorNavSection
-          {...(section as any)}
-          title={filter(section.title, data)}
-          key={index}
-          name={section.href || index}
-        >
-          {this.renderSection
-            ? this.renderSection(section, this.props, index)
-            : sectionRender
-            ? sectionRender(section, this.props, index)
-            : render(`section/${index}`, section.body || '')}
-        </AnchorNavSection>
-      ) : null
-    );
+    let children = this.renderSections(links);
 
     return (
       <CAnchorNav
         classPrefix={ns}
         classnames={cx}
         className={className}
+        style={style}
         linkClassName={linkClassName}
         sectionClassName={sectionClassName}
         onSelect={this.handleSelect}

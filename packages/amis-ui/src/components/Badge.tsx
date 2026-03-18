@@ -7,72 +7,16 @@ import hoistNonReactStatic from 'hoist-non-react-statics';
 
 import {evalExpression, buildStyle} from 'amis-core';
 import {resolveVariable, resolveVariableAndFilter} from 'amis-core';
-import {ClassNamesFn} from 'amis-core';
+import {ClassNamesFn, AMISBadgeBase} from 'amis-core';
 
-/**
- * Badge 角标。
- * 文档：https://baidu.gitee.io/amis/docs/components/badge
- */
-export interface BadgeObject {
-  className?: string;
-
-  /**
-   * 文本内容
-   */
-  text?: string | number;
-
-  /**
-   * 大小
-   */
-  size?: number;
-
-  /**
-   * 角标类型
-   */
-  mode?: 'text' | 'dot' | 'ribbon';
-
-  /**
-   * 角标位置，相对于position的位置进行偏移
-   */
-  offset?: [number | string, number | string];
-
-  /**
-   * 角标位置
-   */
-  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
-
-  /**
-   * 封顶的数字值
-   */
-  overflowCount?: number;
-
-  /**
-   * 动态控制是否显示
-   */
-  visibleOn?: string;
-
-  /**
-   * 是否显示动画
-   */
-  animation?: boolean;
-
-  /**
-   * 角标的自定义样式
-   */
-  style?: {
-    [propName: string]: any;
-  };
-
-  /**
-   * 提示类型
-   */
-  level?: 'info' | 'warning' | 'success' | 'danger' | string;
-}
+// 保留原来的叫法
+export type BadgeObject = AMISBadgeBase;
 
 export interface BadgeProps {
   badge?: BadgeObject;
   classnames: ClassNamesFn;
   data?: any;
+  children?: React.ReactNode | Array<React.ReactNode>;
 }
 
 export class Badge extends React.Component<BadgeProps, object> {
@@ -200,7 +144,12 @@ export class Badge extends React.Component<BadgeProps, object> {
         lineHeight: size + 'px'
       };
       // 当text、overflowCount都为number类型时，进行封顶值处理
-      if (typeof text === 'number' && typeof overflowCount === 'number') {
+      // 当text从模版字符串解析（text: "${badge}"）数字就会变为字符串
+      // 因此当设置了overflowCount属性时 如果text可以强制转换成数字 那么也进行封顶处理
+      if (
+        typeof overflowCount === 'number' &&
+        (typeof text === 'number' || (text && !isNaN(Number(text))))
+      ) {
         text = (
           (text as number) > (overflowCount as number)
             ? `${overflowCount}+`
@@ -273,10 +222,12 @@ export class Badge extends React.Component<BadgeProps, object> {
   }
 }
 
+export default Badge;
+
 export function withBadge<P extends object>(Component: React.ComponentType<P>) {
   return hoistNonReactStatic(
     class WithBadge extends React.Component<P & BadgeProps> {
-      static displayName = `WithBadge(${
+      static displayName: string = `WithBadge(${
         Component.displayName || Component.name
       })`;
 

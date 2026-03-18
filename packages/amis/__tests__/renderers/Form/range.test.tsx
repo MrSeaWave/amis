@@ -1,10 +1,22 @@
+/**
+ * 组件名称：InputRange 滑块
+ * 单测内容：
+ * 01. showInput & showInputUnit
+ * 02. multiple & clearable & delimiter
+ * 03. showSteps
+ * 04. marks
+ * 05. tooltipVisible & tooltipPlacement
+ * 06. min & max & step & joinValues
+ * 07. min & max & step 变量
+ */
+
 import React = require('react');
 import {render, fireEvent, screen, waitFor} from '@testing-library/react';
 import '../../../src';
 import {render as amisRender} from '../../../src';
 import {makeEnv, wait} from '../../helper';
 
-test('Renderer:range with showInput', async () => {
+test('Renderer:range with showInput & showInputUnit', async () => {
   const {container} = render(
     amisRender(
       {
@@ -15,7 +27,9 @@ test('Renderer:range with showInput', async () => {
             type: 'input-range',
             name: 'range',
             value: 10,
-            showInput: true
+            showInput: true,
+            showInputUnit: true,
+            unit: '个'
           }
         ],
         title: 'The form',
@@ -38,6 +52,7 @@ test('Renderer:range with showInput', async () => {
     container.querySelector('.cxd-InputRange-input') as Element
   ).toBeInTheDocument();
 
+  const inputWrapper = container.querySelector('.cxd-InputRange-input');
   const input = container.querySelector('.cxd-InputRange-input input');
   fireEvent.change(input!, {
     target: {
@@ -52,6 +67,7 @@ test('Renderer:range with showInput', async () => {
     ).getAttribute('style')
   ).toContain('width: 7%');
 
+  expect(inputWrapper).toHaveClass('cxd-InputRange-input-with-unit');
   expect(container).toMatchSnapshot();
 });
 
@@ -118,7 +134,7 @@ test('Renderer:range with multiple & clearable & delimiter', async () => {
   ).toBe('7--13');
 
   expect(container).toMatchSnapshot();
-});
+}, 10000);
 
 test('Renderer:range with showSteps', async () => {
   const {container} = render(
@@ -296,6 +312,87 @@ test('Renderer:range with min & max & step & joinValues', async () => {
       min: 0.2,
       max: 0.8
     }
+  });
+
+  expect(container).toMatchSnapshot();
+});
+
+test('Renderer: range with min & max & step by variables', async () => {
+  const onSubmit = jest.fn();
+  const submitBtnText = 'Submit';
+  const {container} = render(
+    amisRender(
+      {
+        type: 'page',
+        data: {
+          min: '6',
+          max: '66',
+          step: '2'
+        },
+        body: {
+          type: 'form',
+          submitText: submitBtnText,
+          api: '/api/mock2/form/saveForm',
+          body: [
+            {
+              type: 'input-range',
+              label: '滑块',
+              name: 'range',
+              min: '${min}',
+              max: '${max}',
+              step: '${step}',
+              showInput: true
+            }
+          ]
+        }
+      },
+      {onSubmit},
+      makeEnv({})
+    )
+  );
+
+  const inputs = container.querySelectorAll('.cxd-InputRange-input input');
+  const inputEl = inputs[0];
+  const calculatePercentage = (value: number) => ((value - 6) / (66 - 6)) * 100;
+  /** min & max 正常解析 */
+  fireEvent.change(inputEl, {target: {value: 88}});
+  fireEvent.blur(inputEl);
+  await wait(200);
+  expect(
+    (
+      container.querySelector('.cxd-InputRange-track-active') as Element
+    ).getAttribute('style')
+  ).toContain(`width: 100%; left: 0%;`);
+  await wait(200);
+  fireEvent.change(inputEl, {target: {value: 0}});
+  fireEvent.blur(inputEl);
+  await wait(200);
+  expect(
+    (
+      container.querySelector('.cxd-InputRange-track-active') as Element
+    ).getAttribute('style')
+  ).toContain(`width: 0%; left: 0%;`);
+  /** step正常解析 */
+  fireEvent.change(inputEl, {target: {value: 12}});
+  fireEvent.blur(inputEl);
+  await wait(200);
+  expect(
+    (
+      container.querySelector('.cxd-InputRange-track-active') as Element
+    ).getAttribute('style')
+  ).toContain(`width: ${calculatePercentage(12)}%; left: 0%;`);
+  /** 提交参数 */
+  await wait(500);
+  const submitBtn = screen.getByRole('button', {name: submitBtnText});
+  await waitFor(() => {
+    expect(submitBtn).toBeInTheDocument();
+  });
+  fireEvent.click(submitBtn);
+  await wait(500);
+  const formData = onSubmit.mock.calls[0][0];
+  expect(onSubmit).toHaveBeenCalled();
+  expect(formData).toEqual({
+    range: 12
   });
 
   expect(container).toMatchSnapshot();

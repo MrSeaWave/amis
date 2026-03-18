@@ -2,6 +2,7 @@ import {types, SnapshotIn, Instance} from 'mobx-state-tree';
 import {iRendererStore} from './iRenderer';
 import type {IFormStore, IFormItemStore} from './form';
 import {getStoreById} from './manager';
+import {countTree} from '../utils/helper';
 
 export const UniqueGroup = types
   .model('UniqueGroup', {
@@ -34,7 +35,10 @@ export const ComboStore = iRendererStore
     minLength: 0,
     maxLength: 0,
     length: 0,
-    activeKey: 0
+    activeKey: 0,
+    perPage: 0,
+    page: 1,
+    memberValidMap: types.optional(types.frozen(), {})
   })
   .views(self => {
     function getForms() {
@@ -58,7 +62,10 @@ export const ComboStore = iRendererStore
               return;
             }
 
-            let total = item.items[0].options.length;
+            let total = countTree(
+              item.items[0].options,
+              item => typeof item.value !== 'undefined'
+            );
             let current = item.items.reduce((total, item) => {
               return total + item.selectedOptions.length;
             }, 0);
@@ -94,6 +101,24 @@ export const ComboStore = iRendererStore
         return self.multiple
           ? [forms[parseInt(name, 10)]]
           : forms[0].getItemsByName(name);
+      },
+
+      get multiplePage() {
+        return self.multiple && self.perPage > 0;
+      },
+
+      get offset() {
+        return (self.page - 1) * self.perPage;
+      },
+
+      getRangeByPage(items: Array<any>) {
+        if (self.perPage <= 0) {
+          return items;
+        }
+
+        const start = this.offset;
+        const end = start + self.perPage;
+        return items.slice(start, end);
       }
     };
   })
@@ -147,9 +172,15 @@ export const ComboStore = iRendererStore
           });
 
           self.forms.forEach(form =>
-            form.items.forEach(
-              item => item.unique && item.syncOptions(undefined, form.data)
-            )
+            form.items.forEach(item => {
+              if (item.unique) {
+                item.syncOptions(undefined, form.data);
+
+                if (item.errors.length) {
+                  item.validate(item.tmpValue);
+                }
+              }
+            })
           );
         }
       }
@@ -160,13 +191,27 @@ export const ComboStore = iRendererStore
       self.activeKey = key;
     }
 
+    function setMemberValid(valid: boolean, index: number) {
+      self.memberValidMap = {
+        ...self.memberValidMap,
+        [index]: valid
+      };
+    }
+
     return {
       config,
       setActiveKey,
       bindUniuqueItem,
       unBindUniuqueItem,
       addForm,
-      onChildStoreDispose
+      onChildStoreDispose,
+      setMemberValid,
+      changePage: (page: number, perPage?: number) => {
+        self.page = page || 1;
+        if (typeof perPage === 'number') {
+          self.perPage = perPage;
+        }
+      }
     };
   });
 

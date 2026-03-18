@@ -1,13 +1,17 @@
 import React from 'react';
-import {ThemeProps, themeable} from 'amis-core';
+import {TestIdBuilder, ThemeProps, themeable} from 'amis-core';
 import Input from './Input';
 import {autobind, ucFirst} from 'amis-core';
 import {Icon} from './icons';
 
 export interface InputBoxProps
   extends ThemeProps,
-    Omit<React.DOMAttributes<HTMLInputElement>, 'prefix' | 'onChange'> {
+    Omit<
+      React.InputHTMLAttributes<HTMLInputElement>,
+      'style' | 'prefix' | 'onChange' | 'translate' | 'size'
+    > {
   value?: string;
+  blurValue?: string;
   readOnly?: boolean;
   onChange?: (value: string) => void;
   onClear?: (e: React.MouseEvent<any>) => void;
@@ -16,8 +20,11 @@ export interface InputBoxProps
   hasError?: boolean;
   placeholder?: string;
   prefix?: JSX.Element;
-  children?: JSX.Element;
+  children?: React.ReactNode | Array<React.ReactNode>;
   borderMode?: 'full' | 'half' | 'none';
+  testIdBuilder?: TestIdBuilder;
+  inputRender?: (props: any, ref?: any) => JSX.Element;
+  dataName?: string;
 }
 
 export interface InputBoxState {
@@ -48,7 +55,7 @@ export class InputBox extends React.Component<InputBoxProps, InputBoxState> {
   @autobind
   handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const onChange = this.props.onChange;
-    onChange && onChange(e.currentTarget.value);
+    onChange && onChange(e.currentTarget ? e.currentTarget.value : (e as any));
   }
 
   @autobind
@@ -78,11 +85,16 @@ export class InputBox extends React.Component<InputBoxProps, InputBoxState> {
       disabled,
       hasError,
       value,
+      blurValue,
       placeholder,
       prefix: result,
       children,
       borderMode,
       onClick,
+      mobileUI,
+      testIdBuilder,
+      inputRender,
+      dataName,
       ...rest
     } = this.props;
     const isFocused = this.state.isFocused;
@@ -90,6 +102,7 @@ export class InputBox extends React.Component<InputBoxProps, InputBoxState> {
     return (
       <div
         className={cx('InputBox', className, {
+          'is-mobile': mobileUI,
           'is-focused': isFocused,
           'is-disabled': disabled,
           'is-error': hasError,
@@ -97,27 +110,42 @@ export class InputBox extends React.Component<InputBoxProps, InputBoxState> {
           [`InputBox--border${ucFirst(borderMode)}`]: borderMode
         })}
         onClick={onClick}
+        data-amis-name={dataName}
       >
         {result}
 
-        <Input
-          {...rest}
-          value={value || ''}
-          onChange={this.handleChange}
-          placeholder={placeholder}
-          onFocus={this.handleFocus}
-          onBlur={this.handleBlur}
-          size={12}
-          disabled={disabled}
-        />
-
-        {children}
+        {typeof inputRender === 'function' ? (
+          inputRender({
+            ...rest,
+            value: value ?? '',
+            onChange: this.handleChange as any,
+            placeholder,
+            onFocus: this.handleFocus,
+            onBlur: this.handleBlur,
+            disabled,
+            ...testIdBuilder?.getTestId()
+          })
+        ) : (
+          <Input
+            {...rest}
+            value={(isFocused ? undefined : blurValue) ?? value ?? ''}
+            onChange={this.handleChange}
+            placeholder={placeholder}
+            onFocus={this.handleFocus}
+            onBlur={this.handleBlur}
+            size={12}
+            disabled={disabled}
+            {...testIdBuilder?.getTestId()}
+          />
+        )}
 
         {clearable && !disabled && value ? (
           <a onClick={this.clearValue} className={cx('InputBox-clear')}>
-            <Icon icon="close" className="icon" />
+            <Icon icon="input-clear" className="icon" />
           </a>
         ) : null}
+
+        {children}
       </div>
     );
   }

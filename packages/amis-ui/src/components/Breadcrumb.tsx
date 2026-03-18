@@ -8,7 +8,7 @@ import {ClassNamesFn, themeable, ThemeProps} from 'amis-core';
 import {RootClose} from 'amis-core';
 import {removeHTMLTag} from 'amis-core';
 import {Icon} from './icons';
-import {generateIcon} from 'amis-core';
+import type {TestIdBuilder} from 'amis-core';
 
 export type ItemPlace = 'start' | 'middle' | 'end';
 export type TooltipPositionType = 'top' | 'bottom' | 'left' | 'right';
@@ -33,6 +33,7 @@ interface BreadcrumbItemProps {
   tooltipContainer?: any;
   tooltipPosition?: TooltipPositionType;
   classnames: ClassNamesFn;
+  testIdBuilder?: TestIdBuilder;
   [propName: string]: any;
 }
 
@@ -40,6 +41,7 @@ interface BreadcrumbProps extends ThemeProps {
   tooltipContainer?: any;
   tooltipPosition?: TooltipPositionType;
   items: Array<BreadcrumbBaseItem>;
+  testIdBuilder?: TestIdBuilder;
   [propName: string]: any;
 }
 
@@ -60,8 +62,15 @@ export class Breadcrumb extends React.Component<BreadcrumbProps> {
 
   render() {
     const cx = this.props.classnames;
-    const {className, separatorClassName, items, separator, ...restProps} =
-      this.props;
+    const {
+      className,
+      style,
+      separatorClassName,
+      items,
+      separator,
+      testIdBuilder,
+      ...restProps
+    } = this.props;
 
     const crumbsLength = items?.length;
     if (!crumbsLength) {
@@ -70,6 +79,9 @@ export class Breadcrumb extends React.Component<BreadcrumbProps> {
 
     const crumbs = items
       .map<React.ReactNode>((item, index) => {
+        const itemTestIdBuilder = testIdBuilder?.getChild(
+          `item-${item.label || index}`
+        );
         let itemPlace: ItemPlace = 'middle';
         if (index === 0) {
           itemPlace = 'start';
@@ -83,6 +95,7 @@ export class Breadcrumb extends React.Component<BreadcrumbProps> {
             item={item}
             itemPlace={itemPlace}
             key={index}
+            testIdBuilder={itemTestIdBuilder}
           ></BreadcrumbItem>
         );
       })
@@ -97,7 +110,11 @@ export class Breadcrumb extends React.Component<BreadcrumbProps> {
         curr
       ]);
 
-    return <div className={cx('Breadcrumb', className)}>{crumbs}</div>;
+    return (
+      <div className={cx('Breadcrumb', className)} style={style}>
+        {crumbs}
+      </div>
+    );
   }
 }
 
@@ -148,7 +165,12 @@ export class BreadcrumbItem extends React.Component<
     item: BreadcrumbBaseItem,
     label?: string
   ) {
-    const {itemClassName, dropdownItemClassName, classnames: cx} = this.props;
+    const {
+      itemClassName,
+      dropdownItemClassName,
+      classnames: cx,
+      testIdBuilder
+    } = this.props;
     const baseItemClassName =
       itemType === 'default' ? itemClassName : dropdownItemClassName;
     if (showHref) {
@@ -156,20 +178,34 @@ export class BreadcrumbItem extends React.Component<
         <a
           href={item.href}
           className={cx('Breadcrumb-item-' + itemType, baseItemClassName)}
+          {...testIdBuilder?.getTestId()}
         >
-          {item.icon
-            ? generateIcon(cx, item.icon, 'Icon', 'Breadcrumb-icon')
-            : null}
-          <span className={cx('TplField')}>{label}</span>
+          {item.icon ? (
+            <Icon
+              cx={cx}
+              icon={item.icon}
+              className="Icon"
+              classNameProp="Breadcrumb-icon"
+            />
+          ) : null}
+          <span className={cx('TplField fr-view')}>{label}</span>
         </a>
       );
     }
     return (
-      <span className={cx('Breadcrumb-item-' + itemType, baseItemClassName)}>
-        {item.icon
-          ? generateIcon(cx, item.icon, 'Icon', 'Breadcrumb-icon')
-          : null}
-        <span className={cx('TplField')}>{label}</span>
+      <span
+        className={cx('Breadcrumb-item-' + itemType, baseItemClassName)}
+        {...testIdBuilder?.getTestId()}
+      >
+        {item.icon ? (
+          <Icon
+            cx={cx}
+            icon={item.icon}
+            className="Icon"
+            classNameProp="Breadcrumb-icon"
+          />
+        ) : null}
+        <span className={cx('TplField fr-view')}>{label}</span>
       </span>
     );
   }

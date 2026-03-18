@@ -13,10 +13,11 @@ exports[`Renderer:inputArray 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -25,7 +26,7 @@ exports[`Renderer:inputArray 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -46,6 +47,7 @@ exports[`Renderer:inputArray 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="array"
                   data-role="form-item"
                 >
                   <label
@@ -53,7 +55,7 @@ exports[`Renderer:inputArray 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           颜色集合
@@ -92,9 +94,11 @@ exports[`Renderer:inputArray 1`] = `
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -143,8 +147,8 @@ exports[`Renderer:inputArray 1`] = `
                             type="button"
                           >
                             <icon-mock
-                              classname="icon icon-plus"
-                              icon="plus"
+                              classname="icon icon-plus-fine"
+                              icon="plus-fine"
                             />
                             <span>
                               新增
@@ -173,45 +177,6 @@ exports[`Renderer:inputArray 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -233,10 +198,11 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -245,7 +211,7 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -266,6 +232,7 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="array"
                   data-role="form-item"
                 >
                   <label
@@ -273,7 +240,7 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           颜色集合
@@ -325,9 +292,11 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -399,9 +368,11 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -473,9 +444,11 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -524,8 +497,8 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                             type="button"
                           >
                             <icon-mock
-                              classname="icon icon-plus"
-                              icon="plus"
+                              classname="icon icon-plus-fine"
+                              icon="plus-fine"
                             />
                             <span>
                               新增
@@ -559,45 +532,6 @@ exports[`Renderer:inputArray with draggable & draggableTip 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -619,10 +553,11 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -631,7 +566,7 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -652,6 +587,7 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="array"
                   data-role="form-item"
                 >
                   <label
@@ -659,7 +595,7 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           颜色集合
@@ -698,9 +634,11 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -749,9 +687,11 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -790,8 +730,8 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
                             type="button"
                           >
                             <icon-mock
-                              classname="icon icon-plus"
-                              icon="plus"
+                              classname="icon icon-plus-fine"
+                              icon="plus-fine"
                             />
                             <span>
                               新增
@@ -820,45 +760,6 @@ exports[`Renderer:inputArray with minLength & maxLength 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -880,10 +781,11 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 1`]
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -892,7 +794,7 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 1`]
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -913,6 +815,7 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 1`]
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="array"
                   data-role="form-item"
                 >
                   <label
@@ -920,7 +823,7 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 1`]
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           颜色集合
@@ -959,9 +862,11 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 1`]
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -1010,9 +915,11 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 1`]
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -1068,45 +975,6 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 1`]
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -1128,10 +996,11 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 2`]
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -1140,7 +1009,7 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 2`]
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -1161,6 +1030,7 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 2`]
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="array"
                   data-role="form-item"
                 >
                   <label
@@ -1168,7 +1038,7 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 2`]
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           颜色集合
@@ -1207,9 +1077,11 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 2`]
                                 >
                                   <div
                                     class="cxd-Form-col"
+                                    style="flex: 1;"
                                   >
                                     <div
                                       class="cxd-Form-item cxd-Form-item--row"
+                                      data-amis-name="flat"
                                       data-role="form-item"
                                     >
                                       <div
@@ -1258,8 +1130,8 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 2`]
                             type="button"
                           >
                             <icon-mock
-                              classname="icon icon-plus"
-                              icon="plus"
+                              classname="icon icon-plus-fine"
+                              icon="plus-fine"
                             />
                             <span>
                               我是增加按钮
@@ -1287,45 +1159,6 @@ exports[`Renderer:inputArray with removable & addable & addButtonText: false 2`]
                   </span>
                 </button>
               </div>
-            </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
             </div>
           </div>
         </div>

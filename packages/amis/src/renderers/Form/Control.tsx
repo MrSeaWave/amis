@@ -1,21 +1,28 @@
 import React from 'react';
-import {RendererProps, Renderer} from 'amis-core';
-import {FormBaseControlSchema, SchemaCollection} from '../../Schema';
+import {
+  RendererProps,
+  Renderer,
+  AMISFormItem,
+  AMISSchemaCollection
+} from 'amis-core';
 import {autobind} from 'amis-core';
 import {resolveVariable} from 'amis-core';
 import {FormBaseControl, FormItemWrap} from 'amis-core';
 
 /**
- * Group 表单集合渲染器，能让多个表单在一行显示
- * 文档：https://baidu.gitee.io/amis/docs/components/form/group
+ * Control 表单项包裹
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/control
  */
-export interface FormControlSchema extends FormBaseControlSchema {
+export interface AMISFormControlSchema extends AMISFormItem {
+  /**
+   * 指定为 control 组件
+   */
   type: 'control';
 
   /**
    * FormItem 内容
    */
-  body: SchemaCollection;
+  body: AMISSchemaCollection;
 }
 
 @Renderer({

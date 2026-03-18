@@ -149,12 +149,14 @@ api 返回支持两种格式，一种是直接返回完整 echarts 配置，数�
             "type": "value"
         },
         "series": [{
-            "data": "${line}",
+            "data": "${line || []}",
             "type": "line"
         }]
     }
 }
 ```
+
+> Echarts 中有些配置不能为未定义，所以要使用变量，最好使用类似上面的 `${line || []}` 写法配置默认值，保证在数据加载完前渲染也不会报错
 
 其中 api 返回内容是如下写法，可以看到通过[数据映射](../../docs/concepts/data-mapping)语法，我们可以将 api 放回结果中的 line 字段作为折线的数据。
 
@@ -174,6 +176,8 @@ api 返回支持两种格式，一种是直接返回完整 echarts 配置，数�
 
 有时候数据是在上层获取的，比如通过 service 中返回了数据，这时需要通过 `trackExpression` 来指定跟踪什么数据，比如下面的例子，数据是从 service 获取的就需要配置 `trackExpression`。
 
+> 如果`trackExpression` 追踪的数据是**对象数据**，可以使用[数据映射](../../docs/concepts/data-mapping)的`json`方法将数据序列化之后再比较，例如`"trackExpression": "${fieldToTrack|json}"`
+
 ```schema: scope="body"
 {
     "type": "service",
@@ -192,7 +196,7 @@ api 返回支持两种格式，一种是直接返回完整 echarts 配置，数�
                     "type": "value"
                 },
                 "series": [{
-                    "data": "${line}",
+                    "data": "${line || []}",
                     "type": "line"
                 }]
             }
@@ -304,7 +308,7 @@ api 返回支持两种格式，一种是直接返回完整 echarts 配置，数�
             "body": [
                 {
                     "type": "tpl",
-                    "tpl": "<span>当前选中值 ${value|json}<span>"
+                    "tpl": "<p>当前选中值 ${value|json}</p> <p>seriesType ${seriesType}</p> <p>seriesIndex ${seriesIndex}</p> <p>seriesName ${seriesName}</p> <p>name ${name}</p> <p>dataIndex ${dataIndex}</p>"
                 },
                 {
                     "type": "chart",
@@ -314,6 +318,36 @@ api 返回支持两种格式，一种是直接返回完整 echarts 配置，数�
         }
     }
 }
+```
+
+具体能拿到的参数请参考 [Echarts](https://echarts.apache.org/handbook/zh/concepts/event#%E9%BC%A0%E6%A0%87%E4%BA%8B%E4%BB%B6%E7%9A%84%E5%A4%84%E7%90%86) 的文档，官方定义如下
+
+```typescript
+type EventParams = {
+  // 当前点击的图形元素所属的组件名称，
+  // 其值如 'series'、'markLine'、'markPoint'、'timeLine' 等。
+  componentType: string;
+  // 系列类型。值可能为：'line'、'bar'、'pie' 等。当 componentType 为 'series' 时有意义。
+  seriesType: string;
+  // 系列在传入的 option.series 中的 index。当 componentType 为 'series' 时有意义。
+  seriesIndex: number;
+  // 系列名称。当 componentType 为 'series' 时有意义。
+  seriesName: string;
+  // 数据名，类目名
+  name: string;
+  // 数据在传入的 data 数组中的 index
+  dataIndex: number;
+  // 传入的原始数据项
+  data: Object;
+  // sankey、graph 等图表同时含有 nodeData 和 edgeData 两种 data，
+  // dataType 的值会是 'node' 或者 'edge'，表示当前点击在 node 还是 edge 上。
+  // 其他大部分图表中只有一种 data，dataType 无意义。
+  dataType: string;
+  // 传入的数据值
+  value: number | Array;
+  // 数据图形的颜色。当 componentType 为 'series' 时有意义。
+  color: string;
+};
 ```
 
 ## 远程拉取动态配置项
@@ -663,7 +697,502 @@ echarts 的 config 一般是静态配置的，支持简单的数据映射。如�
 
 > 2.4.1 及以上版本
 
-当前组件会对外派发`click`、`mouseover`、`legendselectchanged`事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`来获取事件产生的数据，详细请查看[事件动作](../../docs/concepts/event-action)。事件参数提供通用的字段，可以查看[ECharst 事件与行为文档](https://echarts.apache.org/handbook/zh/concepts/event/)。
+当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`或`${event.data.[事件参数名]}`来获取事件产生的数据，详细请查看[事件动作](../../docs/concepts/event-action)。
+
+| 事件名称            | 事件参数                                                                             | 说明                                                |
+| ------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| init                | -                                                                                    | 组件实例被创建并插入 DOM 中时触发。2.4.1 及以上版本 |
+| click               | 查看[ECharst 事件与行为文档](https://echarts.apache.org/handbook/zh/concepts/event/) | 鼠标点击时触发                                      |
+| mouseover           | 查看[ECharst 事件与行为文档](https://echarts.apache.org/handbook/zh/concepts/event/) | 鼠标悬浮时触发                                      |
+| legendselectchanged | 查看[ECharst 事件与行为文档](https://echarts.apache.org/handbook/zh/concepts/event/) | 切换图例选中状态时触发                              |
+| finished | {echarts: echarts.init(ref, theme)} | echarts 图表绘制完成, version > 6.11.0                              |
+
+### init
+
+```schema: scope="body"
+{
+    "type": "chart",
+    "id": "chart01",
+    "api": "/api/mock2/chart/chartData",
+    "config": {
+      "xAxis": {
+        "type": "category",
+        "data": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat"
+        ]
+      },
+      "yAxis": {
+        "type": "value"
+      },
+      "series": [
+        {
+          "data": "${line || []}",
+          "type": "line"
+        }
+      ]
+    },
+    "onEvent": {
+        "init": {
+            "actions": [
+            {
+                "actionType": "toast",
+                "args": {
+                    "msg": "init"
+                }
+            }
+            ]
+        }
+    }
+}
+```
+
+### click
+
+用户鼠标操作点击时触发，例如点击下图蓝色线条上的数据点，将弹出详情。
+
+```schema: scope="body"
+{
+    "type": "chart",
+    "onEvent": {
+    "click": {
+        "actions": [
+        {
+            "actionType": "dialog",
+            "dialog": {
+            "title": "详情",
+            "body": [
+                {
+                "type": "tpl",
+                "tpl": "<span>当前选中值 ${value|json}<span>"
+                },
+                {
+                "type": "chart",
+                "api": "/api/mock2/chart/chart1"
+                }
+            ]
+            }
+        }
+        ]
+    }
+    },
+    "config": {
+    "title": {
+        "text": "极坐标双数值轴"
+    },
+    "legend": {
+        "data": [
+        "line"
+        ]
+    },
+    "polar": {
+        "center": [
+        "50%",
+        "54%"
+        ]
+    },
+    "tooltip": {
+        "trigger": "axis",
+        "axisPointer": {
+        "type": "cross"
+        }
+    },
+    "angleAxis": {
+        "type": "value",
+        "startAngle": 0
+    },
+    "radiusAxis": {
+        "min": 0
+    },
+    "series": [
+        {
+        "coordinateSystem": "polar",
+        "name": "line",
+        "type": "line",
+        "showSymbol": false,
+        "data": [
+            [
+            0,
+            0
+            ],
+            [
+            0.03487823687206265,
+            1
+            ],
+            [
+            0.06958655048003272,
+            2
+            ],
+            [
+            0.10395584540887964,
+            3
+            ],
+            [
+            0.13781867790849958,
+            4
+            ],
+            [
+            0.17101007166283433,
+            5
+            ],
+            [
+            0.2033683215379001,
+            6
+            ],
+            [
+            0.2347357813929454,
+            7
+            ],
+            [
+            0.26495963211660245,
+            8
+            ],
+            [
+            0.2938926261462365,
+            9
+            ],
+            [
+            0.3213938048432697,
+            10
+            ]
+        ]
+        }
+    ],
+    "animationDuration": 2000
+    }
+}
+```
+
+### mouseover
+
+用户鼠标悬浮时触发，例如悬浮到下图蓝色线条上的数据点，将弹出详情。
+
+```schema: scope="body"
+{
+    "type": "chart",
+    "onEvent": {
+    "mouseover": {
+        "actions": [
+        {
+            "actionType": "dialog",
+            "dialog": {
+            "title": "详情",
+            "body": [
+                {
+                "type": "tpl",
+                "tpl": "<span>当前选中值 ${value|json}<span>"
+                },
+                {
+                "type": "chart",
+                "api": "/api/mock2/chart/chart1"
+                }
+            ]
+            }
+        }
+        ]
+    }
+    },
+    "config": {
+    "title": {
+        "text": "极坐标双数值轴"
+    },
+    "legend": {
+        "data": [
+        "line"
+        ]
+    },
+    "polar": {
+        "center": [
+        "50%",
+        "54%"
+        ]
+    },
+    "tooltip": {
+        "trigger": "axis",
+        "axisPointer": {
+        "type": "cross"
+        }
+    },
+    "angleAxis": {
+        "type": "value",
+        "startAngle": 0
+    },
+    "radiusAxis": {
+        "min": 0
+    },
+    "series": [
+        {
+        "coordinateSystem": "polar",
+        "name": "line",
+        "type": "line",
+        "showSymbol": false,
+        "data": [
+            [
+            0,
+            0
+            ],
+            [
+            0.03487823687206265,
+            1
+            ],
+            [
+            0.06958655048003272,
+            2
+            ],
+            [
+            0.10395584540887964,
+            3
+            ],
+            [
+            0.13781867790849958,
+            4
+            ],
+            [
+            0.17101007166283433,
+            5
+            ],
+            [
+            0.2033683215379001,
+            6
+            ],
+            [
+            0.2347357813929454,
+            7
+            ],
+            [
+            0.26495963211660245,
+            8
+            ],
+            [
+            0.2938926261462365,
+            9
+            ],
+            [
+            0.3213938048432697,
+            10
+            ]
+        ]
+        }
+    ],
+    "animationDuration": 2000
+    }
+}
+```
+
+### legendselectchanged
+
+图例开关的行为会触发 legendselectchanged 事件。
+
+```schema: scope="body"
+{
+    "type": "chart",
+    "onEvent": {
+    "legendselectchanged": {
+        "actions": [
+        {
+            "actionType": "toast",
+            "args": {
+            "msg": "${event.data|json}"
+            }
+        }
+        ]
+    }
+    },
+    "config": {
+    "title": {
+        "text": "极坐标双数值轴"
+    },
+    "legend": {
+        "data": [
+        "line"
+        ]
+    },
+    "polar": {
+        "center": [
+        "50%",
+        "54%"
+        ]
+    },
+    "tooltip": {
+        "trigger": "axis",
+        "axisPointer": {
+        "type": "cross"
+        }
+    },
+    "angleAxis": {
+        "type": "value",
+        "startAngle": 0
+    },
+    "radiusAxis": {
+        "min": 0
+    },
+    "series": [
+        {
+        "coordinateSystem": "polar",
+        "name": "line",
+        "type": "line",
+        "showSymbol": false,
+        "data": [
+            [
+            0,
+            0
+            ],
+            [
+            0.03487823687206265,
+            1
+            ],
+            [
+            0.06958655048003272,
+            2
+            ],
+            [
+            0.10395584540887964,
+            3
+            ],
+            [
+            0.13781867790849958,
+            4
+            ],
+            [
+            0.17101007166283433,
+            5
+            ],
+            [
+            0.2033683215379001,
+            6
+            ],
+            [
+            0.2347357813929454,
+            7
+            ],
+            [
+            0.26495963211660245,
+            8
+            ],
+            [
+            0.2938926261462365,
+            9
+            ],
+            [
+            0.3213938048432697,
+            10
+            ]
+        ]
+        }
+    ],
+    "animationDuration": 2000
+    }
+}
+```
+
+
+### finished
+
+echarts渲染完触发`finished`事件, version>6.11.0。
+
+```schema: scope="body"
+{
+    "type": "chart",
+    "onEvent": {
+      "finished": {
+          "actions": [
+            {
+                "actionType": "custom",
+                "script": "console.log(event);alert(event.data.echarts.getDataURL({type: 'png',pixelRatio: 2,backgroundColor: '#fff',excludeComponents: ['toolbox']}))"
+            }
+          ]
+      }
+    },
+    "config": {
+    "title": {
+        "text": "极坐标双数值轴"
+    },
+    "legend": {
+        "data": [
+        "line"
+        ]
+    },
+    "polar": {
+        "center": [
+        "50%",
+        "54%"
+        ]
+    },
+    "tooltip": {
+        "trigger": "axis",
+        "axisPointer": {
+        "type": "cross"
+        }
+    },
+    "angleAxis": {
+        "type": "value",
+        "startAngle": 0
+    },
+    "radiusAxis": {
+        "min": 0
+    },
+    "series": [
+        {
+        "coordinateSystem": "polar",
+        "name": "line",
+        "type": "line",
+        "showSymbol": false,
+        "data": [
+            [
+            0,
+            0
+            ],
+            [
+            0.03487823687206265,
+            1
+            ],
+            [
+            0.06958655048003272,
+            2
+            ],
+            [
+            0.10395584540887964,
+            3
+            ],
+            [
+            0.13781867790849958,
+            4
+            ],
+            [
+            0.17101007166283433,
+            5
+            ],
+            [
+            0.2033683215379001,
+            6
+            ],
+            [
+            0.2347357813929454,
+            7
+            ],
+            [
+            0.26495963211660245,
+            8
+            ],
+            [
+            0.2938926261462365,
+            9
+            ],
+            [
+            0.3213938048432697,
+            10
+            ]
+        ]
+        }
+    ],
+    "animationDuration": 2000
+    }
+}
+```
 
 ## 动作表
 
@@ -675,3 +1204,354 @@ echarts 的 config 一般是静态配置的，支持简单的数据映射。如�
 | setValue | `value: object` 更新的数据 | 更新数据，等于更新图表所依赖数据域中的变量 |
 
 2.4.1 及以上版本，除了以上动作，还支持直接触发[ECharts 组件行为](https://echarts.apache.org/handbook/zh/concepts/event/#%E4%BB%A3%E7%A0%81%E8%A7%A6%E5%8F%91-echarts-%E4%B8%AD%E7%BB%84%E4%BB%B6%E7%9A%84%E8%A1%8C%E4%B8%BA)，即通过`actionType`指定行为名称，行为配置通过`args: {动作配置项名称: xxx}`来配置具体的参数。
+
+### reload
+
+#### 只做刷新
+
+重新发送`api`请求，刷新 Chart 时，只配置`componentId`目标组件 ID 即可。
+
+```schema: scope="body"
+[
+    {
+      "type": "button",
+      "label": "刷新请求",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "componentId": "chart01",
+              "actionType": "reload"
+            }
+          ]
+        }
+      }
+    },
+    {
+    "type": "chart",
+    "id": "chart01",
+    "api": "/api/mock2/chart/chartData",
+    "config": {
+      "xAxis": {
+        "type": "category",
+        "data": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat"
+        ]
+      },
+      "yAxis": {
+        "type": "value"
+      },
+      "series": [
+        {
+          "data": "${line || []}",
+          "type": "line"
+        }
+      ]
+    }
+  }
+]
+```
+
+#### 发送数据并刷新
+
+刷新 Chart 组件时，如果配置了`data`，将发送`data`给目标组件，并将该数据合并到目标组件的数据域中（如果配置`"dataMergeMode": "override"`将覆盖目标组件的数据），然后重新请求数据。
+
+```schema: scope="body"
+[
+    {
+      "type": "button",
+      "label": "刷新请求",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "componentId": "chart01",
+              "actionType": "reload",
+              "data": {
+                "xAxis": [
+                  "周一",
+                  "周二",
+                  "周三",
+                  "周四",
+                  "周五",
+                  "周六"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+    "type": "chart",
+    "id": "chart01",
+    "data": {
+      "xAxis": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat"
+      ]
+    },
+    "api": "/api/mock2/chart/chartData",
+    "config": {
+      "xAxis": {
+        "type": "category",
+        "data": "${xAxis}"
+      },
+      "yAxis": {
+        "type": "value"
+      },
+      "series": [
+        {
+          "data": "${line || []}",
+          "type": "line"
+        }
+      ]
+    }
+  }
+]
+```
+
+### setValue
+
+通过`setValue`更新指定图表的数据。
+
+#### 合并数据
+
+默认`setValue`会将新数据与目标组件数据进行合并。
+
+```schema: scope="body"
+[
+    {
+      "type": "button",
+      "label": "更新数据",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "componentId": "chart02",
+              "actionType": "setValue",
+              "args": {
+                "value": {
+                  "line":[98,41,51,2,90,40]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+    "type": "chart",
+    "id": "chart02",
+    "data": {
+      "xAxis": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat"
+        ]
+    },
+    "api": "/api/mock2/chart/chartData",
+    "config": {
+      "xAxis": {
+        "type": "category",
+        "data": "${xAxis}"
+      },
+      "yAxis": {
+        "type": "value"
+      },
+      "series": [
+        {
+          "data": "${line || []}",
+          "type": "line"
+        }
+      ]
+    }
+  }
+]
+```
+
+#### 覆盖数据
+
+可以通过`"dataMergeMode": "override"`来覆盖目标组件数据。
+
+```schema: scope="body"
+[
+    {
+      "type": "button",
+      "label": "更新数据",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "componentId": "chart02",
+              "actionType": "setValue",
+              "args": {
+                "value": {
+                  "line":[98,41,51,2,90,40]
+                }
+              },
+              "dataMergeMode": "override"
+            }
+          ]
+        }
+      }
+    },
+    {
+    "type": "chart",
+    "id": "chart02",
+    "data": {
+      "xAxis": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat"
+        ]
+    },
+    "api": "/api/mock2/chart/chartData",
+    "config": {
+      "xAxis": {
+        "type": "category",
+        "data": "${xAxis}"
+      },
+      "yAxis": {
+        "type": "value"
+      },
+      "series": [
+        {
+          "data": "${line || []}",
+          "type": "line"
+        }
+      ]
+    }
+  }
+]
+```
+
+### 其他动作
+
+```schema: scope="body"
+[
+    {
+      "type": "button",
+      "label": "显示提示框",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "componentId": "chart03",
+              "actionType": "showTip",
+              "args": {
+                "type": "showTip",
+                "seriesIndex": 0,
+                "name": "",
+                "dataIndex": 8
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "chart",
+      "id": "chart03",
+      "config": {
+        "title": {
+          "text": "极坐标双数值轴"
+        },
+        "legend": {
+          "data": [
+            "line"
+          ]
+        },
+        "polar": {
+          "center": [
+            "50%",
+            "54%"
+          ]
+        },
+        "tooltip": {
+          "trigger": "axis",
+          "axisPointer": {
+            "type": "cross"
+          }
+        },
+        "angleAxis": {
+          "type": "value",
+          "startAngle": 0
+        },
+        "radiusAxis": {
+          "min": 0
+        },
+        "series": [
+          {
+            "coordinateSystem": "polar",
+            "name": "line",
+            "type": "line",
+            "showSymbol": false,
+            "data": [
+              [
+                0,
+                0
+              ],
+              [
+                0.03487823687206265,
+                1
+              ],
+              [
+                0.06958655048003272,
+                2
+              ],
+              [
+                0.10395584540887964,
+                3
+              ],
+              [
+                0.13781867790849958,
+                4
+              ],
+              [
+                0.17101007166283433,
+                5
+              ],
+              [
+                0.2033683215379001,
+                6
+              ],
+              [
+                0.2347357813929454,
+                7
+              ],
+              [
+                0.26495963211660245,
+                8
+              ],
+              [
+                0.2938926261462365,
+                9
+              ],
+              [
+                0.3213938048432697,
+                10
+              ]
+            ]
+          }
+        ],
+        "animationDuration": 2000
+      }
+    }
+  ]
+```

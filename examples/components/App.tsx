@@ -12,9 +12,9 @@ import {
   SearchBox,
   InputBox
 } from 'amis';
-import {eachTree, mapTree} from 'amis-core';
+import {eachTree} from 'amis-core';
 import 'amis-ui/lib/locale/en-US';
-import {withRouter} from 'react-router';
+import {withRouter} from 'react-router-dom';
 // @ts-ignore
 import DocSearch from './DocSearch';
 import Doc from './Doc';
@@ -58,6 +58,11 @@ const themes = [
     label: 'ang',
     ns: 'a-',
     value: 'ang'
+  },
+  {
+    label: '暗黑',
+    ns: 'dark-',
+    value: 'dark'
   }
 ];
 
@@ -136,8 +141,9 @@ class BackTop extends React.PureComponent {
     );
   }
 }
+
 // @ts-ignore
-@withRouter // @ts-ignore
+@withRouter
 export class App extends React.PureComponent<{
   location: Location;
 }> {
@@ -290,12 +296,21 @@ export class App extends React.PureComponent<{
             >
               示例
             </NavLink>
-            <a
-              href="https://github.com/fex-team/amis-editor-demo"
-              target="_blank"
-            >
-              编辑器
-            </a>
+            {process.env.NODE_ENV === 'development' ? (
+              <>
+                <a href={`/packages/amis-ui/#/basic/button`}>UI控件</a>
+                <a href={`/packages/amis-editor/`}>编辑器</a>
+              </>
+            ) : (
+              <>
+                <a
+                  href="https://github.com/fex-team/amis-editor-demo"
+                  target="_blank"
+                >
+                  编辑器
+                </a>
+              </>
+            )}
             {/* <a href="https://suda.bce.baidu.com" target="_blank">
               爱速搭
             </a> */}
@@ -553,7 +568,7 @@ export class App extends React.PureComponent<{
 
   renderContent() {
     const locale = 'zh-CN'; // 暂时不支持切换，因为目前只有中文文档
-    const theme = this.state.theme;
+    const {theme} = this.state;
 
     return (
       <React.Suspense
@@ -850,7 +865,6 @@ export function navigations2route(
 
 export default function entry() {
   // PathPrefix = pathPrefix || DocPathPrefix;
-
   return (
     <Router>
       <Switch>

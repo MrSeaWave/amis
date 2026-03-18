@@ -1,5 +1,14 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {
+  createRendererEvent,
+  OnEventProps,
+  Renderer,
+  RendererProps,
+  runActions,
+  CustomStyle,
+  setThemeClassName,
+  AMISSchemaBase
+} from 'amis-core';
 import {filter} from 'amis-core';
 import {autobind, createObject} from 'amis-core';
 import {ScopedContext, IScopedContext} from 'amis-core';
@@ -10,22 +19,18 @@ import {dataMapping, resolveVariableAndFilter} from 'amis-core';
 
 /**
  * IFrame 渲染器
- * 文档：https://baidu.gitee.io/amis/docs/components/iframe
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/iframe
  */
-export interface IFrameSchema extends BaseSchema {
+/**
+ * IFrame 组件，用于嵌入外部页面。支持高度/边框/沙箱设置。
+ */
+export interface AMISIFrameSchema extends AMISSchemaBase {
   type: 'iframe';
 
   /**
    * 页面地址
    */
   src: SchemaUrlPath;
-
-  /**
-   * 事件相应，配置后当 iframe 通过 postMessage 发送事件时，可以触发 AMIS 内部的动作。
-   */
-  events?: {
-    [eventName: string]: ActionSchema;
-  };
 
   width?: number | string;
   height?: number | string;
@@ -49,7 +54,9 @@ export interface IFrameSchema extends BaseSchema {
 
 export interface IFrameProps
   extends RendererProps,
-    Omit<IFrameSchema, 'type' | 'className'> {}
+    Omit<AMISIFrameSchema, 'type' | 'className'> {
+  inDragging?: boolean;
+}
 
 export default class IFrame extends React.Component<IFrameProps, object> {
   IFrameRef: React.RefObject<HTMLIFrameElement> = React.createRef();
@@ -103,7 +110,7 @@ export default class IFrame extends React.Component<IFrameProps, object> {
     if (
       url &&
       typeof url === 'string' &&
-      !/^(\.\/|\.\.\/|\/|https?\:\/\/|\/\/)/.test(url)
+      !/^(\.\/|\.\.\/|\/|(blob\:)?https?\:\/\/|\/\/)/.test(url)
     ) {
       return false;
     }
@@ -112,10 +119,10 @@ export default class IFrame extends React.Component<IFrameProps, object> {
   }
 
   @autobind
-  onMessage(e: MessageEvent) {
-    const {events, onAction, data} = this.props;
+  async onMessage(e: MessageEvent) {
+    const {events, onEvent, onAction, data} = this.props;
 
-    if (typeof e?.data?.type !== 'string' || !events) {
+    if (typeof e?.data?.type !== 'string') {
       return;
     }
 
@@ -131,8 +138,26 @@ export default class IFrame extends React.Component<IFrameProps, object> {
         height: e.data.data.height || '100%'
       });
     } else {
-      const action = events[type];
-      action && onAction(e, action, createObject(data, e.data.data));
+      const eventConfig: any = onEvent?.[type];
+
+      if (eventConfig && eventConfig.actions?.length) {
+        const rendererEvent = createRendererEvent(type, {
+          env: this.props?.env,
+          nativeEvent: e,
+          data: createObject(data, e.data.data),
+          scoped: this.context
+        });
+        await runActions(eventConfig.actions, this, rendererEvent);
+
+        if (rendererEvent.prevented) {
+          return;
+        }
+      }
+
+      if (events) {
+        const action = events[type];
+        action && onAction(e, action, createObject(data, e.data.data));
+      }
     }
   }
 
@@ -195,7 +220,13 @@ export default class IFrame extends React.Component<IFrameProps, object> {
       sandbox,
       referrerpolicy,
       translate: __,
-      env
+      id,
+      wrapperCustomStyle,
+      env,
+      themeCss,
+      baseControlClassName,
+      inDragging,
+      classnames: cx
     } = this.props;
 
     let tempStyle: any = {};
@@ -207,7 +238,12 @@ export default class IFrame extends React.Component<IFrameProps, object> {
       ...tempStyle,
       ...style
     };
-
+    if (inDragging) {
+      style = {
+        ...style,
+        pointerEvents: 'none'
+      };
+    }
     const finalSrc = src
       ? resolveVariableAndFilter(src, data, '| raw')
       : undefined;
@@ -225,18 +261,49 @@ export default class IFrame extends React.Component<IFrameProps, object> {
     }
 
     return (
-      <iframe
-        name={name}
-        className={className}
-        frameBorder={frameBorder}
-        style={style}
-        ref={this.IFrameRef}
-        onLoad={this.onLoad}
-        src={finalSrc}
-        allow={allow}
-        referrerPolicy={referrerpolicy}
-        sandbox={sandbox}
-      />
+      <>
+        <iframe
+          name={name}
+          className={cx(
+            'IFrame',
+            className,
+            setThemeClassName({
+              ...this.props,
+              name: 'baseControlClassName',
+              id,
+              themeCss
+            }),
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            })
+          )}
+          frameBorder={frameBorder}
+          style={style}
+          ref={this.IFrameRef}
+          onLoad={this.onLoad}
+          src={finalSrc}
+          allow={allow}
+          referrerPolicy={referrerpolicy}
+          sandbox={sandbox}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'baseControlClassName'
+              }
+            ]
+          }}
+          env={env}
+        />
+      </>
     );
   }
 }
@@ -257,5 +324,6 @@ export class IFrameRenderer extends IFrame {
   componentWillUnmount() {
     const scoped = this.context as IScopedContext;
     scoped.unRegisterComponent(this);
+    super.componentWillUnmount();
   }
 }

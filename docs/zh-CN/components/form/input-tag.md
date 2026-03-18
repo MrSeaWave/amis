@@ -36,6 +36,8 @@ order: 55
 
 `maxTagCount`可以限制标签的最大展示数量，超出数量的部分会收纳到 Popover 中，可以通过`overflowTagPopover`配置 Popover 相关的[属性](../tooltip#属性表)，注意该属性仅在多选模式开启后生效。
 
+> 6.13.0 版本开始，可摆放个数会根据所剩空间尽可能多的摆放，但是摆放个数不会超出设定的值，所以可以将这个值稍微设置大点。
+
 ```schema: scope="body"
 {
     "type": "form",
@@ -44,11 +46,11 @@ order: 55
             "type": "input-tag",
             "name": "tag",
             "label": "标签",
-            "maxTagCount": 3,
+            "maxTagCount": 100,
             "overflowTagPopover": {
                 "title": "水果"
             },
-            "value": "Pineapple,Kiwifruit,Banana,Blueberry,Carambola",
+            "value": "Pineapple,Kiwifruit,Banana,Blueberry,Carambola,Coconut,Lemon,Grape,Pomegranate,Mango,Papaya,Mangosteen,Durian,Longan,Litchi,Loquat,Persimmon,Pomelo,Orange,Tangerine,Kumquat,Plum,Apricot,Peach,Pear,Apple,Strawberry",
             "options": [
                 {"label": "苹果", "value": "Apple"},
                 {"label": "香蕉", "value": "Banana"},
@@ -59,7 +61,27 @@ order: 55
                 {"label": "椰子", "value": "Coconut"},
                 {"label": "猕猴桃", "value": "Kiwifruit"},
                 {"label": "柠檬", "value": "Lemon"},
-                {"label": "菠萝", "value": "Pineapple"}
+                {"label": "菠萝", "value": "Pineapple"},
+                {"label": "葡萄", "value": "Grape"},
+                {"label": "石榴", "value": "Pomegranate"},
+                {"label": "芒果", "value": "Mango"},
+                {"label": "木瓜", "value": "Papaya"},
+                {"label": "山竹", "value": "Mangosteen"},
+                {"label": "榴莲", "value": "Durian"},
+                {"label": "龙眼", "value": "Longan"},
+                {"label": "荔枝", "value": "Litchi"},
+                {"label": "枇杷", "value": "Loquat"},
+                {"label": "柿子", "value": "Persimmon"},
+                {"label": "柚子", "value": "Pomelo"},
+                {"label": "橙子", "value": "Orange"},
+                {"label": "橘子", "value": "Tangerine"},
+                {"label": "金桔", "value": "Kumquat"},
+                {"label": "李子", "value": "Plum"},
+                {"label": "杏子", "value": "Apricot"},
+                {"label": "桃子", "value": "Peach"},
+                {"label": "梨子", "value": "Pear"},
+                {"label": "草莓", "value": "Strawberry"}
+
             ]
         }
     ]
@@ -134,15 +156,120 @@ order: 55
 
 ## 事件表
 
-当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`来获取事件产生的数据（`< 2.3.2 及以下版本 为 ${event.data.[事件参数名]}`），详细请查看[事件动作](../../docs/concepts/event-action)。
+当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`或`${event.data.[事件参数名]}`来获取事件产生的数据，详细请查看[事件动作](../../docs/concepts/event-action)。
 
 > `[name]`表示当前组件绑定的名称，即`name`属性，如果没有配置`name`属性，则通过`value`取值。
 
-| 事件名称 | 事件参数                                                             | 说明                 |
-| -------- | -------------------------------------------------------------------- | -------------------- |
-| change   | `[name]: string` 组件的值                                            | 选中值变化时触发     |
-| blur     | `[name]: string` 组件的值<br/>`items: object` \| `object[]` 所有选项 | 输入框失去焦点时触发 |
-| focus    | `[name]: string` 组件的值<br/>`items: object` \| `object[]` 所有选项 | 输入框获取焦点时触发 |
+| 事件名称 | 事件参数                                                                                                          | 说明                 |
+| -------- | ----------------------------------------------------------------------------------------------------------------- | -------------------- |
+| change   | `[name]: string` 组件的值（多个以逗号分割）<br/>`selectedItems: Option[]` 选中的项<br/>`items: Option[]` 所有选项 | 选中值变化时触发     |
+| blur     | `[name]: string` 组件的值<br/>`selectedItems: Option[]` 选中的项<br/>`items: Option[]` 所有选项                   | 输入框失去焦点时触发 |
+| focus    | `[name]: string` 组件的值<br/>`selectedItems: Option[]` 选中的项<br/>`items: Option[]` 所有选项                   | 输入框获取焦点时触发 |
+
+### change
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+      {
+        "type": "input-tag",
+        "name": "tag",
+        "label": "标签",
+        "placeholder": "请选择标签",
+        "options": [
+          "Aaron Rodgers",
+          "Tom Brady",
+          "Charlse Woodson",
+          "Aaron Jones"
+        ],
+        "onEvent": {
+            "change": {
+                "actions": [
+                    {
+                      "actionType": "toast",
+                      "args": {
+                          "msg": "${event.data.value|json}"
+                      }
+                    }
+                ]
+            }
+        }
+      }
+    ]
+  }
+```
+
+### blur
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+      {
+        "type": "input-tag",
+        "name": "tag",
+        "label": "标签",
+        "placeholder": "请选择标签",
+        "options": [
+          "Aaron Rodgers",
+          "Tom Brady",
+          "Charlse Woodson",
+          "Aaron Jones"
+        ],
+        "onEvent": {
+            "blur": {
+                "actions": [
+                    {
+                      "actionType": "toast",
+                      "args": {
+                          "msg": "${event.data.value|json}"
+                      }
+                    }
+                ]
+            }
+        }
+      }
+    ]
+  }
+```
+
+### focus
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+      {
+        "type": "input-tag",
+        "name": "tag",
+        "label": "标签",
+        "placeholder": "请选择标签",
+        "options": [
+          "Aaron Rodgers",
+          "Tom Brady",
+          "Charlse Woodson",
+          "Aaron Jones"
+        ],
+        "onEvent": {
+            "focus": {
+                "actions": [
+                    {
+                      "actionType": "toast",
+                      "args": {
+                          "msg": "${event.data.value|json}"
+                      }
+                    }
+                ]
+            }
+        }
+      }
+    ]
+  }
+```
 
 ## 动作表
 
@@ -151,6 +278,164 @@ order: 55
 | 动作名称 | 动作配置                 | 说明                                                    |
 | -------- | ------------------------ | ------------------------------------------------------- |
 | clear    | -                        | 清空                                                    |
-| reset    | -                        | 将值重置为`resetValue`，若没有配置`resetValue`，则清空  |
+| reset    | -                        | 将值重置为初始值。6.3.0 及以下版本为`resetValue`        |
 | reload   | -                        | 重新加载，调用 `source`，刷新数据域数据刷新（重新加载） |
 | setValue | `value: string` 更新的值 | 更新数据，多个值用`,`分隔                               |
+
+### clear
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "input-tag",
+          "name": "tag",
+          "label": "标签",
+          "placeholder": "请选择标签",
+          "options": [
+            "Aaron Rodgers",
+            "Tom Brady",
+            "Charlse Woodson",
+            "Aaron Jones"
+          ],
+          "value": "Charlse Woodson",
+          "id": "clear_text"
+        },
+        {
+            "type": "button",
+            "label": "清空",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "clear",
+                            "componentId": "clear_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### reset
+
+如果配置了`resetValue`，则重置时使用`resetValue`的值，否则使用初始值。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "input-tag",
+          "name": "tag",
+          "label": "标签",
+          "placeholder": "请选择标签",
+          "options": [
+            "Aaron Rodgers",
+            "Tom Brady",
+            "Charlse Woodson",
+            "Aaron Jones"
+          ],
+          "value": "Charlse Woodson",
+          "id": "reset_text"
+        },
+        {
+            "type": "button",
+            "label": "重置",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "reset",
+                            "componentId": "reset_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### reload
+
+只有选择器模式支持，即配置`source`，用于重新加载选择器的数据源。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "input-tag",
+          "name": "tag",
+          "label": "标签",
+          "placeholder": "请选择标签",
+          "id": "reload_type",
+          "source": "/api/mock2/form/getOptions?waitSeconds=1",
+          "value": "a"
+        },
+        {
+            "type": "button",
+            "label": "重新加载",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "reload",
+                            "componentId": "reload_type"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### setValue
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+          "type": "input-tag",
+          "name": "tag",
+          "label": "标签",
+          "placeholder": "请选择标签",
+          "options": [
+            "Aaron Rodgers",
+            "Tom Brady",
+            "Charlse Woodson",
+            "Aaron Jones"
+          ],
+          "value": "Charlse Woodson",
+          "id": "setvalue_text"
+        },
+        {
+            "type": "button",
+            "label": "赋值",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "setValue",
+                            "componentId": "setvalue_text",
+                            "args": {
+                                "value": "Tom Brady"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```

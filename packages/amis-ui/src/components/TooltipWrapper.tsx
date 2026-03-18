@@ -6,8 +6,8 @@
 
 import React from 'react';
 import Html from './Html';
-import {uncontrollable} from 'amis-core';
-import {findDOMNode} from 'react-dom';
+import {EnvContext, uncontrollable} from 'amis-core';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import Tooltip from './Tooltip';
 import {ClassNamesFn, themeable} from 'amis-core';
 import {Overlay} from 'amis-core';
@@ -27,7 +27,7 @@ export interface TooltipObject {
   /**
    * 浮层出现位置
    */
-  placement?: 'top' | 'right' | 'bottom' | 'left';
+  placement?: 'top' | 'right' | 'bottom' | 'left' | 'auto';
   /**
    * 主题样式
    */
@@ -67,7 +67,7 @@ export interface TooltipObject {
   /**
    * 挂载容器元素
    */
-  container?: React.ReactNode;
+  container?: HTMLElement | (() => HTMLElement | null | undefined);
   /**
    * 浮层触发方式
    */
@@ -80,14 +80,28 @@ export interface TooltipObject {
    * 文字提示浮层CSS类名
    */
   tooltipClassName?: string;
+
+  /**
+   * 箭头CSS类名
+   */
+  tooltipArrowClassName?: string;
+
+  /**
+   * 文字提示浮层Body的CSS类名
+   */
+  tooltipBodyClassName?: string;
+  /**
+   * html xss filter
+   */
+  filterHtml?: (input: string) => string;
 }
 
 export interface TooltipWrapperProps {
   tooltip?: string | TooltipObject;
   classPrefix: string;
   classnames: ClassNamesFn;
-  placement: 'top' | 'right' | 'bottom' | 'left';
-  container?: React.ReactNode;
+  placement: 'top' | 'right' | 'bottom' | 'left' | 'auto';
+  container?: HTMLElement | (() => HTMLElement | null | undefined);
   trigger: Trigger | Array<Trigger>;
   rootClose: boolean;
   overlay?: any;
@@ -99,6 +113,8 @@ export interface TooltipWrapperProps {
    * 显示&隐藏时触发
    */
   onVisibleChange?: (visible: boolean) => void;
+  children?: React.ReactNode | Array<React.ReactNode>;
+  disabled?: boolean;
 }
 
 interface TooltipWrapperState {
@@ -294,6 +310,8 @@ export class TooltipWrapper extends React.Component<
       trigger,
       rootClose,
       tooltipClassName,
+      tooltipArrowClassName,
+      tooltipBodyClassName,
       style,
       disabled = false,
       offset,
@@ -341,6 +359,8 @@ export class TooltipWrapper extends React.Component<
           className={tooltipClassName}
           tooltipTheme={tooltipTheme}
           showArrow={showArrow}
+          arrowClassName={tooltipArrowClassName}
+          bodyClassName={tooltipBodyClassName}
           onMouseEnter={
             ~triggers.indexOf('hover') ? this.tooltipMouseEnter : () => {}
           }

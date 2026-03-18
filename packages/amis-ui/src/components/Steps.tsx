@@ -1,7 +1,6 @@
 import React from 'react';
 import {ClassName, themeable, ThemeProps} from 'amis-core';
 import {Icon} from './icons';
-import {isMobile} from 'amis-core';
 
 export enum StepStatus {
   wait = 'wait',
@@ -37,6 +36,9 @@ export type StepObject = {
   status?: StepStatus;
 
   iconClassName?: string;
+  subTitleClassName?: string;
+  titleClassName?: string;
+  descriptionClassName?: string;
 };
 
 export interface StepsObject {
@@ -70,7 +72,7 @@ export interface StepsObject {
   /**
    * 展示模式
    */
-  mode?: 'horizontal' | 'vertical';
+  mode?: 'horizontal' | 'vertical' | 'simple';
 
   /**
    * 标签放置位置
@@ -86,10 +88,15 @@ export interface StepsProps extends ThemeProps {
     | {
         [propName: string]: StepStatus;
       };
-  mode?: 'horizontal' | 'vertical';
+  mode?: 'horizontal' | 'vertical' | 'simple';
   labelPlacement?: 'horizontal' | 'vertical';
   progressDot?: boolean;
-  useMobileUI?: boolean;
+  onClickStep?: (i: number, step: StepObject) => void;
+  iconPosition?: boolean;
+  iconClassName?: string;
+  subTitleClassName?: string;
+  titleClassName?: string;
+  descriptionClassName?: string;
 }
 
 export function Steps(props: StepsProps) {
@@ -97,12 +104,19 @@ export function Steps(props: StepsProps) {
     steps: stepsRow,
     classnames: cx,
     className,
+    style,
     current,
     status,
     mode = 'horizontal',
     labelPlacement = 'horizontal',
     progressDot = false,
-    useMobileUI
+    iconPosition,
+    mobileUI,
+    iconClassName,
+    subTitleClassName,
+    titleClassName,
+    descriptionClassName,
+    onClickStep
   } = props;
   const FINISH_ICON = 'check';
   const ERROR_ICON = 'close';
@@ -137,7 +151,6 @@ export function Steps(props: StepsProps) {
     };
   }
 
-  const mobileUI = useMobileUI && isMobile();
   return (
     <ul
       className={cx(
@@ -153,9 +166,11 @@ export function Steps(props: StepsProps) {
         mobileUI ? 'Steps-mobile' : '',
         className
       )}
+      style={style}
     >
       {stepsRow.map((step, i) => {
         const {stepStatus, icon} = getStepStatus(step, i);
+
         return (
           <li
             key={i}
@@ -163,26 +178,49 @@ export function Steps(props: StepsProps) {
               'StepsItem',
               `is-${stepStatus}`,
               step.className,
-              `StepsItem-${progressDot ? 'ProgressDot' : ''}`
+              `${progressDot ? 'StepsItem-ProgressDot' : ''}`,
+              `${
+                onClickStep && stepStatus === StepStatus.finish
+                  ? 'is-clickable'
+                  : ''
+              }`
             )}
           >
-            <div className={cx('StepsItem-container')}>
+            <div
+              className={cx(
+                'StepsItem-container',
+                iconPosition && mode != 'vertical' && 'StepsItem-vertical'
+              )}
+            >
               <div className={cx('StepsItem-containerTail')}></div>
               {progressDot ? (
-                <div className={cx('StepsItem-containerProgressDot')}></div>
+                <div
+                  className={cx('StepsItem-containerProgressDot')}
+                  onClick={() => onClickStep && onClickStep(i, step)}
+                ></div>
               ) : (
                 <div
                   className={cx(
                     'StepsItem-containerIcon',
                     i < current && 'is-success'
                   )}
+                  onClick={() => onClickStep && onClickStep(i, step)}
                 >
-                  <span className={cx('StepsItem-icon', step.iconClassName)}>
+                  <span
+                    className={cx(
+                      'StepsItem-icon',
+                      iconClassName,
+                      step.iconClassName
+                    )}
+                  >
                     {icon ? <Icon icon={icon} className="icon" /> : i + 1}
                   </span>
                 </div>
               )}
-              <div className={cx('StepsItem-containerWrapper')}>
+              <div
+                className={cx('StepsItem-containerWrapper')}
+                onClick={() => onClickStep && onClickStep(i, step)}
+              >
                 <div className={cx('StepsItem-body')}>
                   <div
                     className={cx(
@@ -192,8 +230,10 @@ export function Steps(props: StepsProps) {
                     )}
                   >
                     <span
-                      className={cx('StepsItem-ellText')}
-                      title={String(step.title)}
+                      className={cx('StepsItem-ellText', titleClassName)}
+                      title={
+                        typeof step.title === 'string' ? step.title : undefined
+                      }
                     >
                       {step.title}
                     </span>
@@ -201,9 +241,14 @@ export function Steps(props: StepsProps) {
                       <span
                         className={cx(
                           'StepsItem-subTitle',
-                          'StepsItem-ellText'
+                          'StepsItem-ellText',
+                          subTitleClassName
                         )}
-                        title={String(step.subTitle)}
+                        title={
+                          typeof step.subTitle === 'string'
+                            ? step.subTitle
+                            : undefined
+                        }
                       >
                         {step.subTitle}
                       </span>
@@ -211,11 +256,26 @@ export function Steps(props: StepsProps) {
                   </div>
                   <div
                     className={cx('StepsItem-description', 'StepsItem-ellText')}
-                    title={String(step.description)}
+                    title={
+                      typeof step.description === 'string'
+                        ? step.description
+                        : undefined
+                    }
                   >
-                    <span>{step.description}</span>
+                    <span className={cx(descriptionClassName)}>
+                      {step.description}
+                    </span>
                   </div>
                 </div>
+                {mode === 'simple' && i < stepsRow.length - 1 && (
+                  <div className={cx('StepsItem-icon-line')}>
+                    <Icon
+                      icon="right-arrow"
+                      className="icon"
+                      iconContent="StepsItem-icon-line"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </li>

@@ -2,20 +2,24 @@
  * 扩展 Schema，目前用于实现 input-kv
  */
 import isEqual from 'lodash/isEqual';
-import {Schema} from 'amis-core';
+import {guid, Schema} from 'amis-core';
 import {addSchemaFilter} from 'amis-core';
 import {isObject} from 'amis-core';
 
 // input-kv 实际上是 combo 的一种扩展
-addSchemaFilter(function (schema: Schema, renderer, props?: any) {
+addSchemaFilter(function (schema: Schema) {
   if (schema && schema.type === 'input-kv') {
+    const autoParseJSON = schema.autoParseJSON ?? true;
     return {
       draggable: true,
       ...schema,
       multiple: true,
-      pipeIn: (value: any) => {
+      pipeIn: function (this: any, value: any) {
         if (!isObject(value)) {
           return [];
+        }
+        if (isEqual(value, this.cachedValue)) {
+          return this.cachedValueArray;
         }
         const arr: Array<any> = [];
         Object.keys(value).forEach(key => {
@@ -32,7 +36,7 @@ addSchemaFilter(function (schema: Schema, renderer, props?: any) {
         });
         return arr;
       },
-      pipeOut: (value: any) => {
+      pipeOut: function (this: any, value: any) {
         if (!Array.isArray(value)) {
           return value;
         }
@@ -40,7 +44,11 @@ addSchemaFilter(function (schema: Schema, renderer, props?: any) {
         value.forEach((item: any) => {
           const key: string = item.key ?? '';
           let value: any = item.value ?? schema.defaultValue ?? '';
-          if (typeof value === 'string' && value.startsWith('{')) {
+          if (
+            autoParseJSON &&
+            typeof value === 'string' &&
+            value.startsWith('{')
+          ) {
             try {
               value = JSON.parse(value);
             } catch (e) {}
@@ -48,28 +56,44 @@ addSchemaFilter(function (schema: Schema, renderer, props?: any) {
 
           obj[key] = value;
         });
+        this.cachedValue = obj;
+        this.cachedValueArray = value;
         return obj;
       },
       items: [
-        {
-          placeholder: schema.keyPlaceholder ?? 'Key',
-          type: 'input-text',
-          unique: true,
-          name: 'key',
-          required: true,
-          validateOnChange: true
-        },
-        schema.valueComponent
+        schema.keySchema
+          ? {
+              id: `u:${guid()}`,
+              ...schema.keySchema,
+              unique: true,
+              name: 'key',
+              required: true,
+              validateOnChange: true
+            }
+          : {
+              placeholder: schema.keyPlaceholder ?? 'Key',
+              type: 'input-text',
+              unique: true,
+              name: 'key',
+              required: true,
+              validateOnChange: true,
+              id: `u:${guid()}`
+            },
+        schema.valueSchema
+          ? {id: `u:${guid()}`, ...schema.valueSchema, name: 'value'}
+          : schema.valueComponent
           ? {
               placeholder: schema.valuePlaceholder ?? 'Value',
               component: schema.valueComponent,
               asFormItem: true,
-              name: 'value'
+              name: 'value',
+              id: `u:${guid()}`
             }
           : {
               placeholder: schema.valuePlaceholder ?? 'Value',
               type: schema.valueType || 'input-text',
-              name: 'value'
+              name: 'value',
+              id: `u:${guid()}`
             }
       ]
     };
@@ -83,7 +107,7 @@ addSchemaFilter(function (schema: Schema, renderer, props?: any) {
  * 很多属性是给单个值设置的，比如 valuePlaceholder 导致
  * 耦合在一起会导致配置项混乱，所以新增了这个组件专门支持 value 是对象或数组的场景
  */
-addSchemaFilter(function (schema: Schema, renderer, props?: any) {
+addSchemaFilter(function (schema: Schema) {
   if (schema && schema.type === 'input-kvs') {
     const keyItem = schema.keyItem || {};
     const valueItems = schema.valueItems || [];

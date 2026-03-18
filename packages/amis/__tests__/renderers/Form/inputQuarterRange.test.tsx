@@ -1,8 +1,8 @@
 /**
  * 组件名称：InputQuarterRange 季度范围
- * 
+ *
  * 备注：InputQuarterRange 与 dateRange 等日期范围使用的是同一个组件，所以只测试不同的地方即可
- * 
+ *
  * 单测内容：
  1. 点击选择
  2. 内嵌模式
@@ -49,12 +49,12 @@ test('Renderer:InputQuarterRange click', async () => {
   fireEvent.click(
     await within(
       document.querySelector('.cxd-DateRangePicker-start')!
-    ).findByText('Q2')
+    ).findByText('Q1')
   );
 
   fireEvent.click(
     await within(
-      document.querySelector('.cxd-DateRangePicker-end')!
+      document.querySelector('.cxd-DateRangePicker-start')!
     ).findByText('Q4')
   );
 
@@ -62,7 +62,7 @@ test('Renderer:InputQuarterRange click', async () => {
 
   const thisYear = moment().format('YYYY');
 
-  expect((inputs[0] as HTMLInputElement).value).toEqual(`${thisYear}-Q2`);
+  expect((inputs[0] as HTMLInputElement).value).toEqual(`${thisYear}-Q1`);
   expect((inputs[1] as HTMLInputElement).value).toEqual(`${thisYear}-Q4`);
 });
 
@@ -81,8 +81,9 @@ test('Renderer:InputQuarterRange with embed', async () => {
             name: 'a',
             label: '季度范围',
             embed: true,
-            format: 'YYYY-MM',
-            value: '2022-10,2022-12'
+            valueFormat: 'YYYY-MM',
+            displayFormat: 'YYYY/MM',
+            value: '2021-10,2021-12'
           }
         ]
       },

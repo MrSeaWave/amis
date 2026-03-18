@@ -10,17 +10,28 @@
  * 7. 边框模式：无边框 & 半边框
  * 8. 大数模式
  */
-
+import React = require('react');
 import {render, fireEvent, waitFor} from '@testing-library/react';
 import '../../../src';
 import {render as amisRender} from '../../../src';
-import {makeEnv, wait} from '../../helper';
+import {makeEnv, replaceReactAriaIds, wait} from '../../helper';
 
 const setup = async (
   inputOptions: any = {},
   formOptions: any = {},
   formItems: any[] = [{}]
 ) => {
+  const fetcher = jest.fn().mockImplementation(() =>
+    Promise.resolve({
+      data: {
+        status: 0,
+        msg: 'ok',
+        data: {
+          id: '12'
+        }
+      }
+    })
+  );
   const utils = render(
     amisRender(
       {
@@ -39,7 +50,9 @@ const setup = async (
         ...formOptions
       },
       {},
-      makeEnv()
+      makeEnv({
+        fetcher
+      })
     )
   );
 
@@ -105,6 +118,7 @@ test('Renderer:number', async () => {
   await wait(300);
   expect(input?.value).toEqual('456');
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -145,6 +159,8 @@ test('Renderer:number with prefix & suffix & kilobitSeparator', async () => {
   });
 
   expect(input.value).toEqual('$123,456%');
+
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -178,7 +194,49 @@ test('Renderer:number with unitOptions', async () => {
   await wait(300);
   expect(staticDom.innerHTML).toBe('99em');
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
+});
+
+test('Renderer:number with unitOptions and default value', async () => {
+  const {container} = await setup(
+    {
+      unitOptions: ['px', '%', 'em'],
+      value: 12
+    },
+    {},
+    [
+      {
+        type: 'static',
+        name: 'number'
+      }
+    ]
+  );
+
+  const staticDom = container.querySelector('.cxd-PlainField') as Element;
+  expect(staticDom.innerHTML).toBe('12px');
+});
+
+test('Renderer:number with unitOptions and initApi', async () => {
+  const {container} = await setup(
+    {
+      name: 'id',
+      unitOptions: ['px', '%', 'em']
+    },
+    {
+      initApi: '/amis/api/mock2/sample/12'
+    },
+    [
+      {
+        type: 'static',
+        name: 'id'
+      }
+    ]
+  );
+  await wait(500); // 等待 initApi 加载完
+
+  const staticDom = container.querySelector('.cxd-PlainField') as Element;
+  expect(staticDom.innerHTML).toBe('12px');
 });
 
 test('Renderer:number with precision and default value', async () => {
@@ -189,7 +247,18 @@ test('Renderer:number with precision and default value', async () => {
   });
 
   expect(input.value).toBe('2.99');
+
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
+});
+
+test('Renderer:number with precision and round', async () => {
+  const {input, wrap, container, getByText} = await setup({
+    precision: 2,
+    value: 6.295
+  });
+
+  expect(input.value).toBe('6.30');
 });
 
 test('Renderer:number with step & precision & displayMode & keyboard', async () => {
@@ -221,6 +290,7 @@ test('Renderer:number with step & precision & displayMode & keyboard', async () 
   // await wait(300);
   // expect(input.value).toBe('17.111');
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -264,12 +334,41 @@ test('Renderer:number with big value', async () => {
   fireEvent.change(input, {target: {value: '9999999999999999.999'}}); // 整数部分 17 位，会四舍五入
   fireEvent.blur(input);
   await wait(300);
-  expect(input.value).toEqual('10000000000000000');
+  expect(input.value).toEqual('10000000000000000.00');
 
   fireEvent.change(input, {target: {value: '999999999999999999.99'}}); // 整数部分 18 大于最大值
   fireEvent.blur(input);
   await wait(300);
   expect(input.value).toEqual('99999999999999999.99'); // 最大值
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
+});
+
+test('Renderer:number with static', async () => {
+  const {input: stringValInput} = await setup({
+    value: '123'
+  });
+  const {input: numberValInput} = await setup({
+    value: 123
+  });
+
+  expect(stringValInput.value).toEqual('123');
+  expect(numberValInput.value).toEqual('123');
+});
+
+test('Renderer:number with showAsPercent', async () => {
+  const {input} = await setup({
+    suffix: '%',
+    showAsPercent: true,
+    value: 1.123,
+    precision: 3
+  });
+
+  expect(input.value).toEqual('112.3%');
+
+  fireEvent.change(input, {target: {value: 23.1234}});
+  fireEvent.blur(input);
+  await wait(300);
+  expect(input.value).toEqual('23.123%');
 });

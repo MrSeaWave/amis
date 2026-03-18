@@ -32,6 +32,7 @@ import FormLayoutTestSchema from './Form/layoutTest';
 import Definitions from './Form/Definitions';
 import AnchorNav from './Form/AnchorNav';
 import InputKVSSchema from './Form/InputKVS';
+import TimelineSchema from "./Timeline";
 import Tree from './Form/Tree';
 
 import TableCrudSchema from './CRUD/Table';
@@ -56,6 +57,9 @@ import HeaderHideSchema from './CRUD/HeaderHide';
 import LoadOnceTableCrudSchema from './CRUD/LoadOnce';
 import ExportCSVExcelSchema from './CRUD/ExportCSVExcel';
 import CRUDDynamicSchema from './CRUD/Dynamic';
+import CRUDSimplePagerSchema from './CRUD/SimplePager';
+import CRUDParsePrimitiveQuerySchema from './CRUD/ParsePrimitiveQuery';
+import CRUDMatchFuncSchema from './CRUD/MatchFunc';
 import ItemActionchema from './CRUD/ItemAction';
 import SdkTest from './Sdk/Test';
 import JSONSchemaForm from './Form/Schem';
@@ -71,6 +75,7 @@ import OptionsLocalPageSchema from './Linkage/OptionsLocal';
 import FormSubmitSchema from './Linkage/FormSubmit';
 import InputEventSchema from './EventAction/cmpt-event-action/InputEvent';
 import DateEventSchema from './EventAction/cmpt-event-action/DateEvent';
+import TagEvent from './EventAction/cmpt-event-action/TagEvent';
 import SwitchEventSchema from './EventAction/cmpt-event-action/SwitchEvent';
 import TabsEventSchema from './EventAction/cmpt-event-action/TabsEvent';
 import UploadEventSchema from './EventAction/cmpt-event-action/UploadEvent';
@@ -88,6 +93,7 @@ import CarouselEventSchema from './EventAction/cmpt-event-action/CarouselEvent';
 import TableEventSchema from './EventAction/cmpt-event-action/TableEvent';
 import ListEventSchema from './EventAction/cmpt-event-action/ListEvent';
 import ChartEventSchema from './EventAction/cmpt-event-action/ChartEvent';
+import SearchBoxEventSchema from './EventAction/cmpt-event-action/SearchBoxEvent';
 import ReloadFormActionSchema from './EventAction/reload-action/ReloadForm';
 import ReloadSelectActionSchema from './EventAction/reload-action/ReloadSelect';
 import ReloadChartActionSchema from './EventAction/reload-action/ReloadChart';
@@ -101,6 +107,7 @@ import UpdateButtonGroupSelectActionSchema from './EventAction/update-data/Updat
 import UpdateComboActionSchema from './EventAction/update-data/UpdateCombo';
 import SyncUpdateActionSchema from './EventAction/update-data/SyncUpdate';
 import DataAutoFillActionSchema from './EventAction/update-data/DataAutoFill';
+import SetVariable from './EventAction/update-data/SetVariable';
 import PreventFormActionSchema from './EventAction/prevent-defalut/PreventForm';
 import WizardSchema from './Wizard';
 import ChartSchema from './Chart';
@@ -123,6 +130,10 @@ import Tab2Schema from './Tabs/Tab2';
 import Tab3Schema from './Tabs/Tab3';
 import Loading from './Loading';
 import CodeSchema from './Code';
+import OfficeViewer from './OfficeViewer';
+import PdfViewer from './PdfViewer';
+import InputTableEvent from './EventAction/cmpt-event-action/InputTableEvent';
+import WizardPage from './WizardPage';
 
 import {Switch} from 'react-router-dom';
 import {navigations2route} from './App';
@@ -430,9 +441,20 @@ export const examples = [
             component: makeSchemaRenderer(PopOverCrudSchema)
           },
           {
-            label: '一次性加载',
-            path: '/examples/crud/load-once',
-            component: makeSchemaRenderer(LoadOnceTableCrudSchema)
+            label: '前端分页',
+            icon: 'fa fa-list-ol',
+            children: [
+              {
+                label: '一次性加载',
+                path: '/examples/crud/load-once',
+                component: makeSchemaRenderer(LoadOnceTableCrudSchema)
+              },
+              {
+                label: '匹配函数',
+                path: '/examples/crud/match-func',
+                component: makeSchemaRenderer(CRUDMatchFuncSchema)
+              }
+            ]
           },
           {
             label: '点击联动',
@@ -448,6 +470,16 @@ export const examples = [
             label: '动态列',
             path: '/examples/crud/dynamic',
             component: makeSchemaRenderer(CRUDDynamicSchema)
+          },
+          {
+            label: '简单分页',
+            path: '/examples/crud/simple-pager',
+            component: makeSchemaRenderer(CRUDSimplePagerSchema)
+          },
+          {
+            label: '解析Query参数',
+            path: '/examples/crud/parse-primitive-query',
+            component: makeSchemaRenderer(CRUDParsePrimitiveQuerySchema)
           }
           // {
           //     label: '测试',
@@ -633,6 +665,11 @@ export const examples = [
                 label: '数据回填',
                 path: '/examples/action/setdata/autofill',
                 component: makeSchemaRenderer(DataAutoFillActionSchema)
+              },
+              {
+                label: '更新全局变量数据',
+                path: '/examples/action/setdata/variable',
+                component: makeSchemaRenderer(SetVariable)
               }
             ]
           },
@@ -663,6 +700,11 @@ export const examples = [
                 label: '时间类组件',
                 path: 'examples/event/date',
                 component: makeSchemaRenderer(DateEventSchema)
+              },
+              {
+                label: '可关闭的tag group',
+                path: 'examples/event/each-tag',
+                component: makeSchemaRenderer(TagEvent)
               },
               {
                 label: '开关组件',
@@ -733,6 +775,16 @@ export const examples = [
                 label: 'chart组件',
                 path: 'examples/event/chart',
                 component: makeSchemaRenderer(ChartEventSchema)
+              },
+              {
+                label: 'SearchBox组件',
+                path: 'examples/event/searchbox',
+                component: makeSchemaRenderer(SearchBoxEventSchema)
+              },
+              {
+                label: 'input-table组件',
+                path: 'examples/event/input-table',
+                component: makeSchemaRenderer(InputTableEvent)
               }
             ]
           },
@@ -851,6 +903,20 @@ export const examples = [
       },
 
       {
+        label: 'Office 文档预览',
+        icon: 'fa fa-file-word',
+        path: '/examples/office-viwewer',
+        component: makeSchemaRenderer(OfficeViewer)
+      },
+
+      {
+        label: 'Pdf 预览',
+        icon: 'fa fa-file-pdf',
+        path: '/examples/pdf-viewer',
+        component: makeSchemaRenderer(PdfViewer)
+      },
+
+      {
         label: '多 loading',
         icon: 'fa fa-spinner',
         path: '/examples/loading',
@@ -871,6 +937,19 @@ export const examples = [
 
           return null;
         }
+      },
+
+      {
+        label: 'wizard页面',
+        icon: 'fa fa-desktop',
+        path: '/examples/wizard-page',
+        component: makeSchemaRenderer(WizardPage)
+      },
+      {
+        label: '时间轴',
+        icon: 'fa fa-list-ol',
+        path: '/examples/timeline',
+        component: makeSchemaRenderer(TimelineSchema)
       }
 
       // {

@@ -1,6 +1,12 @@
 import React from 'react';
-import {localeable, LocaleProps} from 'amis-core';
-import {themeable, ThemeProps} from 'amis-core';
+import {
+  localeable,
+  LocaleProps,
+  RendererProps,
+  themeable,
+  ThemeProps,
+  setThemeClassName
+} from 'amis-core';
 import type {PlainObject} from 'amis-core';
 
 export interface SparkLineProps extends ThemeProps, LocaleProps {
@@ -16,6 +22,9 @@ export interface SparkLineProps extends ThemeProps, LocaleProps {
   >;
   placeholder?: string;
   onClick?: (e: React.MouseEvent, value?: PlainObject) => void;
+  id?: string;
+  wrapperCustomStyle?: any;
+  themeCss?: any;
 }
 
 export class SparkLine extends React.Component<SparkLineProps> {
@@ -74,12 +83,16 @@ export class SparkLine extends React.Component<SparkLineProps> {
     const {
       classnames: cx,
       className,
+      style,
       value,
       width,
       height,
       placeholder,
       translate: __,
-      onClick
+      onClick,
+      id,
+      wrapperCustomStyle,
+      themeCss
     } = this.props;
 
     return (
@@ -87,8 +100,21 @@ export class SparkLine extends React.Component<SparkLineProps> {
         className={cx(
           'Sparkline',
           className,
-          onClick ? 'Sparkline--clickable' : ''
+          onClick ? 'Sparkline--clickable' : '',
+          setThemeClassName({
+            ...this.props,
+            name: 'baseControlClassName',
+            id,
+            themeCss
+          }),
+          setThemeClassName({
+            ...this.props,
+            name: 'wrapperCustomStyle',
+            id,
+            themeCss: wrapperCustomStyle
+          })
         )}
+        style={style}
         onClick={onClick}
       >
         {Array.isArray(value) && value.length > 1 ? (

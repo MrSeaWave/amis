@@ -1,34 +1,55 @@
-import React from 'react';
+import React, {MouseEvent, TouchEvent} from 'react';
 import Transition, {
   ENTERED,
   ENTERING,
-  EXITING
+  EXITING,
+  EXITED
 } from 'react-transition-group/Transition';
-import {Renderer, RendererProps} from 'amis-core';
+import {
+  AMISSchemaBase,
+  Renderer,
+  RendererProps,
+  setThemeClassName
+} from 'amis-core';
 import {resolveVariableAndFilter} from 'amis-core';
 import {
   autobind,
   createObject,
   isObject,
   isArrayChildrenModified,
-  getPropValue
+  getPropValue,
+  CustomStyle
 } from 'amis-core';
-import {ActionObject} from 'amis-core';
+import {ActionObject, AMISSchemaCollection} from 'amis-core';
 import {Icon} from 'amis-ui';
-import {BaseSchema, SchemaCollection, SchemaName} from '../Schema';
+import {BaseSchema, SchemaName} from '../Schema';
 import {Html} from 'amis-ui';
 import Image from '../renderers/Image';
 import {ScopedContext, IScopedContext} from 'amis-core';
 
 /**
- * Carousel 轮播图渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/carousel
+ * 轮播图组件，用于图片或内容的轮播展示。支持自动播放、指示器、切换动画等。
  */
-export interface CarouselSchema extends BaseSchema {
+export interface AMISCarouselSchema extends AMISSchemaBase {
   /**
-   * 指定为轮播图类型
+   * 指定为 carousel 组件
    */
   type: 'carousel';
+
+  /**
+   * 轮播图方向
+   */
+  direction?: 'horizontal' | 'vertical';
+
+  /**
+   * 是否循环播放
+   */
+  loop?: boolean;
+
+  /**
+   * 是否支持鼠标事件
+   */
+  mouseEvent?: boolean;
 
   /**
    * 是否自动播放
@@ -48,12 +69,12 @@ export interface CarouselSchema extends BaseSchema {
   /**
    * 设置宽度
    */
-  width?: number;
+  width?: number | string;
 
   /**
    * 设置高度
    */
-  height?: number;
+  height?: number | string;
 
   controlsTheme?: 'light' | 'dark';
 
@@ -70,12 +91,12 @@ export interface CarouselSchema extends BaseSchema {
   /**
    * 动画类型
    */
-  animation?: 'fade' | 'slide';
+  animation?: 'fade' | 'slide' | 'marquee';
 
   /**
    * 配置单条呈现模板
    */
-  itemSchema?: SchemaCollection;
+  itemSchema?: AMISSchemaCollection;
 
   name?: SchemaName;
 
@@ -88,6 +109,26 @@ export interface CarouselSchema extends BaseSchema {
    * 配置固定值
    */
   options?: Array<any>;
+
+  /**
+   * 是否一直显示箭头
+   */
+  alwaysShowArrow?: boolean;
+
+  /**
+   * 多图模式配置项
+   */
+  multiple?: {
+    count: number;
+  };
+
+  /**
+   * 自定义箭头图标
+   */
+  icons?: {
+    prev?: AMISSchemaCollection;
+    next?: AMISSchemaCollection;
+  };
 }
 
 const animationStyles: {
@@ -100,7 +141,7 @@ const animationStyles: {
 
 export interface CarouselProps
   extends RendererProps,
-    Omit<CarouselSchema, 'className'> {
+    Omit<AMISCarouselSchema, 'className'> {
   value?: any;
 }
 
@@ -108,6 +149,8 @@ export interface CarouselState {
   current: number;
   options: any[];
   nextAnimation: string;
+  mouseStartLocation: number | null;
+  isPaused: boolean;
 }
 
 const defaultSchema = {
@@ -121,12 +164,18 @@ const defaultSchema = {
         {data.hasOwnProperty('image') ? (
           <Image
             src={data.image}
-            title={data.title}
-            href={data.href}
-            blank={data.blank}
-            htmlTarget={data.htmlTarget}
-            imageCaption={data.description}
-            thumbMode={data.thumbMode ?? thumbMode ?? 'contain'}
+            title={data.hasOwnProperty('title') ? data.title : ''}
+            href={data.hasOwnProperty('href') ? data.href : ''}
+            blank={data.hasOwnProperty('blank') ? data.blank : false}
+            htmlTarget={
+              data.hasOwnProperty('htmlTarget') ? data.htmlTarget : ''
+            }
+            caption={data.hasOwnProperty('description') ? data.description : ''}
+            thumbMode={
+              data.hasOwnProperty('thumbMode')
+                ? data.thumbMode
+                : thumbMode ?? 'contain'
+            }
             imageMode="original"
             className={cx('Carousel-image')}
           />
@@ -142,6 +191,8 @@ const defaultSchema = {
   }
 };
 
+const SCROLL_THRESHOLD = 20;
+
 export class Carousel extends React.Component<CarouselProps, CarouselState> {
   wrapperRef: React.RefObject<HTMLDivElement> = React.createRef();
   intervalTimeout: NodeJS.Timer | number;
@@ -156,6 +207,8 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
     | 'animation'
     | 'controls'
     | 'placeholder'
+    | 'multiple'
+    | 'alwaysShowArrow'
   > = {
     auto: true,
     interval: 5000,
@@ -163,17 +216,30 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
     controlsTheme: 'light',
     animation: 'fade',
     controls: ['dots', 'arrows'],
-    placeholder: '-'
+    placeholder: '-',
+    multiple: {count: 1},
+    alwaysShowArrow: false
   };
 
   state = {
     current: 0,
     options: this.props.options || getPropValue(this.props) || [],
-    nextAnimation: ''
+    nextAnimation: '',
+    mouseStartLocation: null,
+    isPaused: false
   };
+
+  loading: boolean = false;
+  marqueeRef = React.createRef<HTMLDivElement>();
+  contentRef = React.createRef<HTMLDivElement>();
+  marqueeRequestId: number;
 
   componentDidMount() {
     this.prepareAutoSlide();
+    // 跑马灯效果
+    if (this.props.animation === 'marquee') {
+      this.marquee();
+    }
   }
 
   componentDidUpdate(prevProps: CarouselProps) {
@@ -187,13 +253,59 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
         options: nextOptions
       });
     }
+
+    if (
+      this.props.animation === 'marquee' &&
+      prevProps.animation !== 'marquee'
+    ) {
+      this.marquee();
+    }
   }
 
   componentWillUnmount() {
     this.clearAutoTimeout();
+    cancelAnimationFrame(this.marqueeRequestId);
   }
 
-  doAction(action: ActionObject, args: object, throwErrors: boolean): any {
+  marquee() {
+    if (!this.marqueeRef.current || !this.contentRef.current) {
+      return;
+    }
+
+    let positionNum = 0;
+    let lastTime = performance.now();
+
+    const contentDom = this.contentRef.current;
+    const animate = (time: number) => {
+      const diffTime = time - lastTime;
+      lastTime = time;
+      const wrapWidth = this.marqueeRef.current?.offsetWidth ?? 0;
+
+      if (!this.state.isPaused) {
+        // 计算每帧移动距离
+        const moveDistance = wrapWidth * (diffTime / this.props.duration!);
+        positionNum += -moveDistance;
+
+        // 检查是否需要重置位置
+        const contentWidth = contentDom.scrollWidth / 2;
+        if (Math.abs(positionNum) >= contentWidth) {
+          positionNum = 0;
+        }
+        contentDom.style.transform = `translateX(${positionNum}px)`;
+      }
+
+      this.marqueeRequestId = requestAnimationFrame(animate);
+    };
+
+    this.marqueeRequestId = requestAnimationFrame(animate);
+  }
+
+  doAction(
+    action: ActionObject,
+    ctx: object,
+    throwErrors: boolean,
+    args: object
+  ): any {
     const actionType = action?.actionType as string;
 
     if (!!~['next', 'prev'].indexOf(actionType)) {
@@ -251,6 +363,16 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
   async transitFramesTowards(direction: string, nextAnimation: string) {
     let {current} = this.state;
     let prevIndex = current;
+
+    // 如果这里是不循环状态，需要阻止切换到第一张或者最后一张图片
+    if (
+      this.props.loop === false &&
+      ((current === 0 && direction === 'right') ||
+        (current === this.state.options.length - 1 && direction === 'left'))
+    ) {
+      return;
+    }
+
     switch (direction) {
       case 'left':
         current = this.getFrameId('next');
@@ -294,11 +416,19 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   @autobind
   next() {
+    const multiple = this.props.multiple;
+    if (this.loading && multiple && multiple.count > 1) {
+      return;
+    }
     this.autoSlide('next');
   }
 
   @autobind
   prev() {
+    const multiple = this.props.multiple;
+    if (this.loading && multiple && multiple.count > 1) {
+      return;
+    }
     this.autoSlide('prev');
   }
 
@@ -311,7 +441,11 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
   @autobind
   async changeSlide(index: number) {
     const {current} = this.state;
-    const {dispatchEvent, data} = this.props;
+    const {dispatchEvent, data, multiple} = this.props;
+
+    if (this.loading && multiple && multiple.count > 1) {
+      return;
+    }
 
     const rendererEvent = await dispatchEvent(
       'change',
@@ -369,18 +503,120 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   @autobind
   handleMouseEnter() {
+    const multiple = this.props.multiple;
+    if (multiple && multiple.count > 1) {
+      return;
+    }
     this.clearAutoTimeout();
   }
 
   @autobind
   handleMouseLeave() {
+    const multiple = this.props.multiple;
+    if (multiple && multiple.count > 1) {
+      return;
+    }
     this.prepareAutoSlide();
+  }
+
+  // 处理options
+  getNewOptions(options: any, count: number = 1) {
+    let newOptions: Array<any> = options;
+    if (Array.isArray(options) && options.length) {
+      newOptions = new Array(options.length);
+      for (let i = 0; i < options.length; i++) {
+        newOptions[i] = new Array(count);
+        for (let j = 0; j < count; j++) {
+          newOptions[i][j] = options[(i + j) % options.length];
+        }
+      }
+    }
+    return newOptions;
+  }
+
+  /**
+   * 获取事件发生的屏幕坐标，兼容鼠标事件和触摸事件。
+   *
+   * @param event 事件对象，可以是鼠标事件或触摸事件
+   * @returns 返回包含屏幕横纵坐标的对象
+   */
+  getEventScreenXY(
+    event: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>
+  ) {
+    let screenX, screenY;
+    if ((event as MouseEvent<HTMLDivElement>).screenX !== undefined) {
+      screenX = (event as MouseEvent<HTMLDivElement>).screenX;
+      screenY = (event as MouseEvent<HTMLDivElement>).screenY;
+    } else if ((event as TouchEvent<HTMLDivElement>).touches?.length) {
+      // touchStart 事件
+      screenX = (event as TouchEvent<HTMLDivElement>).touches[0]?.screenX;
+      screenY = (event as TouchEvent<HTMLDivElement>).touches[0]?.screenY;
+    } else if ((event as TouchEvent<HTMLDivElement>).changedTouches?.length) {
+      // touchEnd 事件
+      screenX = (event as TouchEvent<HTMLDivElement>).changedTouches[0]
+        ?.screenX;
+      screenY = (event as TouchEvent<HTMLDivElement>).changedTouches[0]
+        ?.screenY;
+    }
+
+    return {
+      screenX,
+      screenY
+    };
+  }
+
+  /**
+   * 添加鼠标按下事件监听器, 用于判断滑动方向
+   * @param event 鼠标事件对象
+   */
+  @autobind
+  addMouseDownListener(
+    event: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>
+  ) {
+    const {direction} = this.props;
+
+    const {screenX, screenY} = this.getEventScreenXY(event);
+
+    // 根据当前滑动方向确定是应该使用x坐标还是y坐标做mark
+    const location = direction === 'vertical' ? screenY : screenX;
+
+    location !== undefined &&
+      this.setState({
+        mouseStartLocation: location
+      });
+  }
+
+  /**
+   * 添加鼠标抬起事件监听器, 用于判断滑动方向
+   * @param event 鼠标事件对象
+   */
+  @autobind
+  addMouseUpListener(
+    event: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>
+  ) {
+    const {screenX, screenY} = this.getEventScreenXY(event);
+
+    // 根据当前滑动方向确定是应该使用x坐标还是y坐标做mark
+    const {direction} = this.props;
+    const location = direction === 'vertical' ? screenY : screenX;
+
+    if (this.state.mouseStartLocation !== null && location !== undefined) {
+      if (location - this.state.mouseStartLocation > SCROLL_THRESHOLD) {
+        this.autoSlide('prev');
+      } else if (this.state.mouseStartLocation - location > SCROLL_THRESHOLD) {
+        this.autoSlide();
+      }
+      this.setState({
+        mouseStartLocation: null
+      });
+    }
   }
 
   render() {
     const {
       render,
       className,
+      style,
       classnames: cx,
       itemSchema,
       animation,
@@ -390,94 +626,330 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
       controlsTheme,
       placeholder,
       data,
-      name
+      name,
+      duration,
+      multiple,
+      alwaysShowArrow,
+      icons,
+      id,
+      wrapperCustomStyle,
+      env,
+      themeCss
     } = this.props;
     const {options, current, nextAnimation} = this.state;
 
     let body: JSX.Element | null = null;
     let carouselStyles: {
       [propName: string]: string;
-    } = {};
-    width ? (carouselStyles.width = width + 'px') : '';
-    height ? (carouselStyles.height = height + 'px') : '';
+    } = style ? {...style} : {};
+
+    // 不允许传0，需要有最小高度
+    if (width) {
+      // 数字类型认为是px单位，否则传入字符串直接赋给style对象
+      !isNaN(Number(width))
+        ? (carouselStyles.width = width + 'px')
+        : (carouselStyles.width = width as string);
+    }
+
+    if (height) {
+      !isNaN(Number(height))
+        ? (carouselStyles.height = height + 'px')
+        : (carouselStyles.height = height as string);
+    }
+
     const [dots, arrows] = [
-      controls!.indexOf('dots') > -1,
-      controls!.indexOf('arrows') > -1
+      controls!.indexOf('dots') > -1 && animation !== 'marquee',
+      controls!.indexOf('arrows') > -1 && animation !== 'marquee'
     ];
     const animationName = nextAnimation || animation;
 
     if (Array.isArray(options) && options.length) {
-      body = (
-        <div
-          ref={this.wrapperRef}
-          className={cx('Carousel-container')}
-          onMouseEnter={this.handleMouseEnter}
-          onMouseLeave={this.handleMouseLeave}
-        >
-          {options.map((option: any, key: number) => (
-            <Transition
-              mountOnEnter
-              unmountOnExit
-              in={key === current}
-              timeout={500}
-              key={key}
-            >
-              {(status: string) => {
-                if (status === ENTERING) {
-                  this.wrapperRef.current &&
-                    this.wrapperRef.current.childNodes.forEach(
-                      (item: HTMLElement) => item.offsetHeight
-                    );
-                }
+      let multipleCount = 1;
+      if (
+        multiple &&
+        typeof multiple.count === 'number' &&
+        multiple.count >= 2
+      ) {
+        multipleCount =
+          Math.floor(multiple.count) < options.length
+            ? Math.floor(multiple.count)
+            : options.length;
+      }
+      const newOptions = this.getNewOptions(options, multipleCount);
+      const transitionDuration =
+        multipleCount > 1 && typeof duration === 'number'
+          ? `${duration}ms`
+          : duration || '500ms';
+      const timeout =
+        multipleCount > 1 && typeof duration === 'number' ? duration : 500;
 
-                return (
-                  <div
-                    className={cx(
-                      'Carousel-item',
-                      animationName,
-                      animationStyles[status]
-                    )}
-                  >
-                    {render(
-                      `${current}/body`,
-                      itemSchema ? itemSchema : (defaultSchema as any),
-                      {
-                        thumbMode: this.props.thumbMode,
-                        data: createObject(
-                          data,
-                          isObject(option)
-                            ? option
-                            : {item: option, [name!]: option}
-                        )
-                      }
-                    )}
-                  </div>
-                );
-              }}
-            </Transition>
-          ))}
-        </div>
-      );
+      const transformStyles: {
+        [propName: string]: number;
+      } = {
+        [ENTERING]: 0,
+        [ENTERED]: 0,
+        [EXITING]:
+          animationName === 'slideRight'
+            ? 100 / multipleCount
+            : -100 / multipleCount,
+        [EXITED]:
+          animationName === 'slideRight'
+            ? -100 / multipleCount
+            : 100 / multipleCount
+      };
+      const itemStyle =
+        multipleCount > 1
+          ? {
+              transitionTimingFunction: 'linear',
+              transitionDuration: transitionDuration,
+              ...(animation === 'slide'
+                ? {
+                    transform: `translateX(${transformStyles[status]}%)`
+                  }
+                : {})
+            }
+          : {};
+      const itemRender = (option: any) => {
+        const {itemSchema: optionItemSchema, ...restOption} = option;
+        return render(
+          `${current}/body`,
+          optionItemSchema || itemSchema
+            ? optionItemSchema || itemSchema
+            : (defaultSchema as any),
+          {
+            thumbMode: this.props.thumbMode,
+            data: createObject(
+              data,
+              isObject(option) ? restOption : {item: option, [name!]: option}
+            )
+          }
+        );
+      };
+
+      body =
+        animation === 'marquee' ? (
+          <div
+            ref={this.marqueeRef}
+            className={cx('Marquee-container')}
+            onMouseEnter={() =>
+              this.setState({
+                isPaused: true
+              })
+            }
+            onMouseLeave={() =>
+              this.setState({
+                isPaused: false
+              })
+            }
+            style={{
+              width: '100%',
+              height
+            }}
+          >
+            <div className={cx('Marquee-content')} ref={this.contentRef}>
+              {options.concat(options).map((option, key) => (
+                <div key={key} className={cx('Marquee-item')}>
+                  {multipleCount === 1 ? itemRender(option) : null}
+                  {multipleCount > 1
+                    ? newOptions
+                        .concat(newOptions)
+                        [key].map((option: any, index: number) => (
+                          <div
+                            key={index}
+                            style={{
+                              width: 100 / multipleCount + '%',
+                              height: '100%',
+                              float: 'left'
+                            }}
+                          >
+                            {itemRender(option)}
+                          </div>
+                        ))
+                    : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div
+            ref={this.wrapperRef}
+            className={cx('Carousel-container')}
+            onMouseEnter={this.handleMouseEnter}
+            onMouseLeave={this.handleMouseLeave}
+          >
+            {options.map((option: any, key: number) => (
+              <Transition
+                mountOnEnter
+                unmountOnExit
+                in={key === current}
+                timeout={timeout}
+                key={key}
+              >
+                {(status: string) => {
+                  if (status === ENTERING) {
+                    this.wrapperRef.current &&
+                      this.wrapperRef.current.childNodes.forEach(
+                        (item: HTMLElement) => item.offsetHeight
+                      );
+                  }
+                  if (multipleCount > 1) {
+                    if (
+                      (status === ENTERING || status === EXITING) &&
+                      !this.loading
+                    ) {
+                      this.loading = true;
+                    } else if (
+                      (status === ENTERED || status === EXITED) &&
+                      this.loading
+                    ) {
+                      this.loading = false;
+                    }
+                  }
+
+                  return (
+                    <div
+                      className={cx(
+                        'Carousel-item',
+                        animationName,
+                        animationStyles[status]
+                      )}
+                      style={itemStyle}
+                    >
+                      {multipleCount === 1 ? itemRender(option) : null}
+                      {multipleCount > 1
+                        ? newOptions[key].map((option: any, index: number) => (
+                            <div
+                              key={index}
+                              style={{
+                                width: 100 / multipleCount + '%',
+                                height: '100%',
+                                float: 'left'
+                              }}
+                            >
+                              {itemRender(option)}
+                            </div>
+                          ))
+                        : null}
+                    </div>
+                  );
+                }}
+              </Transition>
+            ))}
+          </div>
+        );
     }
 
     return (
       <div
-        className={cx(`Carousel Carousel--${controlsTheme}`, className)}
+        className={cx(
+          `Carousel Carousel--${controlsTheme}`,
+          {['Carousel-arrow--always']: !!alwaysShowArrow},
+          className,
+          setThemeClassName({
+            ...this.props,
+            name: 'baseControlClassName',
+            id,
+            themeCss
+          }),
+          setThemeClassName({
+            ...this.props,
+            name: 'wrapperCustomStyle',
+            id,
+            themeCss: wrapperCustomStyle
+          }),
+          {'Carousel-vertical': this.props.direction === 'vertical'}
+        )}
+        onMouseDown={
+          this.props.mouseEvent ? this.addMouseDownListener : undefined
+        }
+        onMouseUp={this.props.mouseEvent ? this.addMouseUpListener : undefined}
+        onMouseLeave={
+          this.props.mouseEvent ? this.addMouseUpListener : undefined
+        }
+        onTouchStart={
+          this.props.mouseEvent ? this.addMouseDownListener : undefined
+        }
+        onTouchEnd={this.props.mouseEvent ? this.addMouseUpListener : undefined}
         style={carouselStyles}
       >
         {body ? body : placeholder}
 
         {dots ? this.renderDots() : null}
         {arrows ? (
-          <div className={cx('Carousel-leftArrow')} onClick={this.prev}>
-            <Icon icon="left-arrow" className="icon" />
+          <div
+            className={cx(
+              'Carousel-leftArrow',
+              setThemeClassName({
+                ...this.props,
+                name: 'galleryControlClassName',
+                id,
+                themeCss
+              })
+            )}
+            onClick={this.prev}
+          >
+            {icons?.prev ? (
+              <div className="ImageGallery-prevBtn">
+                <Icon icon={icons.prev} />
+              </div>
+            ) : (
+              <Icon
+                icon="left-arrow"
+                className="icon"
+                iconContent="ImageGallery-prevBtn"
+              />
+            )}
           </div>
         ) : null}
         {arrows ? (
-          <div className={cx('Carousel-rightArrow')} onClick={this.next}>
-            <Icon icon="right-arrow" className="icon" />
+          <div
+            className={cx(
+              'Carousel-rightArrow',
+              setThemeClassName({
+                ...this.props,
+                name: 'galleryControlClassName',
+                id,
+                themeCss
+              })
+            )}
+            onClick={this.next}
+          >
+            {icons?.next ? (
+              <div className="ImageGallery-prevBtn">
+                <Icon icon={icons.next} />
+              </div>
+            ) : (
+              <Icon
+                icon="right-arrow"
+                className="icon"
+                iconContent="ImageGallery-nextBtn"
+              />
+            )}
           </div>
         ) : null}
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'baseControlClassName'
+              },
+              {
+                key: 'galleryControlClassName',
+                weights: {
+                  default: {
+                    suf: ' svg',
+                    important: true
+                  }
+                }
+              }
+            ]
+          }}
+          env={env}
+        />
       </div>
     );
   }

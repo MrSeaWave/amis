@@ -7,6 +7,7 @@ import {useForm, UseFormReturn, FormProvider} from 'react-hook-form';
 import {useValidationResolver} from '../hooks/use-validation-resolver';
 import {localeable, LocaleProps} from 'amis-core';
 import debounce from 'lodash/debounce';
+import {isObjectShallowModified} from 'amis-core';
 
 export type FormRef = React.MutableRefObject<
   | {
@@ -17,7 +18,10 @@ export type FormRef = React.MutableRefObject<
 
 export interface FormProps extends ThemeProps, LocaleProps {
   defaultValue?: any;
+  value?: any;
   autoSubmit?: boolean;
+  onValidate?: (errors: any, values: any) => Promise<void>;
+  onChange?: (value: any) => void;
   onSubmit?: (value: any) => void;
   forwardRef?: FormRef;
   children?: (
@@ -29,10 +33,11 @@ export interface FormProps extends ThemeProps, LocaleProps {
 }
 
 export function Form(props: FormProps) {
-  const {classnames: cx, className, autoSubmit} = props;
+  const {classnames: cx, className, autoSubmit, value, onChange} = props;
+  const defaultValues = props.value ?? props.defaultValue;
   const methods = useForm({
-    defaultValues: props.defaultValue,
-    resolver: useValidationResolver(props.translate)
+    defaultValues: defaultValues,
+    resolver: useValidationResolver(props.translate, props.onValidate)
   });
   let onSubmit = React.useRef<(data: any) => void>(
     methods.handleSubmit(props.onSubmit || noop)
@@ -54,11 +59,26 @@ export function Form(props: FormProps) {
       };
     }, []);
   }
-
   React.useEffect(() => {
-    if (props.forwardRef) {
-      // 这个模式别的组件没见到过不知道后续会不会不允许
-      props.forwardRef.current = {
+    if (value && isObjectShallowModified(value, methods.getValues(), false)) {
+      Object.keys(value).forEach(key => {
+        methods.setValue(key, value[key]);
+      });
+    }
+  }, [value]);
+  if (onChange) {
+    React.useEffect(() => {
+      const subscriber = methods.watch((value, info) => {
+        onChange({...defaultValues, ...value});
+      });
+      return () => subscriber.unsubscribe();
+    }, [onChange]);
+  }
+
+  React.useImperativeHandle(
+    props.forwardRef,
+    () => {
+      return {
         submit: () =>
           new Promise<any>(resolve => {
             methods.handleSubmit(
@@ -66,18 +86,26 @@ export function Form(props: FormProps) {
                 props.onSubmit?.(values);
                 resolve(values);
               },
-              () => resolve(false)
+              e => resolve(e.customValidate?.message || false)
+            )();
+          }),
+        validate: () =>
+          new Promise<any>(resolve => {
+            methods.handleSubmit(
+              () => {
+                resolve('');
+              },
+              e =>
+                resolve(
+                  e.customValidate?.message ||
+                    props.translate('Form.validateFailed')
+                )
             )();
           })
       };
-    }
-
-    return () => {
-      if (props.forwardRef) {
-        props.forwardRef.current = undefined;
-      }
-    };
-  });
+    },
+    []
+  );
 
   return (
     <FormProvider {...methods}>

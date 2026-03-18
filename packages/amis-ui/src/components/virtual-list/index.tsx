@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import * as PropTypes from 'prop-types';
 import SizeAndPositionManager, {ItemSize} from './SizeAndPositionManager';
 import {
@@ -62,6 +62,10 @@ export interface Props {
   stickyIndices?: number[];
   style?: React.CSSProperties;
   width?: number | string;
+  WrapperComponent?: React.ElementType;
+  InnerComponent?: React.ElementType;
+  innerStyleFilter?: (styles: object) => object;
+  prefix?: React.ReactNode | null;
   onItemsRendered?({startIndex, stopIndex}: RenderedRows): void;
   onScroll?(offset: number, event: UIEvent): void;
   renderItem(itemInfo: ItemInfo): React.ReactNode;
@@ -94,7 +98,7 @@ const STYLE_ITEM: {
   position: 'absolute' as ItemPosition,
   top: 0,
   left: 0,
-  width: 'auto'
+  width: '100%'
 };
 
 const STYLE_STICKY_ITEM = {
@@ -259,6 +263,11 @@ export default class VirtualList extends React.PureComponent<Props, State> {
     ) {
       this.scrollTo(offset);
     }
+
+    if (props.itemCount !== itemCount) {
+      // 长度发生变化时重新渲染
+      this.forceUpdate();
+    }
   }
 
   componentWillUnmount() {
@@ -312,6 +321,10 @@ export default class VirtualList extends React.PureComponent<Props, State> {
       stickyIndices,
       style,
       width,
+      WrapperComponent,
+      InnerComponent,
+      prefix,
+      innerStyleFilter,
       ...props
     } = this.props;
     const {offset} = this.state;
@@ -364,15 +377,23 @@ export default class VirtualList extends React.PureComponent<Props, State> {
       }
     }
 
+    const WrapperCmpt = WrapperComponent || 'div';
+    const InnerCmpt = InnerComponent || 'div';
+
     return (
-      <div ref={this.getRef} {...props} style={wrapperStyle}>
-        <div style={innerStyle}>{items}</div>
-      </div>
+      <WrapperCmpt ref={this.getRef} {...props} style={wrapperStyle}>
+        {prefix ?? null}
+        <InnerCmpt
+          style={innerStyleFilter ? innerStyleFilter(innerStyle) : innerStyle}
+        >
+          {items}
+        </InnerCmpt>
+      </WrapperCmpt>
     );
   }
 
-  private getRef = (node: HTMLDivElement): void => {
-    this.rootNode = node;
+  private getRef = (node: HTMLElement | null): void => {
+    node && (this.rootNode = node);
   };
 
   private handleScroll = (event: UIEvent) => {
@@ -445,3 +466,5 @@ export default class VirtualList extends React.PureComponent<Props, State> {
         });
   }
 }
+
+export {default as AutoSizer} from './AutoSizer';

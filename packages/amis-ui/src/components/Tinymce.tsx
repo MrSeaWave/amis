@@ -1,7 +1,7 @@
 import React from 'react';
 // Import TinyMCE
 // @ts-ignore
-import tinymce from 'tinymce/tinymce';
+import tinymce, {Editor} from 'tinymce/tinymce';
 
 // A theme is also required
 import 'tinymce/icons/default/index';
@@ -13,6 +13,7 @@ import 'tinymce/models/dom/model';
 // Any plugins you want to use has to be imported
 import 'tinymce/plugins/advlist';
 import 'tinymce/plugins/autolink';
+import 'tinymce/plugins/autoresize';
 import 'tinymce/plugins/lists';
 import 'tinymce/plugins/link';
 import 'tinymce/plugins/image';
@@ -35,7 +36,13 @@ import 'tinymce/plugins/nonbreaking';
 import 'tinymce/plugins/emoticons';
 import 'tinymce/plugins/emoticons/js/emojis';
 import 'tinymce/plugins/quickbars/plugin';
-import {LocaleProps} from 'amis-core';
+
+import 'tinymce/plugins/help/js/i18n/keynav/zh_CN';
+import 'tinymce/plugins/help/js/i18n/keynav/en';
+import 'tinymce/plugins/help/js/i18n/keynav/de';
+
+import {LocaleProps, autobind} from 'amis-core';
+import isEqual from 'lodash/isEqual';
 
 interface TinymceEditorProps extends LocaleProps {
   model: string;
@@ -43,7 +50,10 @@ interface TinymceEditorProps extends LocaleProps {
   onFocus?: () => void;
   onBlur?: () => void;
   disabled?: boolean;
-  config?: any;
+  config?: {
+    onLoaded?: (tinymce: any) => void | Promise<void>;
+    [propName: string]: any;
+  };
   outputFormat?: 'html' | 'text';
   receiver?: string;
 }
@@ -53,14 +63,59 @@ export default class TinymceEditor extends React.Component<TinymceEditorProps> {
     outputFormat: 'html'
   };
   config?: any;
-  editor?: any;
+  editor?: Editor;
+  unmounted = false;
+  editorInitialized?: boolean = false;
   currentContent?: string;
 
   elementRef: React.RefObject<HTMLTextAreaElement> = React.createRef();
 
   componentDidMount() {
+    this.initTiny();
+  }
+
+  componentDidUpdate(prevProps: TinymceEditorProps) {
+    const props = this.props;
+
+    if (
+      props.model !== prevProps.model &&
+      props.model !== this.currentContent
+    ) {
+      this.editorInitialized &&
+        this.editor?.setContent((this.currentContent = props.model || ''));
+    }
+
+    if (
+      this.editor &&
+      (!isEqual(this.props.config, prevProps.config) ||
+        props.disabled !== prevProps.disabled)
+    ) {
+      this.editor.contentWindow.removeEventListener(
+        'unload',
+        this.handleIframeUnload
+      );
+      tinymce.remove(this.editor);
+      this.initTiny();
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.editor) {
+      this.editor.contentWindow.removeEventListener(
+        'unload',
+        this.handleIframeUnload
+      );
+      tinymce.remove(this.editor);
+    }
+
+    this.unmounted = true;
+  }
+
+  @autobind
+  async initTiny() {
     const locale = this.props.locale;
 
+    const {onLoaded, ...rest} = this.props.config || {};
     this.config = {
       inline: false,
       skin: false,
@@ -71,6 +126,7 @@ export default class TinymceEditor extends React.Component<TinymceEditorProps> {
       plugins: [
         'advlist',
         'autolink',
+        'autoresize',
         'link',
         'image',
         'lists',
@@ -134,42 +190,48 @@ export default class TinymceEditor extends React.Component<TinymceEditorProps> {
         help: {title: 'Help', items: 'help'}
       },
       paste_data_images: true,
-      ...this.props.config,
+      content_style: [
+        // 支持图片调整大小
+        '.mce-content-body div.mce-resizehandle { background-color: #4099ff; border-color: #4099ff; border-style: solid; border-width: 1px; box-sizing: border-box; height: 10px; position: absolute; width: 10px; z-index: 1298 } .mce-content-body .mce-clonedresizable { cursor: default; opacity: .5; outline: 1px dashed #000; position: absolute; z-index: 10001 }',
+        // 很诡异的问题，video 会被复制放在光标上，直接用样式隐藏先
+        '[data-mce-bogus] video {display:none;}'
+      ].join('\n'),
+      ...rest,
       target: this.elementRef.current,
-      readOnly: this.props.disabled,
+      disabled: this.props.disabled,
+      readonly: this.props.disabled,
       promotion: false,
       setup: (editor: any) => {
         this.editor = editor;
 
         editor.on('init', (e: Event) => {
+          this.editorInitialized = true;
           this.initEditor(e, editor);
         });
       }
     };
 
-    tinymce.init(this.config);
+    await onLoaded?.(tinymce);
+    this.unmounted || tinymce.init(this.config);
   }
 
-  componentDidUpdate(prevProps: TinymceEditorProps) {
-    const props = this.props;
-
-    if (
-      props.model !== prevProps.model &&
-      props.model !== this.currentContent
-    ) {
-      this.editor?.setContent(props.model || '');
-    }
+  @autobind
+  handleIframeUnload() {
+    this.editor!.contentWindow.removeEventListener(
+      'unload',
+      this.handleIframeUnload
+    );
+    requestAnimationFrame(() => {
+      tinymce.remove(this.editor!);
+      this.initTiny();
+    });
   }
 
-  componentWillUnmount() {
-    tinymce.remove(this.editor);
-  }
-
-  initEditor(e: any, editor: any) {
+  initEditor(e: any, editor: Editor) {
     const {model, onModelChange, outputFormat, onFocus, onBlur} = this.props;
 
     const value = model || '';
-    editor.setContent(value);
+    editor.setContent((this.currentContent = value));
 
     if (onModelChange) {
       editor.on('change keyup setcontent', (e: any) => {
@@ -184,6 +246,10 @@ export default class TinymceEditor extends React.Component<TinymceEditorProps> {
 
     onFocus && editor.on('focus', onFocus);
     onBlur && editor.on('blur', onBlur);
+
+    // iframe 移动后，就不可用了，那只能重新初始化
+    // https://poeticcode.wordpress.com/2010/06/08/iframe-reloads-when-moved-around-the-dom-tree/
+    editor.contentWindow.addEventListener('unload', this.handleIframeUnload);
   }
 
   render() {
@@ -636,3 +702,5 @@ tinymce.addI18n('zh_CN', {
   'Caption': '\u6807\u9898',
   'Insert template': '\u63d2\u5165\u6a21\u677f'
 });
+
+export {tinymce};

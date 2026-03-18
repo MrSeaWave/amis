@@ -1,7 +1,18 @@
 import React from 'react';
-import {Renderer, RendererProps, filter} from 'amis-core';
+import {
+  Renderer,
+  RendererProps,
+  filter,
+  ActionObject,
+  ScopedContext,
+  IScopedContext,
+  ScopedComponentType,
+  AMISSchemaBase
+} from 'amis-core';
+import isEqual from 'lodash/isEqual';
+import pick from 'lodash/pick';
 import cx from 'classnames';
-import {BaseSchema, SchemaClassName, SchemaTpl} from '../Schema';
+import {BaseSchema, AMISClassName, SchemaTpl} from '../Schema';
 import {autobind, getPropValue, createObject} from 'amis-core';
 
 import {Progress} from 'amis-ui';
@@ -9,9 +20,12 @@ import type {ColorMapType} from 'amis-ui/lib/components/Progress';
 
 /**
  * 进度展示控件。
- * 文档：https://baidu.gitee.io/amis/docs/components/progress
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/progress
  */
-export interface ProgressSchema extends BaseSchema {
+/**
+ * 进度条组件，用于显示任务进度。支持条形/环形、多状态与格式化显示。
+ */
+export interface AMISProgressSchema extends AMISSchemaBase {
   type: 'progress';
 
   /**
@@ -30,9 +44,9 @@ export interface ProgressSchema extends BaseSchema {
   mode: 'line' | 'circle' | 'dashboard';
 
   /**
-   * 进度条 CSS 类名
+   * 进度条CSS类名
    */
-  progressClassName?: SchemaClassName;
+  progressClassName?: AMISClassName;
 
   /**
    * 配置不同的值段，用不同的样式提示用户
@@ -55,7 +69,7 @@ export interface ProgressSchema extends BaseSchema {
   stripe?: boolean;
 
   /**
-   * 是否显示动画（只有在开启的时候才能看出来）
+   * 是否显示动画
    */
   animate?: boolean;
 
@@ -65,7 +79,7 @@ export interface ProgressSchema extends BaseSchema {
   strokeWidth?: number;
 
   /**
-   * 仪表盘进度条缺口角度，可取值 0 ~ 295
+   * 仪表盘进度条缺口角度
    */
   gapDegree?: number;
 
@@ -94,9 +108,18 @@ export interface ProgressSchema extends BaseSchema {
 
 export interface ProgressProps
   extends RendererProps,
-    Omit<ProgressSchema, 'type' | 'className'> {}
+    Omit<AMISProgressSchema, 'type' | 'className'> {}
 
-export class ProgressField extends React.Component<ProgressProps, object> {
+interface ProgressState {
+  value: number;
+}
+
+const COMPARE_KEYS = ['name', 'value', 'data', 'defaultValue'];
+
+export class ProgressField extends React.Component<
+  ProgressProps,
+  ProgressState
+> {
   static defaultProps = {
     placeholder: '-',
     progressClassName: '',
@@ -107,6 +130,32 @@ export class ProgressField extends React.Component<ProgressProps, object> {
     stripe: false,
     animate: false
   };
+
+  constructor(props: ProgressProps) {
+    super(props);
+
+    this.state = {
+      value: this.getValue()
+    };
+  }
+
+  componentDidUpdate(prevProps: Readonly<ProgressProps>): void {
+    if (
+      !isEqual(pick(prevProps, COMPARE_KEYS), pick(this.props, COMPARE_KEYS))
+    ) {
+      this.setState({value: this.getValue()});
+    }
+  }
+
+  getValue() {
+    let value = getPropValue(this.props);
+    value = typeof value === 'number' ? value : filter(value, this.props.data);
+
+    if (/^\d*\.?\d+$/.test(value)) {
+      value = parseFloat(value);
+    }
+    return value;
+  }
 
   @autobind
   format(value: number) {
@@ -121,6 +170,7 @@ export class ProgressField extends React.Component<ProgressProps, object> {
       data,
       mode,
       className,
+      style,
       placeholder,
       progressClassName,
       map,
@@ -134,13 +184,7 @@ export class ProgressField extends React.Component<ProgressProps, object> {
       threshold,
       showThresholdText
     } = this.props;
-
-    let value = getPropValue(this.props);
-    value = typeof value === 'number' ? value : filter(value, data);
-
-    if (/^\d*\.?\d+$/.test(value)) {
-      value = parseFloat(value);
-    }
+    const {value} = this.state;
 
     if (threshold) {
       if (Array.isArray(threshold)) {
@@ -171,6 +215,7 @@ export class ProgressField extends React.Component<ProgressProps, object> {
         gapDegree={gapDegree}
         gapPosition={gapPosition}
         className={className}
+        style={style}
         progressClassName={progressClassName}
         threshold={threshold}
         showThresholdText={showThresholdText}
@@ -182,4 +227,37 @@ export class ProgressField extends React.Component<ProgressProps, object> {
 @Renderer({
   type: 'progress'
 })
-export class ProgressFieldRenderer extends ProgressField {}
+export class ProgressFieldRenderer extends ProgressField {
+  static contextType = ScopedContext;
+
+  constructor(props: ProgressProps, context: IScopedContext) {
+    super(props);
+    const scoped = context;
+    scoped.registerComponent(this as unknown as ScopedComponentType);
+  }
+
+  componentWillUnmount() {
+    super.componentWillUnmount?.();
+    const scoped = this.context as IScopedContext;
+    scoped.unRegisterComponent(this as unknown as ScopedComponentType);
+  }
+
+  doAction(
+    action: ActionObject,
+    data: any,
+    throwErrors: boolean,
+    args?: any
+  ): any {
+    const actionType = action?.actionType as string;
+
+    if (actionType === 'reset') {
+      this.setState({value: 0});
+    }
+  }
+
+  setData(value: number) {
+    if (typeof value === 'number' || typeof +value === 'number') {
+      this.setState({value: +value});
+    }
+  }
+}

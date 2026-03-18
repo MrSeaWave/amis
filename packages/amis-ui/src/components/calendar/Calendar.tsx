@@ -12,6 +12,14 @@ import {
   utils
 } from 'amis-core';
 import {PickerOption} from '../PickerColumn';
+import 'moment/locale/zh-cn';
+import 'moment/locale/de';
+
+import type {RendererEnv, TestIdBuilder} from 'amis-core';
+import type {unitOfTime} from 'moment';
+
+/** 视图模式 */
+export type ViewMode = 'days' | 'months' | 'years' | 'time' | 'quarters';
 
 export type DateType =
   | 'year'
@@ -20,6 +28,18 @@ export type DateType =
   | 'hours'
   | 'minutes'
   | 'seconds';
+
+/** 底层View组件修改的值类型：time时间、days日期 */
+export type ChangeEventViewMode = Extract<ViewMode, 'time' | 'days'>;
+
+export type ChangeEventViewStatus = 'start' | 'end';
+
+/** 可改变的时间单位 */
+export type MutableUnitOfTime = Extract<
+  unitOfTime.All,
+  'date' | 'hour' | 'minute' | 'second' | 'millisecond'
+>;
+
 export interface BoundaryObject {
   max: number;
   min: number;
@@ -45,9 +65,10 @@ interface BaseDatePickerProps {
   className?: string;
   value?: any;
   defaultValue?: any;
-  viewMode?: 'years' | 'months' | 'days' | 'time' | 'quarters';
+  viewMode?: ViewMode;
   dateFormat?: boolean | string;
   inputFormat?: boolean | string;
+  displayForamt?: boolean | string;
   timeFormat?: any;
   input?: boolean;
   locale: string;
@@ -58,8 +79,15 @@ interface BaseDatePickerProps {
   ) => boolean;
   onViewModeChange?: (type: string) => void;
   requiredConfirm?: boolean;
+  onClick?: (date: moment.Moment) => any;
+  onMouseEnter?: (date: moment.Moment) => any;
+  onMouseLeave?: (date: moment.Moment) => any;
   onClose?: () => void;
-  onChange?: (value: any) => void;
+  onChange?: (
+    value: any,
+    viewMode?: ChangeEventViewMode,
+    status?: ChangeEventViewStatus
+  ) => void;
   isEndDate?: boolean;
   minDate?: moment.Moment;
   maxDate?: moment.Moment;
@@ -88,12 +116,13 @@ interface BaseDatePickerProps {
     content: string | React.ReactElement;
     color?: string;
   }>;
+  env?: RendererEnv;
   largeMode?: boolean;
   todayActiveStyle?: React.CSSProperties;
   onScheduleClick?: (scheduleData: any) => void;
   hideHeader?: boolean;
   updateOn?: string;
-  useMobileUI?: boolean;
+  mobileUI?: boolean;
   embed?: boolean;
   closeOnSelect?: boolean;
   showToolbar?: boolean;
@@ -102,11 +131,14 @@ interface BaseDatePickerProps {
   displayTimeZone?: string;
   timeConstraints?: any;
   timeRangeHeader?: string;
+  status?: ChangeEventViewStatus;
+  testIdBuilder?: TestIdBuilder;
 }
 
 interface BaseDatePickerState {
-  inputFormat?: boolean | string;
+  displayForamt?: boolean | string;
   currentView: string;
+  initView: string;
   viewDate: moment.Moment;
   selectedDate: moment.Moment;
   inputValue?: string;
@@ -312,7 +344,7 @@ class BaseDatePicker extends React.Component<
 
     return {
       updateOn: updateOn,
-      inputFormat: formats.datetime,
+      displayForamt: formats.datetime,
       viewDate: viewDate,
       selectedDate: selectedDate,
       inputValue: inputValue,
@@ -341,8 +373,12 @@ class BaseDatePicker extends React.Component<
     state.currentView = this.props.dateFormat
       ? this.props.viewMode || state.updateOn || 'days'
       : this.props.viewMode || 'time';
+    state.initView = state.currentView;
 
     this.state = state;
+    this.onClick = this.onClick.bind(this);
+    this.onMouseEnter = this.onMouseEnter.bind(this);
+    this.onMouseLeave = this.onMouseLeave.bind(this);
   }
 
   getUpdateOn = (formats: any) => {
@@ -377,7 +413,10 @@ class BaseDatePicker extends React.Component<
       'subtractTime',
       'updateSelectedDate',
       'localMoment',
-      'handleClickOutside'
+      'handleClickOutside',
+      'onClick',
+      'onMouseEnter',
+      'onMouseLeave'
     ]
   };
 
@@ -399,8 +438,8 @@ class BaseDatePicker extends React.Component<
 
     [
       'inputFormat',
+      'displayForamt',
       'onChange',
-      'onClose',
       'requiredConfirm',
       'classPrefix',
       'prevIcon',
@@ -415,9 +454,11 @@ class BaseDatePicker extends React.Component<
       'onScheduleClick',
       'hideHeader',
       'updateOn',
-      'useMobileUI',
+      'mobileUI',
       'showToolbar',
-      'embed'
+      'embed',
+      'env',
+      'testIdBuilder'
     ].forEach(key => (props[key] = (this.props as any)[key]));
 
     return props;
@@ -470,17 +511,19 @@ class BaseDatePicker extends React.Component<
     if (!this.props.value) {
       this.setState({
         selectedDate: date,
-        inputValue: date.format(state.inputFormat as string)
+        inputValue: date.format(state.displayForamt as string)
       });
     }
-    this.props.onChange && this.props.onChange(date);
+    this.props.onChange && this.props.onChange(date, 'time');
   };
 
   setDate = (type: 'month' | 'year' | 'quarters') => {
     // todo 没看懂这个是啥意思，好像没啥用
     const currentShould =
       this.props.viewMode === 'months' &&
-      !/^mm$/i.test((this.props.inputFormat as string) || '');
+      !/^mm$/i.test(
+        ((this.props.inputFormat || this.props.displayForamt) as string) || ''
+      );
     const nextViews = {
       month: currentShould ? 'months' : 'days',
       year: currentShould ? 'months' : 'days',
@@ -505,8 +548,7 @@ class BaseDatePicker extends React.Component<
     };
   };
 
-  updateSelectedDate = (e: React.MouseEvent, close?: boolean) => {
-    const that: any = this;
+  getTargetDate = (e: React.MouseEvent) => {
     let target = e.currentTarget,
       modifier = 0,
       viewDate = this.state.viewDate,
@@ -545,31 +587,38 @@ class BaseDatePicker extends React.Component<
       .minutes(currentDate.minutes())
       .seconds(currentDate.seconds())
       .milliseconds(currentDate.milliseconds());
+    return date;
+  };
+
+  updateSelectedDate = (e: React.MouseEvent, close?: boolean) => {
+    const that: any = this;
+    const {embed, status} = that.props;
+    const date = that.getTargetDate(e);
 
     if (!this.props.value) {
       var open = !(this.props.closeOnSelect && close);
-      if (!open) {
+      if (!open && !embed) {
         that.props.onBlur(date);
       }
 
       this.setState({
         selectedDate: date,
         viewDate: date?.clone().startOf('month'),
-        inputValue: date?.format(this.state.inputFormat),
+        inputValue: date?.format(this.state.displayForamt),
         open: open
       });
     } else {
       this.setState({
         selectedDate: date,
         viewDate: date?.clone().startOf('month'),
-        inputValue: date?.format(this.state.inputFormat)
+        inputValue: date?.format(this.state.displayForamt)
       });
       if (this.props.closeOnSelect && close) {
         that.closeCalendar();
       }
     }
 
-    that.props.onChange(date);
+    that.props.onChange(date, 'days', status);
   };
 
   getDateBoundary = (currentDate: moment.Moment) => {
@@ -636,20 +685,52 @@ class BaseDatePicker extends React.Component<
       this.state.viewDate ||
       moment()
     ).clone();
-    const date = convertArrayValueToMoment(value, types, currentDate);
+    let date = convertArrayValueToMoment(value, types, currentDate);
+
+    if (types?.[1] === 'quarter') {
+      date = date.startOf('quarter').date(currentDate.date());
+    }
 
     if (!this.props.value) {
       this.setState({
         selectedDate: date,
-        inputValue: date!.format(this.state.inputFormat as string)
+        viewDate: date,
+        inputValue: date!.format(this.state.displayForamt as string)
       });
     }
     this.props.onChange && this.props.onChange(date);
+    this.onClose();
+  };
+
+  onClose = () => {
+    this.setState({currentView: this.state.initView});
     this.props.onClose && this.props.onClose();
   };
 
+  onClick(e: React.MouseEvent) {
+    const date = this.getTargetDate(e);
+    this.props.onClick && this.props.onClick(date);
+  }
+
+  onMouseEnter(e: React.MouseEvent) {
+    const date = this.getTargetDate(e);
+    this.props.onMouseEnter && this.props.onMouseEnter(date);
+  }
+
+  onMouseLeave(e: React.MouseEvent) {
+    const date = this.getTargetDate(e);
+    this.props.onMouseLeave && this.props.onMouseLeave(date);
+  }
+
   render() {
-    const {viewMode, timeFormat, dateFormat, timeRangeHeader} = this.props;
+    const {
+      viewMode,
+      timeFormat,
+      dateFormat,
+      timeRangeHeader,
+      mobileUI,
+      testIdBuilder
+    } = this.props;
     const Component = CustomCalendarContainer as any;
     const viewProps = this.getComponentProps();
 
@@ -665,6 +746,7 @@ class BaseDatePicker extends React.Component<
     }
 
     viewProps.onConfirm = this.onConfirm;
+    viewProps.onClose = this.onClose;
     viewProps.getDateBoundary = this.getDateBoundary;
     viewProps.getColumns = this.getColumns;
     viewProps.timeCell = this.timeCell;
@@ -683,11 +765,16 @@ class BaseDatePicker extends React.Component<
             ? 'rdtTime'
             : ''
         )}
+        {...testIdBuilder?.getTestId()}
       >
         <div
           key="dt"
           className={cx(
             'rdtPicker',
+            {
+              'is-mobile-year': mobileUI && viewMode === 'years'
+            },
+            {'is-mobile-embed': mobileUI && viewProps.embed},
             timeFormat && !dateFormat
               ? 'rdtPickerTimeWithoutD'
               : timeFormat && dateFormat

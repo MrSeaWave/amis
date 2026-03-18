@@ -1,17 +1,16 @@
 import React from 'react';
-import {
-  ConditionBuilderFields,
-  ConditionGroupValue,
-  ConditionBuilderFuncs
-} from './types';
+import {ConditionBuilderFields, ConditionBuilderFuncs} from './types';
 import {
   ThemeProps,
   themeable,
   autobind,
-  utils,
   localeable,
   LocaleProps,
-  guid
+  guid,
+  AMISConditionGroupValue,
+  someTree,
+  isPureVariable,
+  resolveVariableAndFilter
 } from 'amis-core';
 import Button from '../Button';
 import GroupOrItem from './GroupOrItem';
@@ -20,6 +19,7 @@ import {FormulaPickerProps} from '../formula/Picker';
 import Select from '../Select';
 
 import {DownArrowBoldIcon} from '../icons';
+import type {TestIdBuilder} from 'amis-core';
 
 interface ConditionGroupState {
   isCollapsed: boolean;
@@ -28,15 +28,17 @@ interface ConditionGroupState {
 export interface ConditionGroupProps extends ThemeProps, LocaleProps {
   builderMode?: 'simple' | 'full';
   config: ConditionBuilderConfig;
-  value?: ConditionGroupValue;
+  value?: AMISConditionGroupValue;
   fields: ConditionBuilderFields;
   funcs?: ConditionBuilderFuncs;
   showNot?: boolean;
   showANDOR?: boolean;
+  showIf?: boolean;
+  formulaForIf?: FormulaPickerProps;
   data?: any;
   disabled?: boolean;
   searchable?: boolean;
-  onChange: (value: ConditionGroupValue) => void;
+  onChange: (value: AMISConditionGroupValue) => void;
   removeable?: boolean;
   onRemove?: (e: React.MouseEvent) => void;
   draggable?: boolean;
@@ -45,8 +47,18 @@ export interface ConditionGroupProps extends ThemeProps, LocaleProps {
   formula?: FormulaPickerProps;
   popOverContainer?: any;
   renderEtrValue?: any;
-  selectMode?: 'list' | 'tree';
+  selectMode?: 'list' | 'tree' | 'chained';
   isCollapsed?: boolean; // 是否折叠
+  depth: number;
+  isAddBtnVisibleOn?: (param: {
+    depth: number;
+    breadth: number;
+  }) => boolean | undefined;
+  isAddGroupBtnVisibleOn?: (param: {
+    depth: number;
+    breadth: number;
+  }) => boolean | undefined;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export class ConditionGroup extends React.Component<
@@ -75,7 +87,7 @@ export class ConditionGroup extends React.Component<
       id: guid(),
       conjunction: 'and',
       ...this.props.value
-    } as ConditionGroupValue;
+    } as AMISConditionGroupValue;
   }
 
   @autobind
@@ -181,16 +193,22 @@ export class ConditionGroup extends React.Component<
       onDragStart,
       showNot,
       showANDOR = false,
-      disabled,
       searchable,
       translate: __,
       formula,
       popOverContainer,
       selectMode,
       renderEtrValue,
-      draggable
+      draggable,
+      depth,
+      isAddBtnVisibleOn,
+      isAddGroupBtnVisibleOn,
+      showIf,
+      formulaForIf,
+      testIdBuilder
     } = this.props;
     const {isCollapsed} = this.state;
+    const disabled = value?.disabled ?? this.props.disabled;
 
     const body =
       Array.isArray(value?.children) && value!.children.length
@@ -198,6 +216,16 @@ export class ConditionGroup extends React.Component<
           ? value!.children.slice(0, 1)
           : value!.children
         : null;
+
+    const param = {depth, breadth: body?.length ?? 0};
+    const anyFieldAvailable = someTree(
+      fields,
+      (field: any) => field.disabled !== true
+    );
+    const addConditionVisibleBool =
+      isAddBtnVisibleOn?.(param) ?? anyFieldAvailable;
+    const addConditionGroupVisibleBool =
+      isAddGroupBtnVisibleOn?.(param) ?? anyFieldAvailable;
 
     return (
       <div className={cx('CBGroup')} data-group-id={value?.id}>
@@ -239,6 +267,9 @@ export class ConditionGroup extends React.Component<
                   value: 'or'
                 }
               ]}
+              testIdBuilder={testIdBuilder?.getChild(
+                value?.conjunction || 'and'
+              )}
               value={value?.conjunction || 'and'}
               disabled={disabled}
               onChange={this.handleConjunctionChange}
@@ -251,19 +282,19 @@ export class ConditionGroup extends React.Component<
             {body ? (
               body.map((item, index) => (
                 <GroupOrItem
-                  draggable={value!.children!.length > 1}
+                  draggable={draggable && value!.children!.length > 1}
                   onDragStart={onDragStart}
                   config={config}
                   key={item.id}
                   fields={fields}
                   fieldClassName={fieldClassName}
-                  value={item as ConditionGroupValue}
+                  value={item as AMISConditionGroupValue}
                   index={index}
                   onChange={this.handleItemChange}
                   funcs={funcs}
                   onRemove={this.handleItemRemove}
                   data={data}
-                  disabled={disabled}
+                  disabled={item.disabled ?? disabled}
                   searchable={searchable}
                   builderMode={builderMode}
                   formula={formula}
@@ -271,6 +302,12 @@ export class ConditionGroup extends React.Component<
                   renderEtrValue={renderEtrValue}
                   selectMode={selectMode}
                   isCollapsed={isCollapsed}
+                  depth={depth}
+                  isAddBtnVisibleOn={isAddBtnVisibleOn}
+                  isAddGroupBtnVisibleOn={isAddGroupBtnVisibleOn}
+                  showIf={showIf}
+                  formulaForIf={formulaForIf}
+                  testIdBuilder={testIdBuilder?.getChild(`group-${index}`)}
                 />
               ))
             ) : (
@@ -307,41 +344,41 @@ export class ConditionGroup extends React.Component<
                 )}
               >
                 <div className={cx('ButtonGroup')}>
-                  <Button
-                    level="link"
-                    onClick={this.handleAdd}
-                    size="xs"
-                    disabled={disabled}
-                  >
-                    {__('Condition.add_cond')}
-                  </Button>
-                  {builderMode === 'simple' ? null : (
+                  {addConditionVisibleBool ? (
+                    <Button
+                      level="link"
+                      onClick={this.handleAdd}
+                      size="xs"
+                      disabled={disabled}
+                      testIdBuilder={testIdBuilder?.getChild('add')}
+                    >
+                      {__('Condition.add_cond')}
+                    </Button>
+                  ) : null}
+                  {addConditionGroupVisibleBool && builderMode !== 'simple' ? (
                     <Button
                       onClick={this.handleAddGroup}
                       size="xs"
                       disabled={disabled}
                       level="link"
+                      testIdBuilder={testIdBuilder?.getChild('add-group')}
                     >
                       {__('Condition.add_cond_group')}
                     </Button>
-                  )}
+                  ) : null}
                   {removeable ? (
                     <Button
                       onClick={onRemove}
                       size="xs"
                       disabled={disabled}
                       level="link"
+                      testIdBuilder={testIdBuilder?.getChild('add-del')}
                     >
                       {__('Condition.delete_cond_group')}
                     </Button>
                   ) : null}
                 </div>
               </div>
-              {/* {removeable ? (
-              <a className={cx('CBDelete')} onClick={onRemove}>
-                {__('Condition.delete_cond_group')}
-              </a>
-            ) : null} */}
             </div>
           )}
         </div>

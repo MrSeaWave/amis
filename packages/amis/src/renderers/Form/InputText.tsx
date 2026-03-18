@@ -1,37 +1,54 @@
 import React from 'react';
+import Downshift, {StateChangeOptions} from 'downshift';
+import {matchSorter} from 'match-sorter';
+import debouce from 'lodash/debounce';
+import find from 'lodash/find';
 import {
   OptionsControl,
   OptionsControlProps,
   highlight,
-  FormOptionsControl,
-  resolveEventData
+  resolveEventData,
+  CustomStyle,
+  PopOver,
+  Overlay,
+  formatInputThemeCss,
+  setThemeClassName,
+  ActionObject,
+  filter,
+  autobind,
+  createObject,
+  setVariable,
+  ucFirst,
+  isEffectiveApi,
+  getVariable
 } from 'amis-core';
-import {ActionObject} from 'amis-core';
-import Downshift, {StateChangeOptions} from 'downshift';
-import {matchSorter} from 'match-sorter';
-import debouce from 'lodash/debounce';
-import {filter} from 'amis-core';
-import find from 'lodash/find';
-import {Icon} from 'amis-ui';
-import {Input} from 'amis-ui';
-import {autobind, createObject, setVariable, ucFirst} from 'amis-core';
-import {isEffectiveApi} from 'amis-core';
-import {Spinner} from 'amis-ui';
+import {Icon, SpinnerExtraProps, Input, Spinner, OverflowTpl} from 'amis-ui';
 import {ActionSchema} from '../Action';
-import {FormOptionsSchema, SchemaApi} from '../../Schema';
-import {generateIcon} from 'amis-core';
+import {FormOptionsSchema, SchemaApi, SchemaObject} from '../../Schema';
 import {supportStatic} from './StaticHoc';
 
-import type {Option} from 'amis-core';
+import type {AMISFormItemWithOptions, Option} from 'amis-core';
 import type {ListenerAction} from 'amis-core';
 
 // declare function matchSorter(items:Array<any>, input:any, options:any): Array<any>;
 
+export type InputTextAddOnObject = {
+  /**
+   * 按钮位置
+   */
+  position?: 'left' | 'right';
+  [propName: string]: any;
+};
+
+export type InputTextAddOn = ActionSchema & InputTextAddOnObject;
+
 /**
- * Text 文本输入框。
- * 文档：https://baidu.gitee.io/amis/docs/components/form/text
+ * 文本输入框，支持建议、校验与多种展示模式。支持异步联想、前后缀、密码显隐、计数、大小写转换。
  */
-export interface TextControlSchema extends FormOptionsSchema {
+export interface AMISInputTextSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 text 组件
+   */
   type:
     | 'input-text'
     | 'input-email'
@@ -41,51 +58,54 @@ export interface TextControlSchema extends FormOptionsSchema {
     | 'native-time'
     | 'native-number';
 
-  addOn?: {
-    position?: 'left' | 'right';
-    label?: string;
-    icon?: string;
-    className?: string;
-  } & ActionSchema;
+  /**
+   * 附加按钮
+   */
+  addOn?: InputTextAddOn;
 
   /**
-   * 是否去除首尾空白文本。
+   * 是否去除首尾空格
    */
   trimContents?: boolean;
 
   /**
-   * 自动完成 API，当输入部分文字的时候，会将这些文字通过 ${term} 可以取到，发送给接口。
-   * 接口可以返回匹配到的选项，帮助用户输入。
+   * 自动完成 API
    */
   autoComplete?: SchemaApi;
 
   /**
-   * 边框模式，全边框，还是半边框，或者没边框。
+   * 原生自动完成
+   * @default off
+   */
+  nativeAutoComplete?: string;
+
+  /**
+   * 边框模式
    */
   borderMode?: 'full' | 'half' | 'none';
 
   /**
-   * 限制文字最小输入个数
+   * 最小长度
    */
   minLength?: number;
 
   /**
-   * 限制文字最大输入个数
+   * 最大长度
    */
   maxLength?: number;
 
   /**
-   * 是否显示计数
+   * 是否显示字符计数
    */
   showCounter?: boolean;
 
   /**
-   * 前缀
+   * 前缀文本
    */
   prefix?: string;
 
   /**
-   * 后缀
+   * 后缀文本
    */
   suffix?: string;
 
@@ -93,9 +113,9 @@ export interface TextControlSchema extends FormOptionsSchema {
    * 自动转换值
    */
   transform?: {
-    /** 用户输入的字符自动转小写 */
+    /** 转小写 */
     lowerCase?: boolean;
-    /** 用户输入的字符自动转大写 */
+    /** 转大写 */
     upperCase?: boolean;
   };
 
@@ -105,7 +125,7 @@ export interface TextControlSchema extends FormOptionsSchema {
   /** 原生input标签的CSS类名 */
   nativeInputClassName?: string;
 
-  /** 在内容为空的时候清除值 */
+  /** 内容为空时清除值 */
   clearValueOnEmpty?: boolean;
 }
 
@@ -114,10 +134,12 @@ export type InputTextRendererEvent =
   | 'focus'
   | 'click'
   | 'change'
+  | 'review' // 查看密码事件
+  | 'encrypt' // 隐藏密码事件
   | 'enter';
 
-export interface TextProps extends OptionsControlProps {
-  placeholder?: string;
+export interface TextProps extends OptionsControlProps, SpinnerExtraProps {
+  placeholder?: string | { [propName: string]: string; };
   addOn?: ActionObject & {
     position?: 'left' | 'right';
     label?: string;
@@ -125,11 +147,11 @@ export interface TextProps extends OptionsControlProps {
     className?: string;
   };
   creatable?: boolean;
-  clearable: boolean;
+  clearable?: boolean;
   resetValue?: any;
   autoComplete?: any;
   allowInputText?: boolean;
-  spinnerClassName: string;
+  spinnerClassName?: string;
   revealPassword?: boolean;
   transform?: {
     lowerCase?: boolean; // 用户输入的字符自动转小写
@@ -139,6 +161,8 @@ export interface TextProps extends OptionsControlProps {
   inputControlClassName?: string;
   /** 原生input标签的CSS类名 */
   nativeInputClassName?: string;
+
+  popOverContainer?: any;
 }
 
 export interface TextState {
@@ -192,7 +216,8 @@ export default class TextControl extends React.PureComponent<
     valueField: 'value',
     placeholder: '',
     allowInputText: true,
-    trimContents: true
+    trimContents: true,
+    nativeAutoComplete: 'off'
   };
 
   componentDidMount() {
@@ -249,13 +274,24 @@ export default class TextControl extends React.PureComponent<
     this.input = ref;
   }
 
-  doAction(action: ListenerAction, args: any) {
+  doAction(
+    action: ListenerAction,
+    data: any,
+    throwErrors: boolean = false,
+    args?: any
+  ) {
     const actionType = action?.actionType as string;
 
-    if (!!~['clear', 'reset'].indexOf(actionType)) {
+    if (actionType === 'reset') {
+      this.resetValue();
+    } else if (actionType === 'clear') {
       this.clearValue();
     } else if (actionType === 'focus') {
       this.focus();
+    } else if (actionType === 'review') {
+      this.setState({revealPassword: true});
+    } else if (actionType === 'encrypt') {
+      this.setState({revealPassword: false});
     }
   }
 
@@ -280,8 +316,59 @@ export default class TextControl extends React.PureComponent<
     }
   }
 
-  clearValue() {
-    const {onChange, resetValue} = this.props;
+  async resetValue() {
+    const {onChange, dispatchEvent, resetValue, formStore, store, name} =
+      this.props;
+    const pristineVal =
+      getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+
+    const changeEvent = await dispatchEvent(
+      'change',
+      resolveEventData(this.props, {value: pristineVal})
+    );
+
+    if (changeEvent?.prevented) {
+      return;
+    }
+
+    onChange(pristineVal);
+
+    this.setState(
+      {
+        inputValue: pristineVal
+      },
+      () => {
+        //this.focus();
+        this.loadAutoComplete();
+      }
+    );
+  }
+
+  async clearValue() {
+    const {onChange, dispatchEvent, clearValueOnEmpty} = this.props;
+    let resetValue = this.props.resetValue;
+
+    if (clearValueOnEmpty && resetValue === '') {
+      resetValue = undefined;
+    }
+
+    const clearEvent = await dispatchEvent(
+      'clear',
+      resolveEventData(this.props, {value: resetValue})
+    );
+
+    if (clearEvent?.prevented) {
+      return;
+    }
+
+    const changeEvent = await dispatchEvent(
+      'change',
+      resolveEventData(this.props, {value: resetValue})
+    );
+
+    if (changeEvent?.prevented) {
+      return;
+    }
 
     onChange(resetValue);
     this.setState(
@@ -289,7 +376,7 @@ export default class TextControl extends React.PureComponent<
         inputValue: resetValue
       },
       () => {
-        this.focus();
+        //this.focus();
         this.loadAutoComplete();
       }
     );
@@ -304,27 +391,31 @@ export default class TextControl extends React.PureComponent<
     onChange(this.normalizeValue(newValue));
   }
 
-  async handleClick() {
-    const {dispatchEvent, value} = this.props;
+  async handleClick(event: React.MouseEvent) {
+    const {dispatchEvent, value, multiple} = this.props;
     const rendererEvent = await dispatchEvent(
       'click',
-      resolveEventData(
-        this.props,
-        {
-          value
-        },
-        'value'
-      )
+      resolveEventData(this.props, {
+        value
+      })
     );
 
     if (rendererEvent?.prevented) {
       return;
     }
-    // 已经 focus 的就不重复执行，否则总重新定位光标
-    this.state.isFocused || this.focus();
-    this.setState({
-      isOpen: true
-    });
+    // 修复 placeholder 点击无法聚焦的问题
+    const isClickedOnInput =
+      event.target === this.input ||
+      (this.input?.parentElement?.contains(event.target as HTMLElement) ??
+        false);
+
+    if (multiple || isClickedOnInput) {
+      // 已经 focus 的就不重复执行，否则总重新定位光标
+      this.state.isFocused || this.focus();
+      this.setState({
+        isOpen: true
+      });
+    }
   }
 
   async handleFocus(e: any) {
@@ -336,13 +427,9 @@ export default class TextControl extends React.PureComponent<
 
     const rendererEvent = await dispatchEvent(
       'focus',
-      resolveEventData(
-        this.props,
-        {
-          value
-        },
-        'value'
-      )
+      resolveEventData(this.props, {
+        value
+      })
     );
 
     if (rendererEvent?.prevented) {
@@ -361,20 +448,22 @@ export default class TextControl extends React.PureComponent<
       },
       () => {
         if (trimContents && value && typeof value === 'string') {
-          onChange(value.trim());
+          const trimedValue = value.trim();
+
+          // 因为下发给 Input 的 value 可能不会变，所以这里需要手动同步一下
+          if (this.input) {
+            this.input.value = trimedValue;
+          }
+          onChange(trimedValue);
         }
       }
     );
 
     const rendererEvent = await dispatchEvent(
       'blur',
-      resolveEventData(
-        this.props,
-        {
-          value
-        },
-        'value'
-      )
+      resolveEventData(this.props, {
+        value
+      })
     );
 
     if (rendererEvent?.prevented) {
@@ -384,12 +473,19 @@ export default class TextControl extends React.PureComponent<
     onBlur && onBlur(e);
   }
 
+  @autobind
+  close() {
+    this.setState({
+      isFocused: false
+    });
+  }
+
   async handleInputChange(evt: React.ChangeEvent<HTMLInputElement>) {
     let value = this.transformValue(evt.currentTarget.value);
     const {creatable, multiple, onChange, dispatchEvent} = this.props;
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value}, 'value')
+      resolveEventData(this.props, {value})
     );
 
     if (rendererEvent?.prevented) {
@@ -453,7 +549,7 @@ export default class TextControl extends React.PureComponent<
 
       const rendererEvent = await dispatchEvent(
         'enter',
-        resolveEventData(this.props, {value}, 'value')
+        resolveEventData(this.props, {value})
       );
 
       if (rendererEvent?.prevented) {
@@ -496,8 +592,14 @@ export default class TextControl extends React.PureComponent<
 
     if (multiple) {
       const newValue = selectedOptions.concat();
-      toggledOption && newValue.push(toggledOption);
-
+      if (toggledOption) {
+        newValue.push(toggledOption);
+      } else if (value && creatable !== false) {
+        newValue.push({
+          label: value,
+          value
+        });
+      }
       onChange(this.normalizeValue(newValue));
     } else {
       onChange(toggledOption ? this.normalizeValue(toggledOption) : value);
@@ -569,7 +671,7 @@ export default class TextControl extends React.PureComponent<
 
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value}, 'value')
+      resolveEventData(this.props, {value})
     );
 
     if (rendererEvent?.prevented) {
@@ -636,9 +738,9 @@ export default class TextControl extends React.PureComponent<
     }
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     const reload = this.props.reloadOptions;
-    reload && reload();
+    reload && reload(subpath, query);
   }
 
   valueToString(value: any) {
@@ -651,9 +753,15 @@ export default class TextControl extends React.PureComponent<
       : JSON.stringify(value);
   }
 
+  @autobind
+  getTarget() {
+    return this.input?.parentElement;
+  }
+
   renderSugestMode() {
     const {
       className,
+      style,
       inputControlClassName,
       nativeInputClassName,
       inputOnly,
@@ -674,9 +782,17 @@ export default class TextControl extends React.PureComponent<
       creatable,
       borderMode,
       showCounter,
+      data,
       maxLength,
       minLength,
-      translate: __
+      translate: __,
+      loadingConfig,
+      popOverContainer,
+      themeCss,
+      css,
+      id,
+      nativeAutoComplete,
+      testIdBuilder
     } = this.props;
     let type = this.props.type?.replace(/^(?:native|input)\-/, '');
 
@@ -699,7 +815,8 @@ export default class TextControl extends React.PureComponent<
           let filtedOptions =
             inputValue && isOpen && !autoComplete
               ? matchSorter(options, inputValue, {
-                  keys: [labelField || 'label', valueField || 'value']
+                  keys: [labelField || 'label', valueField || 'value'],
+                  threshold: matchSorter.rankings.CONTAINS
                 })
               : options;
           const indices = isOpen
@@ -725,11 +842,26 @@ export default class TextControl extends React.PureComponent<
             });
           }
 
+          const filteredPlaceholder = filter(placeholder, data);
+
           return (
             <div
               className={cx(
                 `TextControl-input TextControl-input--withAC`,
                 inputControlClassName,
+                setThemeClassName({
+                  ...this.props,
+                  name: 'inputControlClassName',
+                  id,
+                  themeCss: themeCss || css
+                }),
+                setThemeClassName({
+                  ...this.props,
+                  name: 'inputControlClassName',
+                  id,
+                  themeCss: themeCss || css,
+                  extra: 'inner'
+                }),
                 inputOnly ? className : '',
                 {
                   'is-opened': isOpen,
@@ -739,23 +871,27 @@ export default class TextControl extends React.PureComponent<
                 }
               )}
               onClick={this.handleClick}
+              {...testIdBuilder?.getTestId()}
             >
               <>
-                {placeholder &&
+                {filteredPlaceholder &&
                 !selectedOptions.length &&
                 !this.state.inputValue &&
                 !this.state.isFocused ? (
                   <div className={cx('TextControl-placeholder')}>
-                    {placeholder}
+                    {filteredPlaceholder}
                   </div>
                 ) : null}
 
                 {selectedOptions.map((item, index) =>
                   multiple ? (
                     <div className={cx('TextControl-value')} key={index}>
-                      <span className={cx('TextControl-valueLabel')}>
+                      <OverflowTpl
+                        className={cx('TextControl-valueLabel')}
+                        tooltip={`${item[labelField || 'label']}`}
+                      >
                         {`${item[labelField || 'label']}`}
-                      </span>
+                      </OverflowTpl>
                       <Icon
                         icon="close"
                         className={cx('TextControl-valueIcon', 'icon')}
@@ -783,7 +919,7 @@ export default class TextControl extends React.PureComponent<
                     maxLength,
                     minLength
                   })}
-                  autoComplete="off"
+                  autoComplete={nativeAutoComplete}
                   size={10}
                   className={cx(nativeInputClassName)}
                 />
@@ -794,7 +930,11 @@ export default class TextControl extends React.PureComponent<
                   onClick={this.clearValue}
                   className={cx('TextControl-clear')}
                 >
-                  <Icon icon="input-clear" className="icon" />
+                  <Icon
+                    icon="input-clear"
+                    className="icon"
+                    iconContent="InputText-clear"
+                  />
                 </a>
               ) : null}
 
@@ -814,45 +954,60 @@ export default class TextControl extends React.PureComponent<
                   icon="reload"
                   size="sm"
                   spinnerClassName={cx('TextControl-spinner')}
+                  loadingConfig={loadingConfig}
                 />
               ) : null}
 
-              {isOpen && filtedOptions.length ? (
-                <div className={cx('TextControl-sugs')}>
-                  {filtedOptions.map((option: any) => {
-                    const label = option[labelField || 'label'];
-                    const value = option[valueField || 'value'];
+              <Overlay
+                container={popOverContainer || this.getTarget}
+                target={this.getTarget}
+                show={!!(isOpen && filtedOptions.length)}
+              >
+                <PopOver
+                  className={cx('TextControl-popover')}
+                  style={{
+                    width: this.input
+                      ? this.input.parentElement!.offsetWidth
+                      : 'auto'
+                  }}
+                >
+                  <div className={cx('TextControl-sugs')}>
+                    {filtedOptions.map((option: any) => {
+                      const label = option[labelField || 'label'];
+                      const value = option[valueField || 'value'];
 
-                    return (
-                      <div
-                        {...getItemProps({
-                          item: value,
-                          disabled: option.disabled,
-                          className: cx(`TextControl-sugItem`, {
-                            'is-highlight': highlightedIndex === indices[value],
-                            'is-disabled': option.disabled
-                          })
-                        })}
-                        key={value}
-                      >
-                        {option.isNew ? (
-                          <span>
-                            {__('Text.add', {label: label})}
-                            <Icon icon="enter" className="icon" />
-                          </span>
-                        ) : (
-                          <span>
-                            {option.disabled
-                              ? label
-                              : highlight(label, inputValue as string)}
-                            {option.tip}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
+                      return (
+                        <div
+                          {...getItemProps({
+                            item: value,
+                            disabled: option.disabled,
+                            className: cx(`TextControl-sugItem`, {
+                              'is-highlight':
+                                highlightedIndex === indices[value],
+                              'is-disabled': option.disabled || option.readOnly
+                            })
+                          })}
+                          key={value}
+                        >
+                          {option.isNew ? (
+                            <span>
+                              {__('Text.add', {label: label})}
+                              <Icon icon="enter" className="icon" />
+                            </span>
+                          ) : (
+                            <span>
+                              {option.disabled
+                                ? label
+                                : highlight(label, inputValue as string)}
+                              {option.tip}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </PopOver>
+              </Overlay>
             </div>
           );
         }}
@@ -860,7 +1015,21 @@ export default class TextControl extends React.PureComponent<
     );
   }
 
-  toggleRevealPassword() {
+  async toggleRevealPassword() {
+    const {dispatchEvent, value} = this.props;
+    const eventName = this.state.revealPassword ? 'encrypt' : 'review';
+
+    const rendererEvent = await dispatchEvent(
+      eventName,
+      resolveEventData(this.props, {
+        value
+      })
+    );
+
+    if (rendererEvent?.prevented || rendererEvent?.stoped) {
+      return;
+    }
+
     this.setState({revealPassword: !this.state.revealPassword});
   }
 
@@ -869,6 +1038,7 @@ export default class TextControl extends React.PureComponent<
       classPrefix: ns,
       classnames: cx,
       className,
+      style,
       inputControlClassName,
       nativeInputClassName,
       inputOnly,
@@ -889,7 +1059,12 @@ export default class TextControl extends React.PureComponent<
       data,
       showCounter,
       maxLength,
-      minLength
+      minLength,
+      themeCss,
+      css,
+      id,
+      nativeAutoComplete,
+      testIdBuilder
     } = this.props;
 
     const type = this.props.type?.replace(/^(?:native|input)\-/, '');
@@ -901,9 +1076,23 @@ export default class TextControl extends React.PureComponent<
           {
             [`TextControl-input--border${ucFirst(borderMode)}`]: borderMode
           },
+          setThemeClassName({
+            ...this.props,
+            name: 'inputControlClassName',
+            id,
+            themeCss: themeCss || css
+          }),
+          setThemeClassName({
+            ...this.props,
+            name: 'inputControlClassName',
+            id,
+            themeCss: themeCss || css,
+            extra: 'inner'
+          }),
           inputControlClassName,
           inputOnly ? className : ''
         )}
+        {...testIdBuilder?.getTestId()}
       >
         {prefix ? (
           <span className={cx('TextControl-inputPrefix')}>
@@ -912,7 +1101,7 @@ export default class TextControl extends React.PureComponent<
         ) : null}
         <Input
           name={name}
-          placeholder={placeholder}
+          placeholder={filter(placeholder, data)}
           ref={this.inputRef}
           disabled={disabled}
           readOnly={readOnly}
@@ -923,7 +1112,7 @@ export default class TextControl extends React.PureComponent<
           min={min}
           maxLength={maxLength}
           minLength={minLength}
-          autoComplete="off"
+          autoComplete={nativeAutoComplete}
           size={10}
           step={step}
           onChange={this.handleNormalInputChange}
@@ -931,21 +1120,36 @@ export default class TextControl extends React.PureComponent<
           className={cx(nativeInputClassName, {
             'TextControl-input-password': type === 'password' && revealPassword
           })}
+          {...testIdBuilder?.getChild('input').getTestId()}
         />
         {clearable && !disabled && !readOnly && value ? (
-          <a onClick={this.clearValue} className={`${ns}TextControl-clear`}>
-            <Icon icon="input-clear" className="icon" />
+          <a onClick={this.clearValue} className={cx('TextControl-clear')}>
+            <Icon
+              icon="input-clear"
+              className="icon"
+              iconContent="InputText-clear"
+            />
           </a>
         ) : null}
         {type === 'password' && revealPassword && !disabled ? (
           <a
             onClick={this.toggleRevealPassword}
-            className={`${ns}TextControl-revealPassword`}
+            className={cx('TextControl-revealPassword')}
           >
             {this.state.revealPassword ? (
-              <Icon icon="view" className="icon" />
+              <Icon
+                icon="view"
+                className={cx('TextControl-icon-view')}
+                classNameProp={cx('TextControl-icon-view')}
+                iconContent="InputText-view"
+              />
             ) : (
-              <Icon icon="invisible" className="icon" />
+              <Icon
+                icon="invisible"
+                className={cx('TextControl-icon-invisible')}
+                classNameProp={cx('TextControl-icon-invisible')}
+                iconContent="InputText-invisible"
+              />
             )}
           </a>
         ) : null}
@@ -969,13 +1173,19 @@ export default class TextControl extends React.PureComponent<
     const {
       classnames: cx,
       className,
+      style,
       classPrefix: ns,
       addOn: addOnRaw,
       render,
       data,
       disabled,
+      readOnly,
       inputOnly,
-      static: isStatic
+      static: isStatic,
+      addOnClassName,
+      themeCss,
+      css,
+      id
     } = this.props;
 
     const addOn: any =
@@ -986,19 +1196,43 @@ export default class TextControl extends React.PureComponent<
           }
         : addOnRaw;
 
-    const iconElement = generateIcon(cx, addOn?.icon, 'Icon');
+    const iconElement = <Icon cx={cx} icon={addOn?.icon} className="Icon" />;
 
     let addOnDom =
       addOn && !isStatic ? (
         addOn.actionType ||
         ~['button', 'submit', 'reset', 'action'].indexOf(addOn.type) ? (
-          <div className={cx(`${ns}TextControl-button`, addOn.className)}>
+          <div
+            className={cx(
+              `${ns}TextControl-button`,
+              addOnClassName,
+              setThemeClassName({
+                ...this.props,
+                name: 'addOnClassName',
+                id,
+                themeCss: themeCss || css,
+                extra: 'addOn'
+              })
+            )}
+          >
             {render('addOn', addOn, {
               disabled
             })}
           </div>
         ) : (
-          <div className={cx(`${ns}TextControl-addOn`, addOn.className)}>
+          <div
+            className={cx(
+              `${ns}TextControl-addOn`,
+              addOnClassName,
+              setThemeClassName({
+                ...this.props,
+                name: 'addOnClassName',
+                id,
+                themeCss: themeCss || css,
+                extra: 'addOn'
+              })
+            )}
+          >
             {iconElement}
             {addOn.label ? filter(addOn.label, data) : null}
           </div>
@@ -1013,14 +1247,14 @@ export default class TextControl extends React.PureComponent<
       ? cx(className, `${ns}TextControl`, {
           [`${ns}TextControl--withAddOn`]: !!addOnDom,
           'is-focused': this.state.isFocused,
-          'is-disabled': disabled
+          'is-disabled': disabled || readOnly
         })
       : cx(`${ns}TextControl`, {
           [`${ns}TextControl--withAddOn`]: !!addOnDom
         });
 
     return (
-      <div className={classNames}>
+      <div className={classNames} style={style}>
         {addOn && addOn.position === 'left' ? addOnDom : null}
         {body}
         {addOn && addOn.position !== 'left' ? addOnDom : null}
@@ -1028,16 +1262,96 @@ export default class TextControl extends React.PureComponent<
     );
   }
 
+  /**
+   * 处理input的自定义样式
+   */
+  @autobind
   @supportStatic()
   render(): JSX.Element {
-    const {options, source, autoComplete} = this.props;
-
+    const {
+      options,
+      source,
+      autoComplete,
+      themeCss,
+      css,
+      id,
+      env,
+      classPrefix: ns
+    } = this.props;
     let input =
       autoComplete !== false && (source || options?.length || autoComplete)
         ? this.renderSugestMode()
         : this.renderNormal();
 
-    return this.renderBody(input);
+    return (
+      <>
+        {this.renderBody(input)}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss || css,
+            classNames: [
+              {
+                key: 'inputControlClassName',
+                weights: {
+                  focused: {
+                    parent: `.${ns}TextControl.is-focused`
+                  },
+                  disabled: {
+                    parent: `.${ns}TextControl.is-disabled`
+                  }
+                }
+              }
+            ],
+            id: id
+          }}
+          env={env}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: formatInputThemeCss(themeCss || css),
+            classNames: [
+              {
+                key: 'inputControlClassName',
+                weights: {
+                  default: {
+                    inner: 'input'
+                  },
+                  hover: {
+                    inner: 'input'
+                  },
+                  focused: {
+                    parent: `.${ns}TextControl.is-focused`,
+                    inner: 'input'
+                  },
+                  disabled: {
+                    parent: `.${ns}TextControl.is-disabled`,
+                    inner: 'input'
+                  }
+                }
+              }
+            ],
+            id: id && id + '-inner'
+          }}
+          env={env}
+        />
+
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss || css,
+            classNames: [
+              {
+                key: 'addOnClassName'
+              }
+            ],
+            id: id && id + '-addOn'
+          }}
+          env={env}
+        />
+      </>
+    );
   }
 }
 
@@ -1055,14 +1369,10 @@ export function mapItemIndex(
 }
 
 @OptionsControl({
-  type: 'input-text'
+  type: 'input-text',
+  alias: ['input-password', 'native-date', 'native-time', 'native-number']
 })
 export class TextControlRenderer extends TextControl {}
-
-@OptionsControl({
-  type: 'input-password'
-})
-export class PasswordControlRenderer extends TextControl {}
 
 @OptionsControl({
   type: 'input-email',
@@ -1075,18 +1385,3 @@ export class EmailControlRenderer extends TextControl {}
   validations: 'isUrl'
 })
 export class UrlControlRenderer extends TextControl {}
-
-@OptionsControl({
-  type: 'native-date'
-})
-export class NativeDateControlRenderer extends TextControl {}
-
-@OptionsControl({
-  type: 'native-time'
-})
-export class NativeTimeControlRenderer extends TextControl {}
-
-@OptionsControl({
-  type: 'native-number'
-})
-export class NativeNumberControlRenderer extends TextControl {}

@@ -3,16 +3,25 @@
  * @author fex
  */
 
+type EventType = 'both' | 'width' | 'height';
 class EventQueue {
-  q: Array<Function> = [];
+  q: Array<{
+    fn: Function;
+    type: EventType;
+  }> = [];
 
-  add(cb: Function) {
-    this.q.push(cb);
+  add(cb: Function, type: EventType = 'both') {
+    this.q.push({
+      fn: cb,
+      type
+    });
   }
 
-  call(...args: Array<any>) {
-    this.q.forEach(fn => {
-      fn(...args);
+  call(type: EventType, ...args: any[]) {
+    this.q.forEach(item => {
+      if (item.type === type || item.type === 'both' || type === 'both') {
+        item.fn.apply(null, args);
+      }
     });
   }
 }
@@ -28,15 +37,19 @@ export function getComputedStyle(element: HTMLElement, prop: string) {
   }
 }
 
-function attachResizeEvent(element: HTMLElement, resized: () => void) {
+function attachResizeEvent(
+  element: HTMLElement,
+  resized: () => void,
+  type: EventType = 'both'
+) {
   if (!element) {
     return;
   }
   if (!(element as any).resizedAttached) {
     (element as any).resizedAttached = new EventQueue();
-    (element as any).resizedAttached.add(resized);
+    (element as any).resizedAttached.add(resized, type);
   } else if ((element as any).resizedAttached) {
-    (element as any).resizedAttached.add(resized);
+    (element as any).resizedAttached.add(resized, type);
     return;
   }
 
@@ -98,9 +111,9 @@ function attachResizeEvent(element: HTMLElement, resized: () => void) {
 
   reset();
 
-  let changed = function () {
+  let changed = function (type: EventType = 'both') {
     if ((element as any).resizedAttached) {
-      (element as any).resizedAttached.call();
+      (element as any).resizedAttached.call(type);
     }
   };
 
@@ -121,11 +134,16 @@ function attachResizeEvent(element: HTMLElement, resized: () => void) {
   };
 
   let onScroll = function (e: Event) {
-    if (
-      element.offsetWidth != lastWidth ||
-      element.offsetHeight != lastHeight
-    ) {
-      changed();
+    const widthChanged = element.offsetWidth != lastWidth;
+    const heightChanged = element.offsetHeight != lastHeight;
+    if (widthChanged || heightChanged) {
+      changed(
+        widthChanged && heightChanged
+          ? 'both'
+          : widthChanged
+          ? 'width'
+          : 'height'
+      );
     }
     reset();
   };
@@ -159,31 +177,112 @@ function detach(element: HTMLElement) {
   }
 }
 
-export function resizeSensor(
-  element: HTMLElement,
-  callback: () => void
-): () => void;
-export function resizeSensor(
+export function appearSensor(
   element: HTMLElement,
   callback: () => void,
   once: boolean = false
 ) {
+  if (once) {
+    callback = ((original: () => void) => {
+      return () => {
+        original();
+        dispose();
+      };
+    })(callback);
+  }
+
+  element.addEventListener('animationstart', callback);
+  let originalAnimationName = element.style.animationName;
+  let originalAnimationDuration = element.style.animationDuration;
+  element.style.cssText =
+    'animation-name: apearSensor; animation-duration: 0.2s;';
+  let dispose = () => {
+    element.style.animationName = originalAnimationName;
+    element.style.animationDuration = originalAnimationDuration;
+    element.removeEventListener('animationstart', callback);
+  };
+
+  return dispose;
+}
+
+export function resizeSensorV2(
+  element: HTMLElement,
+  callback: () => void,
+  once: boolean = false,
+  type: EventType = 'both'
+) {
+  const rect = element.getBoundingClientRect();
+  let originWidth = rect.width;
+  let originHeight = rect.height;
+
+  const observer = new ResizeObserver(function (entries) {
+    if (once) {
+      observer.disconnect();
+    }
+    const entry = entries[0];
+    const cr = entry.contentRect;
+    // 变化大于0.5px时才触发回调,允许一定的误差
+    const widthChanged = Math.abs(cr.width - originWidth) > 0.5;
+    const heightChanged = Math.abs(cr.height - originHeight) > 0.5;
+
+    if (widthChanged || heightChanged) {
+      if (type === 'both') {
+        callback();
+      } else if (
+        (type === 'width' && widthChanged) ||
+        (type === 'height' && heightChanged)
+      ) {
+        callback();
+      }
+      originWidth = cr.width;
+      originHeight = cr.height;
+    }
+  });
+  observer.observe(element);
+  return () => {
+    observer.disconnect();
+  };
+}
+
+export function resizeSensor(
+  element: HTMLElement,
+  callback: () => void,
+  once: boolean = false,
+  type: EventType = 'both',
+  triggerOnAppear: boolean = false
+): () => void {
   if (!element) {
     return () => {};
   }
 
+  // 优先用 ResizeObserver
+  if (typeof ResizeObserver !== 'undefined') {
+    const disposes = [
+      resizeSensorV2(element, callback, once, type),
+      triggerOnAppear ? appearSensor(element, callback, true) : undefined
+    ];
+    return () => {
+      disposes.forEach(dispose => dispose?.());
+    };
+  }
+
+  // 不支持 ResizeObserver 的话，用 polyfill
   let disposeEvent: (() => void) | undefined = undefined;
 
   if (once) {
-    disposeEvent = attachResizeEvent(element, function (this: any) {
-      callback.apply(this, arguments);
-      disposeEvent?.();
-      detach(element);
-    });
-    return;
+    disposeEvent = attachResizeEvent(
+      element,
+      function (this: any) {
+        callback.apply(this, arguments);
+        disposeEvent?.();
+        detach(element);
+      },
+      type
+    );
+    return () => {};
   }
 
-  disposeEvent = attachResizeEvent(element, callback);
+  disposeEvent = attachResizeEvent(element, callback, type);
   let detached = false;
 
   return function () {

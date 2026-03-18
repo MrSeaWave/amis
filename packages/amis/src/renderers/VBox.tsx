@@ -1,5 +1,5 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {AMISSchema, AMISSchemaBase, Renderer, RendererProps} from 'amis-core';
 import {Api, SchemaNode, Schema, ActionObject} from 'amis-core';
 import cx from 'classnames';
 import {BaseSchema, SchemaObject} from '../Schema';
@@ -11,9 +11,12 @@ export type HboxRow = SchemaObject & {
 
 /**
  * 垂直布局控件
- * 文档：https://baidu.gitee.io/amis/docs/components/vbox
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/vbox
  */
-export interface VBoxSchema extends BaseSchema {
+/**
+ * 垂直布局组件，用于纵向排列子元素。支持区块间距与对齐配置。
+ */
+export interface AMISVBoxSchema extends AMISSchemaBase {
   type: 'vbox';
 
   /**
@@ -24,14 +27,14 @@ export interface VBoxSchema extends BaseSchema {
 
 export interface HBoxProps
   extends RendererProps,
-    Omit<VBoxSchema, 'className'> {}
+    Omit<AMISVBoxSchema, 'className'> {}
 
 export default class VBox extends React.Component<HBoxProps, object> {
   static propsList: Array<string> = ['rows'];
 
   static defaultProps: Partial<HBoxProps> = {};
 
-  renderChild(region: string, node: Schema) {
+  renderChild(region: string, node: AMISSchema) {
     const {render} = this.props;
 
     return render(region, node);
@@ -47,10 +50,10 @@ export default class VBox extends React.Component<HBoxProps, object> {
   }
 
   render() {
-    const {className, rows, classPrefix: ns} = this.props;
+    const {className, style, rows, classPrefix: ns} = this.props;
 
     return (
-      <div className={cx(`${ns}Vbox`, className)}>
+      <div className={cx(`${ns}Vbox`, className)} style={style}>
         {Array.isArray(rows)
           ? rows.map((row, key) => (
               <div

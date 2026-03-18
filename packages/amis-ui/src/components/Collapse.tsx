@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import {ClassNamesFn, themeable} from 'amis-core';
+import {ClassNamesFn, ThemeProps, themeable} from 'amis-core';
 import Transition, {
   EXITED,
   ENTERING,
@@ -14,6 +14,7 @@ import Transition, {
 import {autobind} from 'amis-core';
 import {isClickOnInput} from 'amis-core';
 import {TranslateFn} from 'amis-core';
+import {Icon} from './icons';
 
 const collapseStyles: {
   [propName: string]: string;
@@ -23,7 +24,7 @@ const collapseStyles: {
   [ENTERING]: 'in'
 };
 
-export interface CollapseProps {
+export interface CollapseProps extends ThemeProps {
   id?: string;
   key?: string;
   collapseId?: string;
@@ -31,8 +32,7 @@ export interface CollapseProps {
   mountOnEnter?: boolean;
   unmountOnExit?: boolean;
   className?: string;
-  classPrefix: string;
-  classnames: ClassNamesFn;
+  style?: any;
   headerPosition?: 'top' | 'bottom';
   header?: React.ReactNode;
   body: any;
@@ -45,11 +45,16 @@ export interface CollapseProps {
   headingClassName?: string;
   collapseHeader?: React.ReactElement | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'base';
-  onCollapse?: (item: any, collapsed: boolean) => void;
+  onCollapse?: (collapsed: boolean) => void;
   wrapperComponent?: any;
   headingComponent?: any;
   translate?: TranslateFn;
   propsUpdate?: boolean;
+  partial?: boolean;
+  children?: React.ReactNode | Array<React.ReactNode>;
+  divideLine?: boolean;
+  /** 当Collapse作为Form组件的子元素时，开启该属性后组件样式设置为FieldSet组件的样式，默认开启 */
+  enableFieldSetStyle?: boolean;
 }
 
 export interface CollapseState {
@@ -69,7 +74,8 @@ export class Collapse extends React.Component<CollapseProps, CollapseState> {
     collapsable: true,
     disabled: false,
     showArrow: true,
-    propsUpdate: false
+    propsUpdate: false,
+    enableFieldSetStyle: true
   };
 
   state: CollapseState = {
@@ -103,10 +109,31 @@ export class Collapse extends React.Component<CollapseProps, CollapseState> {
     if (props.disabled || props.collapsable === false) {
       return;
     }
-    props.onCollapse && props.onCollapse(props, !this.state.collapsed);
+    const newCollapsed = !this.state.collapsed;
+    props.onCollapse?.(newCollapsed);
     this.setState({
-      collapsed: !this.state.collapsed
+      collapsed: newCollapsed
     });
+  }
+
+  /** 变更组件的折叠状态 */
+  @autobind
+  changeCollapsedState(targetState: boolean) {
+    const {disabled, collapsable} = this.props;
+    const {collapsed: currentState} = this.state;
+
+    if (disabled || collapsable === false || currentState === targetState) {
+      return;
+    }
+
+    this.setState(
+      {
+        collapsed: targetState
+      },
+      () => {
+        this.props.onCollapse?.(targetState);
+      }
+    );
   }
 
   contentDom: any;
@@ -154,6 +181,7 @@ export class Collapse extends React.Component<CollapseProps, CollapseState> {
       wrapperComponent: WrapperComponent,
       headingComponent: HeadingComponent,
       className,
+      style,
       headingClassName,
       headerPosition,
       collapseHeader,
@@ -165,7 +193,9 @@ export class Collapse extends React.Component<CollapseProps, CollapseState> {
       showArrow,
       expandIcon,
       disabled,
-      children
+      children,
+      mobileUI,
+      enableFieldSetStyle
     } = this.props;
 
     const finalHeader = this.state.collapsed
@@ -173,31 +203,40 @@ export class Collapse extends React.Component<CollapseProps, CollapseState> {
       : collapseHeader || header;
 
     let dom = [
-      finalHeader ? (
-        <HeadingComponent
-          key="header"
-          onClick={this.toggleCollapsed}
-          className={cx(`Collapse-header`, headingClassName)}
-        >
-          {showArrow && collapsable ? (
-            expandIcon ? (
-              React.cloneElement(expandIcon, {
-                ...expandIcon.props,
-                className: cx(
-                  'Collapse-icon-tranform',
-                  expandIcon.props?.className
-                )
-              })
-            ) : (
-              <span className={cx('Collapse-arrow')} />
-            )
+      <HeadingComponent
+        key="header"
+        onClick={this.toggleCollapsed}
+        className={cx(
+          `Collapse-header`,
+          {'is-mobile': mobileUI},
+          headingClassName,
+          {noTitle: !finalHeader}
+        )}
+      >
+        {showArrow && collapsable ? (
+          expandIcon ? (
+            React.cloneElement(expandIcon, {
+              ...expandIcon.props,
+              className: cx(
+                'Collapse-icon-tranform',
+                expandIcon.props?.className
+              )
+            })
           ) : (
-            ''
-          )}
-          {finalHeader}
-        </HeadingComponent>
-      ) : null,
-
+            <span className={cx('Collapse-arrow-wrap')}>
+              <Icon
+                icon="right-arrow-bold"
+                className={cx('Collapse-arrow', 'icon')}
+                classNameProp={cx('Collapse-arrow')}
+                iconContent="Collapse-arrow"
+              />
+            </span>
+          )
+        ) : (
+          ''
+        )}
+        {finalHeader}
+      </HeadingComponent>,
       <Transition
         key="body"
         mountOnEnter={mountOnEnter}
@@ -237,13 +276,16 @@ export class Collapse extends React.Component<CollapseProps, CollapseState> {
         className={cx(
           `Collapse`,
           {
+            'is-mobile': mobileUI,
             'is-active': !this.state.collapsed,
             [`Collapse--${size}`]: size,
             'Collapse--disabled': disabled,
-            'Collapse--title-bottom': headerPosition === 'bottom'
+            'Collapse--title-bottom': headerPosition === 'bottom',
+            'Collapse-fieldset--disabled': enableFieldSetStyle === false
           },
           className
         )}
+        style={style}
       >
         {dom}
       </WrapperComponent>

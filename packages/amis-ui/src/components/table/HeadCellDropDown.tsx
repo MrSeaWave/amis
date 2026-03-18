@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 
 import {
   themeable,
@@ -15,6 +15,8 @@ import {
   Overlay,
   PopOver
 } from 'amis-core';
+
+import type {TestIdBuilder} from 'amis-core';
 
 export interface FilterPayload {
   closeDropdown?: boolean;
@@ -32,19 +34,20 @@ export interface Props extends ThemeProps, LocaleProps {
   className: string; // 图标样式
   layerClassName: string; // 展开层样式
   active: boolean; // 图标是否高亮
-  popOverContainer?: () => Element | Text | null;
+  popOverContainer?: () => HTMLElement;
   filterDropdown: (payload: FilterDropdownProps) => JSX.Element | null; // 菜单内容
   selectedKeys?: Array<string | number> | string;
   setSelectedKeys?: (keys: Array<string | number> | string) => void;
   classnames: ClassNamesFn;
   classPrefix: string;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export interface State {
   isOpened: boolean;
 }
 
-export class HeadCellDropDown extends React.Component<Props, State> {
+export class HeadCellDropDown extends React.PureComponent<Props, State> {
   constructor(props: Props) {
     super(props);
 
@@ -78,7 +81,9 @@ export class HeadCellDropDown extends React.Component<Props, State> {
         </span>
         {isOpened ? (
           <Overlay
-            container={popOverContainer || (() => findDOMNode(this))}
+            container={
+              popOverContainer || (() => findDOMNode(this) as HTMLElement)
+            }
             placement="left-bottom-left-top right-bottom-right-top"
             target={
               popOverContainer ? () => findDOMNode(this)!.parentNode : null
@@ -100,7 +105,9 @@ export class HeadCellDropDown extends React.Component<Props, State> {
                       }
                     }
                   })
-                : filterDropdown || null}
+                : React.isValidElement(filterDropdown)
+                ? filterDropdown
+                : null}
             </PopOver>
           </Overlay>
         ) : null}

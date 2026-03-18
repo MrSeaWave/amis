@@ -6,17 +6,18 @@
     margin-left: var(--DropDown-caret-marginLeft);
     display: inline-block;
     vertical-align: top;
-    transition: transform var(--animation-duration) ease;
 
     > svg {
       width: px2rem(10px);
       height: px2rem(10px);
-      top: 0.125em;
+      top: 0;
+      transform: rotate(90deg);
+      transition: transform var(--animation-duration) ease;
     }
   }
 
-  &.is-opened &-caret {
-    transform: rotate(180deg);
+  &.is-opened &-caret svg {
+    transform: rotate(270deg);
   }
 
   &.is-actived {
@@ -46,16 +47,17 @@
     &-root {
       position: absolute;
       z-index: $zindex-dropdown;
-      top: 100%;
       left: 0;
       margin: px2rem(1px) 0 0;
-      border: none;
+      border: var(--Form-select-outer-borderWidth) solid
+        var(--Form-select-outer-borderColor);
       border-radius: var(--DropDown-menu-borderRadius);
       box-shadow: var(--DropDown-menu-boxShadow);
       min-width: var(--DropDown-menu-minWidth);
       overflow-y: auto;
       overflow-x: hidden;
       max-height: px2rem(300px);
+      margin-top: px2rem(4px);
     }
   }
 
@@ -66,19 +68,15 @@
 
   &-menuItem,
   &-menu > li {
-    padding: var(--DropDown-menuItem-paddingY) var(--DropDown-menuItem-paddingX);
+    padding: 0 var(--DropDown-menuItem-paddingX);
     white-space: nowrap;
     box-sizing: border-box;
     height: var(--DropDown-menu-height);
+    line-height: var(--DropDown-menu-height);
     vertical-align: middle;
     user-select: none;
     color: var(--DropDown-menuItem-color);
     text-decoration: var(--link-decoration);
-
-    &:hover {
-      background: var(--DropDown-menuItem-onHover-bg);
-      color: var(--DropDown-menuItem-onHover-color);
-    }
 
     &.is-active {
       background: var(--DropDown-menuItem-onHover-bg);
@@ -99,14 +97,16 @@
 
     &.#{$ns}DropDown-divider {
       height: px2rem(1px);
-      margin: px2rem(9px) 0;
+      margin: px2rem(4px) 0;
       overflow: hidden;
       background: var(--DropDown-menu-borderColor);
       padding: 0;
     }
 
     &.#{$ns}DropDown-groupTitle {
-      height: inherit;
+      //height: inherit;
+      height: auto;
+      line-height: 1;
       font-size: var(--fontSizeSm);
       padding: var(--gap-xs) var(--gap-xs);
       padding-left: var(--gap-sm);
@@ -115,7 +115,8 @@
       cursor: default;
 
       &:hover {
-        background: none;
+        background: none !important;
+        color: var(--DropDown-group-color) !important;
       }
 
       span {
@@ -128,6 +129,14 @@
     }
   }
 
+  &-menuItem,
+  &-menu:not(.is-mobile) > li:not(.is-disabled) {
+    &:hover {
+      background: var(--DropDown-menuItem-onHover-bg);
+      color: var(--DropDown-menuItem-onHover-color);
+    }
+  }
+
   &-menu > li a {
     color: inherit;
     display: block;
@@ -137,6 +146,11 @@
   &-popover {
     border: none;
     box-shadow: none;
+    // 如果是在PopOver position: absolute会使overlayNode没有高度 定位不正确
+    // 改成static z-index不生效 无法点击操作
+    > .#{$ns}DropDown-menu-root {
+      position: relative;
+    }
   }
 
   > .#{$ns}Button {

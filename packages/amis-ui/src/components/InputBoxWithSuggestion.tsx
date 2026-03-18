@@ -1,5 +1,5 @@
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {localeable, LocaleProps} from 'amis-core';
 import {themeable, ThemeProps} from 'amis-core';
 // @ts-ignore
@@ -41,9 +41,12 @@ export class InputBoxWithSuggestion extends React.Component<InputBoxWithSuggesti
   }
 
   filterOptions(options: any[]) {
-    return matchSorter(options, this.props.value, {
-      keys: ['label', 'value']
-    });
+    return this.props.value
+      ? matchSorter(options, this.props.value, {
+          keys: ['label', 'value'],
+          threshold: matchSorter.rankings.CONTAINS
+        }).filter((item: any) => item.value !== this.props.value)
+      : options;
   }
 
   // 选了值，还原options
@@ -63,12 +66,17 @@ export class InputBoxWithSuggestion extends React.Component<InputBoxWithSuggesti
       searchable,
       popOverContainer,
       clearable,
-      hasError
+      hasError,
+      mobileUI,
+      className
     } = this.props;
-    const options = this.filterOptions(this.props.options);
+    const options = this.filterOptions(
+      Array.isArray(this.props.options) ? this.props.options : []
+    );
 
     return (
       <PopOverContainer
+        show={!!options.length}
         popOverContainer={popOverContainer || (() => findDOMNode(this))}
         popOverRender={({onClose}) => (
           <>
@@ -90,19 +98,32 @@ export class InputBoxWithSuggestion extends React.Component<InputBoxWithSuggesti
       >
         {({onClick, ref, isOpened}) => (
           <InputBox
-            className={cx('InputBox--sug', isOpened ? 'is-active' : '')}
+            className={cx(
+              'InputBox--sug',
+              className,
+              isOpened ? 'is-active' : ''
+            )}
             ref={ref}
             placeholder={placeholder}
             disabled={disabled}
-            value={options.find(o => o.value === value)?.label ?? value}
+            value={value}
+            blurValue={
+              (Array.isArray(this.props.options)
+                ? this.props.options
+                : []
+              ).find(o => o.value === value)?.label
+            }
             onChange={onChange}
             clearable={clearable}
             onClick={onClick}
             hasError={hasError}
+            mobileUI={mobileUI}
           >
-            <span className={cx('InputBox-caret')}>
-              <Icon icon="caret" className="icon" />
-            </span>
+            {options.length ? (
+              <span className={cx('InputBox-caret')}>
+                <Icon icon="right-arrow-bold" className="icon" />
+              </span>
+            ) : null}
           </InputBox>
         )}
       </PopOverContainer>

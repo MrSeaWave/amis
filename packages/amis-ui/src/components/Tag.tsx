@@ -5,7 +5,6 @@
 import React from 'react';
 import {themeable, ThemeProps} from 'amis-core';
 import {Icon, getIcon} from './icons';
-import {generateIcon} from 'amis-core';
 import {autobind, noop} from 'amis-core';
 
 export interface TagProps extends ThemeProps {
@@ -19,6 +18,10 @@ export interface TagProps extends ThemeProps {
   closeIcon?: string | React.ReactNode;
   onClose?: (e: React.MouseEvent) => void;
   onClick?: (e: React.MouseEvent) => void;
+  onMouseEnter?: (e: React.MouseEvent) => void;
+  onMouseLeave?: (e: React.MouseEvent) => void;
+  children?: React.ReactNode | Array<React.ReactNode>;
+  dataIndex?: number;
 }
 
 export interface CheckableTagProps extends TagProps {
@@ -56,18 +59,7 @@ export class Tag extends React.Component<TagProps> {
       return null;
     }
 
-    const icon =
-      typeof closeIcon === 'string' ? (
-        getIcon(closeIcon) ? (
-          <Icon icon={closeIcon} className="icon" />
-        ) : (
-          generateIcon(cx, closeIcon, 'Icon')
-        )
-      ) : React.isValidElement(closeIcon) ? (
-        closeIcon
-      ) : (
-        <Icon icon="close" className="icon" />
-      );
+    const icon = <Icon cx={cx} icon={closeIcon || 'close'} className="icon" />;
 
     return (
       <span className={cx(`Tag--close`)} onClick={this.handleClose}>
@@ -89,6 +81,18 @@ export class Tag extends React.Component<TagProps> {
     onClick?.(e);
   }
 
+  @autobind
+  handleMouseEnter(e: React.MouseEvent<any>) {
+    const {onMouseEnter} = this.props;
+    onMouseEnter?.(e);
+  }
+
+  @autobind
+  handleMouseLeave(e: React.MouseEvent<any>) {
+    const {onMouseLeave} = this.props;
+    onMouseLeave?.(e);
+  }
+
   render() {
     const {
       children,
@@ -100,7 +104,7 @@ export class Tag extends React.Component<TagProps> {
       icon,
       style,
       label,
-      closable
+      dataIndex
     } = this.props;
 
     const isPresetColor =
@@ -115,21 +119,25 @@ export class Tag extends React.Component<TagProps> {
       ...style
     };
 
-    const prevIcon = displayMode === 'status' && (
-      <span className={cx('Tag--prev')}>
-        {typeof icon === 'string' ? (
-          getIcon(icon) ? (
-            <Icon icon={icon} className="icon" />
-          ) : (
-            generateIcon(cx, icon, 'Icon')
-          )
-        ) : React.isValidElement(icon) ? (
-          icon
-        ) : (
-          <Icon icon="dot" className="icon" />
-        )}
-      </span>
-    );
+    let prevIcon;
+    if (displayMode === 'status') {
+      let iconItem;
+      if (icon) {
+        iconItem = <Icon icon={icon} className="icon" />;
+      }
+      if (!iconItem) {
+        iconItem = (
+          <Icon icon="dot" className={cx('icon', 'Tag-default-icon')} />
+        );
+      }
+
+      const prevIconStyle = customColor ? {style: {color: customColor}} : {};
+      prevIcon = (
+        <span className={cx('Tag--prev')} {...prevIconStyle}>
+          {iconItem}
+        </span>
+      );
+    }
 
     return (
       <span
@@ -140,8 +148,14 @@ export class Tag extends React.Component<TagProps> {
         })}
         style={tagStyle}
         onClick={this.handleClick}
+        onMouseEnter={this.handleMouseEnter}
+        onMouseLeave={this.handleMouseLeave}
+        data-index={dataIndex}
       >
-        <span className={cx('Tag-text')}>
+        <span
+          className={cx('Tag-text')}
+          title={typeof label === 'string' ? label : undefined}
+        >
           {prevIcon}
           {label || children}
         </span>
@@ -168,7 +182,8 @@ class CheckableTagComp extends React.Component<CheckableTagProps> {
       label,
       children,
       checked,
-      style = {}
+      style = {},
+      dataIndex
     } = this.props;
 
     return (
@@ -179,6 +194,8 @@ class CheckableTagComp extends React.Component<CheckableTagProps> {
         })}
         onClick={disabled ? noop : this.handleClick}
         style={style}
+        title={typeof label === 'string' ? label : undefined}
+        data-index={dataIndex}
       >
         {label || children}
       </span>

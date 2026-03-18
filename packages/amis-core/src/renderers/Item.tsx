@@ -1,7 +1,10 @@
-import React from 'react';
+import React, {StrictMode} from 'react';
 import hoistNonReactStatic from 'hoist-non-react-statics';
 import {IFormItemStore, IFormStore} from '../store/form';
 import {reaction} from 'mobx';
+import {isAlive} from 'mobx-state-tree';
+import {isGlobalVarExpression} from '../globalVar';
+import {resolveVariableAndFilter} from '../utils/resolveVariableAndFilter';
 
 import {
   renderersMap,
@@ -17,36 +20,55 @@ import {
   autobind,
   isMobile,
   createObject,
-  getVariable
+  getVariable,
+  extendObject
 } from '../utils/helper';
 import {observer} from 'mobx-react';
-import {FormHorizontal, FormSchemaBase} from './Form';
+import {AMISFormBase, FormHorizontal, FormSchemaBase} from './Form';
 import {
+  ActionObject,
+  BaseApi,
   BaseApiObject,
   BaseSchemaWithoutType,
   ClassName,
+  DataChangeReason,
   Schema
 } from '../types';
-import {filter} from '../utils/tpl';
 import {HocStoreFactory} from '../WithStore';
 import {wrapControl} from './wrapControl';
 import debounce from 'lodash/debounce';
 import {isApiOutdated, isEffectiveApi} from '../utils/api';
-import {findDOMNode} from 'react-dom';
-import {dataMapping} from '../utils';
+import {findDomCompat as findDOMNode} from '../utils/findDomCompat';
+import {
+  createObjectFromChain,
+  dataMapping,
+  deleteVariable,
+  getTreeAncestors,
+  isEmpty,
+  keyToPath,
+  setThemeClassName,
+  setVariable
+} from '../utils';
 import Overlay from '../components/Overlay';
 import PopOver from '../components/PopOver';
+import CustomStyle from '../components/CustomStyle';
+import classNames from 'classnames';
+import isPlainObject from 'lodash/isPlainObject';
+import {IScopedContext} from '../Scoped';
+import {
+  AMISApi,
+  AMISClassName,
+  AMISRemarkBase,
+  AMISSchemaBase,
+  AMISTemplate,
+  AMISVariableName
+} from '../schema';
 
-export type LabelAlign = 'right' | 'left';
+export type LabelAlign = 'right' | 'left' | 'top' | 'inherit';
 
-export interface FormBaseControl extends BaseSchemaWithoutType {
+export interface AMISFormItemBase extends AMISSchemaBase {
   /**
-   * 表单项大小
-   */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
-
-  /**
-   * 描述标题
+   * 描述标题, 当值为 false 时不展示
    */
   label?: string | false;
 
@@ -59,31 +81,40 @@ export interface FormBaseControl extends BaseSchemaWithoutType {
    * label自定义宽度，默认单位为px
    */
   labelWidth?: number | string;
+  /**
+   * label展示形式
+   */
+  labelOverflow?: 'default' | 'ellipsis';
 
   /**
    * 配置 label className
    */
-  labelClassName?: string;
+  labelClassName?: AMISClassName;
 
   /**
    * 字段名，表单提交时的 key，支持多层级，用.连接，如： a.b.c
    */
-  name?: string;
+  name?: AMISVariableName;
+
+  /**
+   * 额外的字段名，当为范围组件时可以用来将另外一个值打平出来
+   */
+  extraName?: AMISVariableName;
 
   /**
    * 显示一个小图标, 鼠标放上去的时候显示提示内容
    */
-  remark?: any;
+  remark?: AMISRemarkBase;
 
   /**
    * 显示一个小图标, 鼠标放上去的时候显示提示内容, 这个小图标跟 label 在一起
    */
-  labelRemark?: any;
+  labelRemark?: AMISRemarkBase;
 
   /**
    * 输入提示，聚焦的时候显示
    */
-  hint?: string;
+  hint?: AMISTemplate;
 
   /**
    * 当修改完的时候是否提交表单。
@@ -109,17 +140,17 @@ export interface FormBaseControl extends BaseSchemaWithoutType {
   /**
    * 描述内容，支持 Html 片段。
    */
-  description?: string;
+  description?: AMISTemplate;
 
   /**
    * @deprecated 用 description 代替
    */
-  desc?: string;
+  desc?: AMISTemplate;
 
   /**
    * 配置描述上的 className
    */
-  descriptionClassName?: ClassName;
+  descriptionClassName?: AMISClassName;
 
   /**
    * 配置当前表单项展示模式
@@ -144,7 +175,11 @@ export interface FormBaseControl extends BaseSchemaWithoutType {
   /**
    * 占位符
    */
-  placeholder?: string;
+  placeholder?:
+    | string
+    | {
+        [propName: string]: string;
+      };
 
   /**
    * 是否为必填
@@ -375,8 +410,102 @@ export interface FormBaseControl extends BaseSchemaWithoutType {
   /**
    * 远端校验表单项接口
    */
-  validateApi?: string | BaseApiObject;
+  validateApi?: AMISApi;
+
+  /**
+   * 自动填充，当选项被选择的时候，将选项中的其他值同步设置到表单内。
+   *
+   * 支持配置 api，配置 api 后将额外请求外部接口完成填充，同时支持自动填充与用户选择填充两种模式。
+   */
+  autoFill?:
+    | {
+        [propName: string]: string;
+      }
+    | {
+        /**
+         * 是否为参照录入模式，参照录入会展示候选值供用户选择，而不是直接填充。
+         */
+        showSuggestion?: boolean;
+
+        /**
+         * 参照录入时，默认选中的值
+         */
+        defaultSelection?: any;
+
+        /**
+         * 自动填充 api
+         */
+        api?: AMISApi;
+
+        /**
+         * 是否展示数据格式错误提示，默认为不展示
+         * @default true
+         */
+        silent?: boolean;
+
+        /**
+         * 填充时的数据映射
+         */
+        fillMapping?: {
+          [propName: string]: any;
+        };
+
+        /**
+         * 触发条件，默认为 change
+         */
+        trigger?: 'change' | 'focus' | 'blur';
+
+        /**
+         * 是否支持多选
+         */
+        multiple?: boolean;
+
+        /**
+         * 弹窗方式，当为参照录入时用可以配置
+         */
+        mode?: 'popOver' | 'dialog' | 'drawer';
+
+        /**
+         * 当参照录入为抽屉时可以配置弹出位置
+         */
+        position?: string;
+
+        /**
+         * 当为参照录入时可以配置弹出容器的大小
+         */
+        size?: string;
+
+        /**
+         * 参照录入展示的项
+         */
+        columns?: Array<any>;
+
+        /**
+         * 参照录入时的过滤条件
+         */
+        filter?: AMISFormBase;
+
+        // picker 里面的部分属性
+        labelField?: string;
+        nameField?: string;
+      };
+
+  /**
+   * @default fillIfNotSet
+   * 初始化时是否把其他字段同步到表单内部。
+   */
+  initAutoFill?: boolean | 'fillIfNotSet';
+
+  row?: number; // flex模式下指定所在的行数
 }
+
+export interface AMISFormItem extends AMISFormItemBase {
+  /**
+   * 表单项大小
+   */
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
+}
+export type FormBaseControl = AMISFormItem;
 
 export interface FormItemBasicConfig extends Partial<RendererConfig> {
   type?: string;
@@ -385,8 +514,14 @@ export interface FormItemBasicConfig extends Partial<RendererConfig> {
   renderDescription?: boolean;
   test?: RegExp | TestFunc;
   storeType?: string;
+  formItemStoreType?: string;
   validations?: string;
   strictMode?: boolean;
+
+  /**
+   * 是否是瘦子
+   */
+  thin?: boolean;
   /**
    * schema变化使视图更新的属性白名单
    */
@@ -417,6 +552,8 @@ export interface FormItemProps extends RendererProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
   labelAlign?: LabelAlign;
   labelWidth?: number | string;
+  formLabelOverflow?: string;
+  labelOverflow?: 'default' | 'ellipsis';
   disabled?: boolean;
   btnDisabled: boolean;
   defaultValue: any;
@@ -430,9 +567,14 @@ export interface FormItemProps extends RendererProps {
   ) => void;
   onBulkChange?: (
     values: {[propName: string]: any},
-    submitOnChange?: boolean
+    submitOnChange?: boolean,
+    changeReason?: DataChangeReason
   ) => void;
-  addHook: (fn: Function, mode?: 'validate' | 'init' | 'flush') => () => void;
+  addHook: (
+    fn: Function,
+    mode?: 'validate' | 'init' | 'flush',
+    enforce?: 'prev' | 'post'
+  ) => () => void;
   removeHook: (fn: Function, mode?: 'validate' | 'init' | 'flush') => void;
   renderFormItems: (
     schema: Partial<FormSchemaBase>,
@@ -494,43 +636,98 @@ export interface FormItemConfig extends FormItemBasicConfig {
 }
 
 const getItemLabelClassName = (props: FormItemProps) => {
-  const {staticLabelClassName, labelClassName} = props;
-  return props.static && staticLabelClassName ? staticLabelClassName : labelClassName;
+  const {staticLabelClassName, labelClassName, id, themeCss} = props;
+  return props.static && staticLabelClassName
+    ? staticLabelClassName
+    : classNames(
+        labelClassName,
+        setThemeClassName({
+          ...props,
+          name: 'labelClassName',
+          id,
+          themeCss,
+          extra: 'item'
+        })
+      );
 };
 
 const getItemInputClassName = (props: FormItemProps) => {
   const {staticInputClassName, inputClassName} = props;
-  return props.static && staticInputClassName ? staticInputClassName : inputClassName;
+  return props.static && staticInputClassName
+    ? staticInputClassName
+    : inputClassName;
 };
 
 export class FormItemWrap extends React.Component<FormItemProps> {
-  reaction: Array<() => void> = [];
   lastSearchTerm: any;
   target: HTMLElement;
+  mounted = false;
+  initedOptionFilled = false;
+  initedApiFilled = false;
+  toDispose: Array<() => void> = [];
 
   constructor(props: FormItemProps) {
     super(props);
 
-    this.state = {
-      isOpened: false
-    };
+    const {formItem: model, formInited, addHook, initAutoFill} = props;
+    if (!model) {
+      return;
+    }
 
-    const {formItem: model} = props;
+    this.toDispose.push(
+      reaction(
+        () =>
+          `${model.errors.join('')}${model.isFocused}${
+            model.dialogOpen
+          }${JSON.stringify(model.filteredOptions)}${model.popOverOpen}`,
+        () => this.forceUpdate()
+      )
+    );
 
-    if (model) {
-      this.reaction.push(
-        reaction(
-          () => `${model.errors.join('')}${model.isFocused}${model.dialogOpen}`,
-          () => this.forceUpdate()
-        )
-      );
-      this.reaction.push(
+    let onInit = () => {
+      this.initedOptionFilled = true;
+      initAutoFill !== false &&
+        isAlive(model) &&
+        this.syncOptionAutoFill(
+          model.getSelectedOptions(model.tmpValue),
+          initAutoFill === 'fillIfNotSet'
+        );
+      this.initedApiFilled = true;
+      initAutoFill !== false &&
+        isAlive(model) &&
+        this.syncApiAutoFill(
+          model.tmpValue ?? '',
+          false,
+          initAutoFill === 'fillIfNotSet'
+        );
+
+      this.toDispose.push(
         reaction(
           () => JSON.stringify(model.tmpValue),
-          () => this.syncAutoFill(model.tmpValue)
+          () => this.mounted && this.handleAutoFill('change')
         )
       );
-    }
+
+      this.toDispose.push(
+        reaction(
+          () => JSON.stringify(model.getSelectedOptions(model.tmpValue)),
+          () =>
+            this.mounted &&
+            this.initedOptionFilled &&
+            this.syncOptionAutoFill(model.getSelectedOptions(model.tmpValue))
+        )
+      );
+    };
+    this.toDispose.push(
+      formInited || !addHook
+        ? model.addInitHook(onInit, 999)
+        : addHook(onInit, 'init', 'post')
+    );
+  }
+
+  componentDidMount() {
+    this.mounted = true;
+    this.target = findDOMNode(this) as HTMLElement;
   }
 
   componentDidUpdate(prevProps: FormItemProps) {
@@ -538,6 +735,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
     const {formItem: model} = props;
 
     if (
+      model &&
       isEffectiveApi(props.autoFill?.api, props.data) &&
       isApiOutdated(
         prevProps.autoFill?.api,
@@ -546,18 +744,30 @@ export class FormItemWrap extends React.Component<FormItemProps> {
         props.data
       )
     ) {
-      this.syncAutoFill(model?.tmpValue, true);
+      // 判断是否是因为自身值之外的值变化引起的，如果是则强制刷新
+      let checkIfCausedByOtherVariables = false;
+      if (props.autoFill?.api !== prevProps.autoFill?.api) {
+        checkIfCausedByOtherVariables = true;
+      } else {
+        let api = props.autoFill?.api;
+        const tmData = {};
+        setVariable(tmData, model.name, model.tmpValue);
+        checkIfCausedByOtherVariables = isApiOutdated(
+          api,
+          api,
+          extendObject(prevProps.data, tmData),
+          extendObject(props.data, tmData)
+        );
+      }
+      this.syncApiAutoFill(model.tmpValue, checkIfCausedByOtherVariables);
     }
   }
 
-  componentDidMount() {
-    this.target = findDOMNode(this) as HTMLElement;
-  }
-
   componentWillUnmount() {
-    this.reaction.forEach(fn => fn());
-    this.reaction = [];
-    this.syncAutoFill.cancel();
+    this.syncApiAutoFill.cancel();
+    this.mounted = false;
+    this.toDispose.forEach(fn => fn());
+    this.toDispose = [];
   }
 
   @autobind
@@ -577,91 +787,135 @@ export class FormItemWrap extends React.Component<FormItemProps> {
 
   @autobind
   handleBlur(e: any) {
-    const {formItem: model} = this.props;
+    const {formItem: model, autoFill} = this.props;
     model && model.blur();
     this.props.onBlur && this.props.onBlur(e);
+
+    if (
+      !autoFill ||
+      (autoFill && !autoFill?.hasOwnProperty('showSuggestion'))
+    ) {
+      return;
+    }
+    this.handleAutoFill('blur');
   }
 
   handleAutoFill(type: string) {
-    const {autoFill, onBulkChange, formItem, data} = this.props;
-    const {trigger, mode} = autoFill;
+    const {autoFill, formItem, data} = this.props;
+    const {trigger, mode} = autoFill || {};
     if (trigger === type && mode === 'popOver') {
       // 参照录入 popOver形式
-      this.setState({
-        isOpened: true
-      });
+      formItem?.openPopOver(
+        this.buildAutoFillSchema(),
+        data,
+        (confirmed, result) => {
+          if (!confirmed || !result?.selectedItems) {
+            return;
+          }
+
+          this.updateAutoFillData(result.selectedItems);
+        }
+      );
     } else if (
       // 参照录入 dialog | drawer
       trigger === type &&
       (mode === 'dialog' || mode === 'drawer')
     ) {
-      formItem?.openDialog(this.buildSchema(), data, result => {
-        if (!result?.selectedItems) {
-          return;
-        }
+      formItem?.openDialog(
+        this.buildAutoFillSchema(),
+        data,
+        (confirmed, result) => {
+          if (!confirmed || !result?.selectedItems) {
+            return;
+          }
 
-        this.updateAutoFillData(result.selectedItems);
-      });
+          this.updateAutoFillData(result.selectedItems);
+        }
+      );
     }
   }
 
   updateAutoFillData(context: any) {
-    const {formStore, autoFill, onBulkChange} = this.props;
+    const {data, autoFill, onBulkChange} = this.props;
     const {fillMapping, multiple} = autoFill;
     // form原始数据
-    const data = formStore?.data;
-    const contextData = createObject(
-      {items: !multiple ? [context] : context, ...data},
-      {...context}
-    );
-    let responseData: any = {};
-    responseData = dataMapping(fillMapping, contextData);
+    const contextData = Array.isArray(context)
+      ? createObject(data, {
+          items: context
+        })
+      : createObjectFromChain([
+          data,
+          {
+            items: [context]
+          },
+          context
+        ]);
 
-    if (!multiple && !fillMapping) {
-      responseData = context;
-    }
-
-    onBulkChange?.(responseData);
+    this.applyMapping(fillMapping ?? {}, contextData, false);
   }
 
-  syncAutoFill = debounce(
-    (term: any, reload?: boolean) => {
-      (async (term: string, reload?: boolean) => {
+  syncApiAutoFill = debounce(
+    async (term: any, forceLoad?: boolean, skipIfExits = false) => {
+      try {
         const {autoFill, onBulkChange, formItem, data} = this.props;
 
         // 参照录入
-        if (!autoFill || (autoFill && !autoFill?.hasOwnProperty('api'))) {
+        if (
+          !onBulkChange ||
+          !formItem ||
+          !autoFill ||
+          (autoFill && !autoFill?.hasOwnProperty('api'))
+        ) {
+          return;
+        } else if (
+          skipIfExits &&
+          (!autoFill.fillMapping ||
+            Object.keys(autoFill.fillMapping).some(
+              key => typeof getVariable(data, key) !== 'undefined'
+            ))
+        ) {
+          // 只要目标填充值有一个有值，就初始不自动填充
           return;
         }
+
         if (autoFill?.showSuggestion) {
           this.handleAutoFill('change');
         } else {
           // 自动填充
-          const itemName = formItem?.name;
+          const itemName = formItem.name;
           const ctx = createObject(data, {
-            [itemName || '']: term
+            __term: term
           });
+          setVariable(ctx, itemName, term);
+
           if (
-            (onBulkChange &&
-              isEffectiveApi(autoFill.api, ctx) &&
-              this.lastSearchTerm !== term) ||
-            reload
+            forceLoad ||
+            (isEffectiveApi(autoFill.api, ctx) && this.lastSearchTerm !== term)
           ) {
-            let result = await formItem?.loadAutoUpdateData(
+            let result = await formItem.loadAutoUpdateData(
               autoFill.api,
               ctx,
               !!(autoFill.api as BaseApiObject)?.silent
             );
+
             this.lastSearchTerm =
               (result && getVariable(result, itemName)) ?? term;
 
-            if (autoFill?.fillMapping) {
-              result = dataMapping(autoFill.fillMapping, result);
+            // 如果没有返回不应该处理
+            if (!result) {
+              return;
             }
-            result && onBulkChange?.(result);
+
+            this.applyMapping(
+              autoFill?.fillMapping ?? {'&': '$$'},
+              result,
+              false
+            );
           }
         }
-      })(term, reload).catch(e => console.error(e));
+      } catch (e) {
+        console.error(e);
+      }
     },
     250,
     {
@@ -670,14 +924,105 @@ export class FormItemWrap extends React.Component<FormItemProps> {
     }
   );
 
-  buildSchema() {
-    const {
-      render,
-      autoFill,
-      classPrefix: ns,
-      classnames: cx,
-      translate: __
-    } = this.props;
+  syncOptionAutoFill(selectedOptions: Array<any>, skipIfExits = false) {
+    const {autoFill, multiple, onBulkChange, data} = this.props;
+    const formItem = this.props.formItem as IFormItemStore;
+    // 参照录入｜自动填充
+    if (autoFill?.hasOwnProperty('api')) {
+      return;
+    }
+
+    if (
+      onBulkChange &&
+      autoFill &&
+      !isEmpty(autoFill) &&
+      formItem.filteredOptions.length
+    ) {
+      this.applyMapping(
+        autoFill,
+        multiple
+          ? {
+              items: selectedOptions.map(item =>
+                createObject(
+                  {
+                    ...data,
+                    ancestors: getTreeAncestors(
+                      formItem.filteredOptions,
+                      item,
+                      true
+                    )
+                  },
+                  item
+                )
+              )
+            }
+          : createObject(
+              {
+                ...data,
+                ancestors: getTreeAncestors(
+                  formItem.filteredOptions,
+                  selectedOptions[0],
+                  true
+                )
+              },
+              selectedOptions[0]
+            ),
+        skipIfExits
+      );
+    }
+  }
+
+  /**
+   * 应用映射函数，根据给定的映射关系，更新数据对象
+   *
+   * @param mapping 映射关系，类型为任意类型
+   * @param ctx 上下文对象，类型为任意类型
+   * @param skipIfExits 是否跳过已存在的属性，默认为 false
+   */
+  applyMapping(mapping: any, ctx: any, skipIfExits = false) {
+    const {onBulkChange, data, formItem} = this.props;
+    const toSync = dataMapping(mapping, ctx);
+
+    const tmpData = {...data};
+    const result = {...toSync};
+
+    Object.keys(mapping).forEach(key => {
+      if (key === '&') {
+        return;
+      }
+
+      const keys = keyToPath(key);
+      let value = getVariable(toSync, key);
+
+      if (skipIfExits) {
+        const originValue = getVariable(data, key);
+        if (typeof originValue !== 'undefined') {
+          value = originValue;
+        }
+      }
+
+      setVariable(result, key, value);
+
+      // 如果左边的 key 是一个路径
+      // 这里不希望直接把原始对象都给覆盖没了
+      // 而是保留原始的对象，只修改指定的属性
+      if (keys.length > 1 && isPlainObject(tmpData[keys[0]])) {
+        // 存在情况：依次更新同一子路径的多个key，eg: a.b.c1 和 a.b.c2，所以需要同步更新data
+        setVariable(tmpData, key, value);
+        result[keys[0]] = tmpData[keys[0]];
+      }
+    });
+
+    // 是否忽略自己的设置
+    // if (ignoreSelf && formItem?.name) {
+    //   deleteVariable(result, formItem.name);
+    // }
+
+    onBulkChange!(result);
+  }
+
+  buildAutoFillSchema() {
+    const {formItem, autoFill, translate: __} = this.props;
     if (!autoFill || (autoFill && !autoFill?.hasOwnProperty('api'))) {
       return;
     }
@@ -687,51 +1032,60 @@ export class FormItemWrap extends React.Component<FormItemProps> {
       size,
       offset,
       position,
+      placement,
       multiple,
       filter,
       columns,
       labelField,
       popOverContainer,
-      popOverClassName
+      popOverClassName,
+      valueField,
+      defaultSelection
     } = autoFill;
     const form = {
       type: 'form',
       // debug: true,
       title: '',
       className: 'suggestion-form',
-      body: {
-        type: 'picker',
-        embed: true,
-        joinValues: false,
-        label: false,
-        labelField,
-        multiple,
-        name: 'selectedItems',
-        options: [],
-        required: true,
-        source: api,
-        pickerSchema: {
-          type: 'crud',
-          affixHeader: false,
-          alwaysShowPagination: true,
-          keepItemSelectionOnPageChange: true,
-          headerToolbar: [],
-          footerToolbar: [
-            {
-              type: 'pagination',
-              align: 'left'
-            },
-            {
-              type: 'bulkActions',
-              align: 'right',
-              className: 'ml-2'
-            }
-          ],
+      body: [
+        {
+          type: 'picker',
+          embed: true,
+          joinValues: false,
+          strictMode: false,
+          label: false,
+          labelField,
+          valueField: valueField || 'value',
           multiple,
-          filter,
-          columns: columns || []
+          name: 'selectedItems',
+          value: defaultSelection || [],
+          options: [],
+          required: true,
+          source: api,
+          pickerSchema: {
+            type: 'crud',
+            bodyClassName: 'mb-0',
+            affixHeader: false,
+            alwaysShowPagination: true,
+            keepItemSelectionOnPageChange: true,
+            headerToolbar: [],
+            footerToolbar: [
+              {
+                type: 'pagination',
+                align: 'left'
+              },
+              {
+                type: 'bulkActions',
+                align: 'right',
+                className: 'ml-2'
+              }
+            ],
+            multiple,
+            filter,
+            columns: columns || []
+          }
         }
-      },
+      ],
       actions: [
         {
           type: 'button',
@@ -746,73 +1100,74 @@ export class FormItemWrap extends React.Component<FormItemProps> {
         }
       ]
     };
-    const schema = {
-      type: mode,
-      className: 'auto-fill-dialog',
-      title: __('FormItem.autoFillSuggest'),
-      size,
-      body: form,
-      actions: [
-        {
-          type: 'button',
-          actionType: 'cancel',
-          label: __('cancel')
-        },
-        {
-          type: 'submit',
-          actionType: 'submit',
-          level: 'primary',
-          label: __('confirm')
-        }
-      ]
-    };
+
     if (mode === 'popOver') {
-      return (
-        <Overlay
-          container={popOverContainer || this.target}
-          target={() => this.target}
-          placement={position || 'left-bottom-left-top'}
-          show
-        >
-          <PopOver
-            classPrefix={ns}
-            className={cx(`${ns}auto-fill-popOver`, popOverClassName)}
-            style={{
-              minWidth: this.target ? this.target.offsetWidth : undefined
-            }}
-            offset={offset}
-            onHide={this.hanldeClose}
-            overlay
-          >
-            {render('popOver-auto-fill-form', form, {
-              onSubmit: this.hanldeSubmit
-            })}
-          </PopOver>
-        </Overlay>
-      );
+      return {
+        popOverContainer,
+        popOverClassName,
+        placement: placement ?? position,
+        offset,
+        body: form
+      };
     } else {
-      return schema;
+      return {
+        type: mode,
+        className: 'auto-fill-dialog',
+        title: __('FormItem.autoFillSuggest'),
+        size,
+        body: {
+          ...form,
+          wrapWithPanel: false
+        },
+        actions: [
+          {
+            type: 'button',
+            actionType: 'cancel',
+            label: __('cancel')
+          },
+          {
+            type: 'submit',
+            actionType: 'submit',
+            level: 'primary',
+            label: __('confirm')
+          }
+        ]
+      };
     }
   }
 
   // 参照录入popOver提交
   @autobind
-  hanldeSubmit(values: any) {
+  handlePopOverConfirm(values: any) {
     const {onBulkChange, autoFill} = this.props;
     if (!autoFill || (autoFill && !autoFill?.hasOwnProperty('api'))) {
       return;
     }
 
     this.updateAutoFillData(values.selectedItems);
-
-    this.hanldeClose();
+    this.closePopOver();
   }
 
   @autobind
-  hanldeClose() {
-    this.setState({
-      isOpened: false
-    });
+  handlePopOverAction(
+    e: React.UIEvent<any>,
+    action: ActionObject,
+    data: object,
+    throwErrors: boolean = false,
+    delegate?: IScopedContext
+  ) {
+    const {onAction} = this.props;
+    if (action.actionType === 'cancel') {
+      this.closePopOver();
+    } else if (onAction) {
+      // 不识别的丢给上层去处理。
+      return onAction(e, action, data, throwErrors, delegate);
+    }
+  }
+
+  @autobind
+  closePopOver() {
+    this.props.formItem?.closePopOver();
   }
 
   @autobind
@@ -823,7 +1178,9 @@ export class FormItemWrap extends React.Component<FormItemProps> {
     }
 
     return new Promise(resolve =>
-      model.openDialog(schema, data, (result?: any) => resolve(result))
+      model.openDialog(schema, data, (confirmed: any, value: any) =>
+        resolve(confirmed ? value : false)
+      )
     );
   }
 
@@ -834,7 +1191,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
       return;
     }
 
-    model.closeDialog(values);
+    model.closeDialog(true, values);
   }
 
   @autobind
@@ -848,6 +1205,8 @@ export class FormItemWrap extends React.Component<FormItemProps> {
 
   renderControl(): JSX.Element | null {
     const {
+      // 这里解构，不可轻易删除，避免被rest传到子组件
+      inputClassName,
       formItem: model,
       classnames: cx,
       children,
@@ -857,17 +1216,15 @@ export class FormItemWrap extends React.Component<FormItemProps> {
       sizeMutable,
       size,
       defaultSize,
-      useMobileUI,
+      mobileUI,
       ...rest
     } = this.props;
 
-    const mobileUI = useMobileUI && isMobile();
     if (renderControl) {
       const controlSize = size || defaultSize;
       return renderControl({
         ...rest,
         onOpenDialog: this.handleOpenDialog,
-
         type,
         classnames: cx,
         formItem: model,
@@ -876,6 +1233,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
           {
             'is-inline': !!rest.inline && !mobileUI,
             'is-error': model && !model.valid,
+            'is-full': size === 'full',
             [`Form-control--withSize Form-control--size${ucFirst(
               controlSize
             )}`]:
@@ -885,6 +1243,13 @@ export class FormItemWrap extends React.Component<FormItemProps> {
               controlSize !== 'full'
           },
           model?.errClassNames,
+          setThemeClassName({
+            ...this.props,
+            name: 'wrapperCustomStyle',
+            id: rest.id,
+            themeCss: rest.wrapperCustomStyle,
+            extra: 'item'
+          }),
           getItemInputClassName(this.props)
         )
       });
@@ -905,6 +1270,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
     horizontal: (props: FormItemProps, renderControl: () => JSX.Element) => {
       let {
         className,
+        style,
         classnames: cx,
         description,
         descriptionClassName,
@@ -923,10 +1289,13 @@ export class FormItemWrap extends React.Component<FormItemProps> {
         hint,
         data,
         showErrorMsg,
-        useMobileUI,
+        mobileUI,
         translate: __,
         static: isStatic,
-        staticClassName
+        staticClassName,
+        id,
+        wrapperCustomStyle,
+        themeCss
       } = props;
 
       // 强制不渲染 label 的话
@@ -938,12 +1307,15 @@ export class FormItemWrap extends React.Component<FormItemProps> {
       const horizontal = props.horizontal || props.formHorizontal || {};
       const left = getWidthRate(horizontal.left);
       const right = getWidthRate(horizontal.right);
-      const labelAlign = props.labelAlign || props.formLabelAlign;
+      const labelAlign =
+        (props.labelAlign !== 'inherit' && props.labelAlign) ||
+        props.formLabelAlign;
       const labelWidth = props.labelWidth || props.formLabelWidth;
-
+      const labelOverflow = props.labelOverflow || props.formLabelOverflow;
       return (
         <div
           data-role="form-item"
+          data-amis-name={props.name}
           className={cx(
             `Form-item Form-item--horizontal`,
             isStatic && staticClassName ? staticClassName : className,
@@ -952,8 +1324,16 @@ export class FormItemWrap extends React.Component<FormItemProps> {
               [`is-error`]: model && !model.valid,
               [`is-required`]: required
             },
-            model?.errClassNames
+            model?.errClassNames,
+            setThemeClassName({
+              ...props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle,
+              extra: 'item'
+            })
           )}
+          style={style}
         >
           {label !== false ? (
             <label
@@ -966,19 +1346,22 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                       : 'normal'
                   }`]: horizontal.leftFixed,
                   [`Form-itemColumn--${left}`]: !horizontal.leftFixed,
-                  'Form-label--left': labelAlign === 'left'
+                  'Form-label--left': labelAlign === 'left',
+                  'Form-label-noLabel': label === ''
                 },
                 getItemLabelClassName(props)
               )}
               style={labelWidth != null ? {width: labelWidth} : undefined}
             >
-              <span>
-                {label
-                  ? render(
-                      'label',
-                      typeof label === 'string' ? filter(label, data) : label
-                    )
-                  : null}
+              <span
+                {...(labelOverflow === 'ellipsis'
+                  ? {
+                      className: cx('Form-ellipsis'),
+                      title: label
+                    }
+                  : {})}
+              >
+                {label ? render('label', label) : null}
                 {required && (label || labelRemark) ? (
                   <span className={cx(`Form-star`)}>*</span>
                 ) : null}
@@ -987,13 +1370,9 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                       type: 'remark',
                       icon: labelRemark.icon || 'warning-mark',
                       tooltip: labelRemark,
-                      useMobileUI,
+                      mobileUI,
                       className: cx(`Form-labelRemark`),
-                      container: props.popOverContainer
-                        ? props.popOverContainer
-                        : env && env.getModalContainer
-                        ? env.getModalContainer
-                        : undefined
+                      container: props.popOverContainer || env.getModalContainer
                     })
                   : null}
               </span>
@@ -1001,12 +1380,11 @@ export class FormItemWrap extends React.Component<FormItemProps> {
           ) : null}
 
           <div
-            className={cx(`Form-value`,{
-                // [`Form-itemColumn--offset${getWidthRate(horizontal.offset)}`]: !label && label !== false,
-                [`Form-itemColumn--${right}`]:
-                  !horizontal.leftFixed && !!right && right !== 12 - left
-              }
-            )}
+            className={cx(`Form-value`, {
+              // [`Form-itemColumn--offset${getWidthRate(horizontal.offset)}`]: !label && label !== false,
+              [`Form-itemColumn--${right}`]:
+                !horizontal.leftFixed && !!right && right !== 12 - left
+            })}
           >
             {renderControl()}
 
@@ -1022,12 +1400,8 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                   icon: remark.icon || 'warning-mark',
                   tooltip: remark,
                   className: cx(`Form-remark`),
-                  useMobileUI,
-                  container: props.popOverContainer
-                    ? props.popOverContainer
-                    : env && env.getModalContainer
-                    ? env.getModalContainer
-                    : undefined
+                  mobileUI,
+                  container: props.popOverContainer || env.getModalContainer
                 })
               : null}
 
@@ -1050,7 +1424,17 @@ export class FormItemWrap extends React.Component<FormItemProps> {
 
             {renderDescription !== false && description
               ? render('description', description, {
-                  className: cx(`Form-description`, descriptionClassName)
+                  className: cx(
+                    `Form-description`,
+                    descriptionClassName,
+                    setThemeClassName({
+                      ...props,
+                      name: 'descriptionClassName',
+                      id,
+                      themeCss,
+                      extra: 'item'
+                    })
+                  )
                 })
               : null}
           </div>
@@ -1061,6 +1445,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
     normal: (props: FormItemProps, renderControl: () => JSX.Element) => {
       let {
         className,
+        style,
         classnames: cx,
         desc,
         description,
@@ -1079,8 +1464,13 @@ export class FormItemWrap extends React.Component<FormItemProps> {
         hint,
         data,
         showErrorMsg,
-        useMobileUI,
-        translate: __
+        mobileUI,
+        translate: __,
+        static: isStatic,
+        staticClassName,
+        themeCss,
+        wrapperCustomStyle,
+        id
       } = props;
 
       description = description || desc;
@@ -1088,25 +1478,29 @@ export class FormItemWrap extends React.Component<FormItemProps> {
       return (
         <div
           data-role="form-item"
+          data-amis-name={props.name}
           className={cx(
             `Form-item Form-item--normal`,
-            className,
+            isStatic && staticClassName ? staticClassName : className,
             {
               'is-error': model && !model.valid,
               [`is-required`]: required
             },
-            model?.errClassNames
+            model?.errClassNames,
+            setThemeClassName({
+              ...props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle,
+              extra: 'item'
+            })
           )}
+          style={style}
         >
           {label && renderLabel !== false ? (
             <label className={cx(`Form-label`, getItemLabelClassName(props))}>
               <span>
-                {label
-                  ? render(
-                      'label',
-                      typeof label === 'string' ? filter(label, data) : label
-                    )
-                  : null}
+                {label ? render('label', label) : null}
                 {required && (label || labelRemark) ? (
                   <span className={cx(`Form-star`)}>*</span>
                 ) : null}
@@ -1116,62 +1510,122 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                       icon: labelRemark.icon || 'warning-mark',
                       tooltip: labelRemark,
                       className: cx(`Form-lableRemark`),
-                      useMobileUI,
-                      container: props.popOverContainer
-                        ? props.popOverContainer
-                        : env && env.getModalContainer
-                        ? env.getModalContainer
-                        : undefined
+                      mobileUI,
+                      container: props.popOverContainer || env.getModalContainer
                     })
                   : null}
               </span>
             </label>
           ) : null}
 
-          {renderControl()}
+          {mobileUI ? (
+            <div className={cx('Form-item-controlBox')}>
+              {renderControl()}
 
-          {caption
-            ? render('caption', caption, {
-                className: cx(`Form-caption`, captionClassName)
-              })
-            : null}
+              {caption
+                ? render('caption', caption, {
+                    className: cx(`Form-caption`, captionClassName)
+                  })
+                : null}
 
-          {remark
-            ? render('remark', {
-                type: 'remark',
-                icon: remark.icon || 'warning-mark',
-                className: cx(`Form-remark`),
-                tooltip: remark,
-                useMobileUI,
-                container:
-                  env && env.getModalContainer
-                    ? env.getModalContainer
-                    : undefined
-              })
-            : null}
+              {remark
+                ? render('remark', {
+                    type: 'remark',
+                    icon: remark.icon || 'warning-mark',
+                    className: cx(`Form-remark`),
+                    tooltip: remark,
+                    mobileUI,
+                    container: props.popOverContainer || env.getModalContainer
+                  })
+                : null}
 
-          {hint && model && model.isFocused
-            ? render('hint', hint, {
-                className: cx(`Form-hint`)
-              })
-            : null}
+              {hint && model && model.isFocused
+                ? render('hint', hint, {
+                    className: cx(`Form-hint`)
+                  })
+                : null}
 
-          {model &&
-          !model.valid &&
-          showErrorMsg !== false &&
-          Array.isArray(model.errors) ? (
-            <ul className={cx(`Form-feedback`)}>
-              {model.errors.map((msg: string, key: number) => (
-                <li key={key}>{msg}</li>
-              ))}
-            </ul>
-          ) : null}
+              {model &&
+              !model.valid &&
+              showErrorMsg !== false &&
+              Array.isArray(model.errors) ? (
+                <ul className={cx(`Form-feedback`)}>
+                  {model.errors.map((msg: string, key: number) => (
+                    <li key={key}>{msg}</li>
+                  ))}
+                </ul>
+              ) : null}
 
-          {renderDescription !== false && description
-            ? render('description', description, {
-                className: cx(`Form-description`, descriptionClassName)
-              })
-            : null}
+              {renderDescription !== false && description
+                ? render('description', description, {
+                    className: cx(
+                      `Form-description`,
+                      descriptionClassName,
+                      setThemeClassName({
+                        ...props,
+                        name: 'descriptionClassName',
+                        id,
+                        themeCss,
+                        extra: 'item'
+                      })
+                    )
+                  })
+                : null}
+            </div>
+          ) : (
+            <>
+              {renderControl()}
+
+              {caption
+                ? render('caption', caption, {
+                    className: cx(`Form-caption`, captionClassName)
+                  })
+                : null}
+
+              {remark
+                ? render('remark', {
+                    type: 'remark',
+                    icon: remark.icon || 'warning-mark',
+                    className: cx(`Form-remark`),
+                    tooltip: remark,
+                    mobileUI,
+                    container: props.popOverContainer || env.getModalContainer
+                  })
+                : null}
+
+              {hint && model && model.isFocused
+                ? render('hint', hint, {
+                    className: cx(`Form-hint`)
+                  })
+                : null}
+
+              {model &&
+              !model.valid &&
+              showErrorMsg !== false &&
+              Array.isArray(model.errors) ? (
+                <ul className={cx(`Form-feedback`)}>
+                  {model.errors.map((msg: string, key: number) => (
+                    <li key={key}>{msg}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {renderDescription !== false && description
+                ? render('description', description, {
+                    className: cx(
+                      `Form-description`,
+                      descriptionClassName,
+                      setThemeClassName({
+                        ...props,
+                        name: 'descriptionClassName',
+                        id,
+                        themeCss,
+                        extra: 'item'
+                      })
+                    )
+                  })
+                : null}
+            </>
+          )}
         </div>
       );
     },
@@ -1179,6 +1633,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
     inline: (props: FormItemProps, renderControl: () => JSX.Element) => {
       let {
         className,
+        style,
         classnames: cx,
         desc,
         description,
@@ -1197,8 +1652,13 @@ export class FormItemWrap extends React.Component<FormItemProps> {
         renderDescription,
         data,
         showErrorMsg,
-        useMobileUI,
-        translate: __
+        mobileUI,
+        translate: __,
+        static: isStatic,
+        staticClassName,
+        themeCss,
+        wrapperCustomStyle,
+        id
       } = props;
       const labelWidth = props.labelWidth || props.formLabelWidth;
       description = description || desc;
@@ -1206,15 +1666,24 @@ export class FormItemWrap extends React.Component<FormItemProps> {
       return (
         <div
           data-role="form-item"
+          data-amis-name={props.name}
           className={cx(
             `Form-item Form-item--inline`,
-            className,
+            isStatic && staticClassName ? staticClassName : className,
             {
               'is-error': model && !model.valid,
               [`is-required`]: required
             },
-            model?.errClassNames
+            model?.errClassNames,
+            setThemeClassName({
+              ...props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle,
+              extra: 'item'
+            })
           )}
+          style={style}
         >
           {label && renderLabel !== false ? (
             <label
@@ -1222,12 +1691,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
               style={labelWidth != null ? {width: labelWidth} : undefined}
             >
               <span>
-                {label
-                  ? render(
-                      'label',
-                      typeof label === 'string' ? filter(label, data) : label
-                    )
-                  : label}
+                {label ? render('label', label) : label}
                 {required && (label || labelRemark) ? (
                   <span className={cx(`Form-star`)}>*</span>
                 ) : null}
@@ -1237,12 +1701,8 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                       icon: labelRemark.icon || 'warning-mark',
                       tooltip: labelRemark,
                       className: cx(`Form-lableRemark`),
-                      useMobileUI,
-                      container: props.popOverContainer
-                        ? props.popOverContainer
-                        : env && env.getModalContainer
-                        ? env.getModalContainer
-                        : undefined
+                      mobileUI,
+                      container: props.popOverContainer || env.getModalContainer
                     })
                   : null}
               </span>
@@ -1264,12 +1724,8 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                   icon: remark.icon || 'warning-mark',
                   className: cx(`Form-remark`),
                   tooltip: remark,
-                  useMobileUI,
-                  container: props.popOverContainer
-                    ? props.popOverContainer
-                    : env && env.getModalContainer
-                    ? env.getModalContainer
-                    : undefined
+                  mobileUI,
+                  container: props.popOverContainer || env.getModalContainer
                 })
               : null}
 
@@ -1292,7 +1748,17 @@ export class FormItemWrap extends React.Component<FormItemProps> {
 
             {renderDescription !== false && description
               ? render('description', description, {
-                  className: cx(`Form-description`, descriptionClassName)
+                  className: cx(
+                    `Form-description`,
+                    descriptionClassName,
+                    setThemeClassName({
+                      ...props,
+                      name: 'descriptionClassName',
+                      id,
+                      themeCss,
+                      extra: 'item'
+                    })
+                  )
                 })
               : null}
           </div>
@@ -1303,6 +1769,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
     row: (props: FormItemProps, renderControl: () => JSX.Element) => {
       let {
         className,
+        style,
         classnames: cx,
         desc,
         description,
@@ -1321,24 +1788,37 @@ export class FormItemWrap extends React.Component<FormItemProps> {
         hint,
         data,
         showErrorMsg,
-        useMobileUI,
-        translate: __
+        mobileUI,
+        translate: __,
+        static: isStatic,
+        staticClassName,
+        wrapperCustomStyle,
+        themeCss,
+        id
       } = props;
-      const labelWidth = props.labelWidth || props.formLabelWidth;
       description = description || desc;
-
+      const labelWidth = props.labelWidth || props.formLabelWidth;
       return (
         <div
           data-role="form-item"
+          data-amis-name={props.name}
           className={cx(
             `Form-item Form-item--row`,
-            className,
+            isStatic && staticClassName ? staticClassName : className,
             {
               'is-error': model && !model.valid,
               [`is-required`]: required
             },
-            model?.errClassNames
+            model?.errClassNames,
+            setThemeClassName({
+              ...props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle,
+              extra: 'item'
+            })
           )}
+          style={style}
         >
           <div className={cx('Form-rowInner')}>
             {label && renderLabel !== false ? (
@@ -1347,10 +1827,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                 style={labelWidth != null ? {width: labelWidth} : undefined}
               >
                 <span>
-                  {render(
-                    'label',
-                    typeof label === 'string' ? filter(label, data) : label
-                  )}
+                  {render('label', label)}
                   {required && (label || labelRemark) ? (
                     <span className={cx(`Form-star`)}>*</span>
                   ) : null}
@@ -1360,12 +1837,9 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                         icon: labelRemark.icon || 'warning-mark',
                         tooltip: labelRemark,
                         className: cx(`Form-lableRemark`),
-                        useMobileUI,
-                        container: props.popOverContainer
-                          ? props.popOverContainer
-                          : env && env.getModalContainer
-                          ? env.getModalContainer
-                          : undefined
+                        mobileUI,
+                        container:
+                          props.popOverContainer || env.getModalContainer
                       })
                     : null}
                 </span>
@@ -1386,10 +1860,7 @@ export class FormItemWrap extends React.Component<FormItemProps> {
                   icon: remark.icon || 'warning-mark',
                   className: cx(`Form-remark`),
                   tooltip: remark,
-                  container:
-                    env && env.getModalContainer
-                      ? env.getModalContainer
-                      : undefined
+                  container: props.popOverContainer || env.getModalContainer
                 })
               : null}
           </div>
@@ -1413,16 +1884,189 @@ export class FormItemWrap extends React.Component<FormItemProps> {
 
           {description && renderDescription !== false
             ? render('description', description, {
-                className: cx(`Form-description`, descriptionClassName)
+                className: cx(
+                  `Form-description`,
+                  descriptionClassName,
+                  setThemeClassName({
+                    ...props,
+                    name: 'descriptionClassName',
+                    id,
+                    themeCss,
+                    extra: 'item'
+                  })
+                )
               })
             : null}
+        </div>
+      );
+    },
+
+    flex: (props: FormItemProps, renderControl: () => JSX.Element) => {
+      let {
+        className,
+        style,
+        classnames: cx,
+        desc,
+        description,
+        label,
+        render,
+        required,
+        caption,
+        remark,
+        labelRemark,
+        env,
+        descriptionClassName,
+        captionClassName,
+        formItem: model,
+        renderLabel,
+        renderDescription,
+        hint,
+        data,
+        showErrorMsg,
+        mobileUI,
+        translate: __,
+        static: isStatic,
+        staticClassName,
+        wrapperCustomStyle,
+        themeCss,
+        id
+      } = props;
+
+      let labelAlign =
+        (props.labelAlign !== 'inherit' && props.labelAlign) ||
+        props.formLabelAlign;
+      const labelWidth = props.labelWidth || props.formLabelWidth;
+      description = description || desc;
+      return (
+        <div
+          data-role="form-item"
+          data-amis-name={props.name}
+          className={cx(
+            `Form-item Form-item--flex`,
+            isStatic && staticClassName ? staticClassName : className,
+            {
+              'is-error': model && !model.valid,
+              [`is-required`]: required
+            },
+            model?.errClassNames,
+            setThemeClassName({
+              ...props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle,
+              extra: 'item'
+            })
+          )}
+          style={style}
+        >
+          <div
+            className={cx(
+              'Form-flexInner',
+              labelAlign && `Form-flexInner--label-${labelAlign}`
+            )}
+          >
+            {label && renderLabel !== false ? (
+              <label
+                className={cx(`Form-label`, getItemLabelClassName(props))}
+                style={
+                  labelWidth != null
+                    ? {width: labelAlign === 'top' ? '100%' : labelWidth}
+                    : undefined
+                }
+              >
+                <span>
+                  {render('label', label)}
+                  {required && (label || labelRemark) ? (
+                    <span className={cx(`Form-star`)}>*</span>
+                  ) : null}
+                  {labelRemark
+                    ? render('label-remark', {
+                        type: 'remark',
+                        icon: labelRemark.icon || 'warning-mark',
+                        tooltip: labelRemark,
+                        className: cx(`Form-lableRemark`),
+                        mobileUI,
+                        container:
+                          props.popOverContainer || env.getModalContainer
+                      })
+                    : null}
+                </span>
+              </label>
+            ) : null}
+
+            <div className={cx(`Form-value`)}>
+              {renderControl()}
+
+              {caption
+                ? render('caption', caption, {
+                    className: cx(`Form-caption`, captionClassName)
+                  })
+                : null}
+
+              {remark
+                ? render('remark', {
+                    type: 'remark',
+                    icon: remark.icon || 'warning-mark',
+                    className: cx(`Form-remark`),
+                    tooltip: remark,
+                    container: props.popOverContainer || env.getModalContainer
+                  })
+                : null}
+              {hint && model && model.isFocused
+                ? render('hint', hint, {
+                    className: cx(`Form-hint`)
+                  })
+                : null}
+
+              {model &&
+              !model.valid &&
+              showErrorMsg !== false &&
+              Array.isArray(model.errors) ? (
+                <ul className={cx('Form-feedback')}>
+                  {model.errors.map((msg: string, key: number) => (
+                    <li key={key}>{msg}</li>
+                  ))}
+                </ul>
+              ) : null}
+
+              {description && renderDescription !== false
+                ? render('description', description, {
+                    className: cx(
+                      `Form-description`,
+                      descriptionClassName,
+                      setThemeClassName({
+                        ...props,
+                        name: 'descriptionClassName',
+                        id,
+                        themeCss,
+                        extra: 'item'
+                      })
+                    )
+                  })
+                : null}
+            </div>
+          </div>
         </div>
       );
     }
   };
 
   render() {
-    const {formMode, inputOnly, wrap, render, formItem: model} = this.props;
+    const {
+      formMode,
+      inputOnly,
+      wrap,
+      render,
+      formItem: model,
+      css,
+      themeCss,
+      id,
+      wrapperCustomStyle,
+      env,
+      classnames: cx,
+      popOverContainer,
+      data
+    } = this.props;
     const mode = this.props.mode || formMode;
 
     if (wrap === false || inputOnly) {
@@ -1453,6 +2097,56 @@ export class FormItemWrap extends React.Component<FormItemProps> {
               }
             )
           : null}
+
+        {model ? (
+          <Overlay
+            container={popOverContainer || this.target}
+            target={() => this.target}
+            placement={model.popOverSchema?.placement || 'left-bottom-left-top'}
+            show={model.popOverOpen}
+          >
+            <PopOver
+              className={cx(
+                `Autofill-popOver`,
+                model.popOverSchema?.popOverClassName
+              )}
+              style={{
+                minWidth: this.target ? this.target.offsetWidth : undefined
+              }}
+              offset={model.popOverSchema?.offset}
+              onHide={this.closePopOver}
+            >
+              {render('popOver-auto-fill-form', model.popOverSchema?.body, {
+                // data: model.popOverData,
+                onAction: this.handlePopOverAction,
+                onSubmit: this.handlePopOverConfirm
+              })}
+            </PopOver>
+          </Overlay>
+        ) : null}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss || css,
+            classNames: [
+              {
+                key: 'labelClassName',
+                weights: {
+                  default: {
+                    suf: `.${cx('Form-label')}`,
+                    parent: `.${cx('Form-item')}`
+                  }
+                }
+              },
+              {
+                key: 'descriptionClassName'
+              }
+            ],
+            wrapperCustomStyle,
+            id: id && id + '-item'
+          }}
+          env={env}
+        />
       </>
     );
   }
@@ -1469,6 +2163,7 @@ export const detectProps = [
   'addOn',
   'btnClassName',
   'btnLabel',
+  'style',
   'btnDisabled',
   'className',
   'clearable',
@@ -1479,6 +2174,9 @@ export const detectProps = [
   'description',
   'disabled',
   'static',
+  'staticClassName',
+  'staticLabelClassName',
+  'staticInputClassName',
   'draggable',
   'editable',
   'editButtonClassName',
@@ -1522,12 +2220,21 @@ export const detectProps = [
   'maxLength',
   'embed',
   'displayMode',
-  'revealPassword'
+  'revealPassword',
+  'loading',
+  'themeCss',
+  'formLabelAlign',
+  'formLabelWidth',
+  'formHorizontal',
+  'labelAlign',
+  'colSize'
 ];
 
 export function asFormItem(config: Omit<FormItemConfig, 'component'>) {
   return (Control: FormControlComponent) => {
-    const isSFC = !(Control.prototype instanceof React.Component);
+    const supportRef =
+      Control.prototype instanceof React.Component ||
+      (Control as any).$$typeof === Symbol.for('react.forward_ref');
 
     // 兼容老的 FormItem 用法。
     if (config.validate && !Control.prototype.validate) {
@@ -1554,9 +2261,11 @@ export function asFormItem(config: Omit<FormItemConfig, 'component'>) {
     }
 
     return wrapControl(
+      config,
       hoistNonReactStatic(
         class extends FormItemWrap {
-          static defaultProps = {
+          static defaultProps: any = {
+            initAutoFill: 'fillIfNotSet',
             className: '',
             renderLabel: config.renderLabel,
             renderDescription: config.renderDescription,
@@ -1575,16 +2284,17 @@ export function asFormItem(config: Omit<FormItemConfig, 'component'>) {
             ...((Control as any).propsList || [])
           ];
 
-          static displayName = `FormItem${
+          static displayName: string = `FormItem${
             config.type ? `(${config.type})` : ''
           }`;
           static ComposedComponent = Control;
 
           ref: any;
 
-          constructor(props: FormItemProps) {
+          constructor(props: FormControlProps) {
             super(props);
             this.refFn = this.refFn.bind(this);
+            this.getData = this.getData.bind(this);
 
             const {validations, formItem: model} = props;
 
@@ -1627,41 +2337,56 @@ export function asFormItem(config: Omit<FormItemConfig, 'component'>) {
             this.ref = ref;
           }
 
+          getData() {
+            return this.props.data;
+          }
+
           renderControl() {
             const {
+              // 这里解构，不可轻易删除，避免被rest传到子组件
+              inputClassName,
               formItem: model,
               classnames: cx,
               children,
               type,
               size,
               defaultSize,
-              useMobileUI,
+              mobileUI,
               ...rest
             } = this.props;
 
-            const controlSize = size || defaultSize;
-            const mobileUI = useMobileUI && isMobile();
-            //@ts-ignore
-            const isOpened = this.state.isOpened;
+            const isRuleSize =
+              size && ['xs', 'sm', 'md', 'lg', 'full'].includes(size);
+
+            const controlSize = isRuleSize ? size : defaultSize;
+
             return (
               <>
                 <Control
                   {...rest}
-                  useMobileUI={useMobileUI}
+                  // 因为 formItem 内部可能不会更新到最新的 data，所以暴露个方法可以获取到最新的
+                  // 获取不到最新的因为做了限制，只有表单项目 name 关联的数值变化才更新
+                  getData={this.getData}
+                  mobileUI={mobileUI}
                   onOpenDialog={this.handleOpenDialog}
                   size={config.sizeMutable !== false ? undefined : size}
                   onFocus={this.handleFocus}
                   onBlur={this.handleBlur}
                   type={type}
                   classnames={cx}
-                  ref={isSFC ? undefined : this.refFn}
-                  forwardedRef={isSFC ? this.refFn : undefined}
+                  ref={supportRef ? this.refFn : undefined}
+                  forwardedRef={supportRef ? undefined : this.refFn}
                   formItem={model}
+                  style={{
+                    width: !isRuleSize && size ? size : undefined
+                  }}
                   className={cx(
                     `Form-control`,
                     {
                       'is-inline': !!rest.inline && !mobileUI,
                       'is-error': model && !model.valid,
+                      'is-full': size === 'full',
+                      'is-thin': config.thin,
                       [`Form-control--withSize Form-control--size${ucFirst(
                         controlSize
                       )}`]:
@@ -1674,7 +2399,6 @@ export function asFormItem(config: Omit<FormItemConfig, 'component'>) {
                     getItemInputClassName(this.props)
                   )}
                 ></Control>
-                {isOpened ? this.buildSchema() : null}
               </>
             );
           }

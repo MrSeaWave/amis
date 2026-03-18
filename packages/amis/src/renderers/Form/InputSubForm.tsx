@@ -5,17 +5,21 @@ import omit from 'lodash/omit';
 import pick from 'lodash/pick';
 import {createObject, guid} from 'amis-core';
 import {Icon} from 'amis-ui';
-import {FormBaseControlSchema, FormSchema, SchemaClassName} from '../../Schema';
+import {FormBaseControlSchema, AMISClassName} from '../../Schema';
 import Sortable from 'sortablejs';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
+import {isMobile} from 'amis-core';
+import {PopUp} from 'amis-ui';
+import {autobind} from 'amis-core';
 
+import type {AMISFormBase, AMISFormItem, TestIdBuilder} from 'amis-core';
 /**
  * SubForm 子表单
- * 文档：https://baidu.gitee.io/amis/docs/components/form/subform
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/subform
  */
-export interface SubFormControlSchema extends FormBaseControlSchema {
+export interface AMISInputSubFormSchema extends AMISFormItem {
   /**
-   * 指定为 SubForm 子表单
+   * 指定为 sub-form 组件
    */
   type: 'input-sub-form';
 
@@ -60,7 +64,7 @@ export interface SubFormControlSchema extends FormBaseControlSchema {
   maxLength?: number;
 
   /**
-   * 当值中存在这个字段，则按钮名称将使用此字段的值来展示。
+   * 当值中存在这个字段，则按钮名称将使用此字段的值来展示
    */
   labelField?: string;
 
@@ -76,19 +80,19 @@ export interface SubFormControlSchema extends FormBaseControlSchema {
   addButtonText?: string;
 
   /**
-   * 新增按钮 CSS 类名
+   * 新增按钮CSS类名
    */
-  addButtonClassName?: SchemaClassName;
+  addButtonClassName?: AMISClassName;
 
   /**
    * 值元素的类名
    */
-  itemClassName?: SchemaClassName;
+  itemClassName?: AMISClassName;
 
   /**
    * 值列表元素的类名
    */
-  itemsClassName?: SchemaClassName;
+  itemsClassName?: AMISClassName;
 
   /**
    * 是否在左下角显示报错信息
@@ -98,7 +102,7 @@ export interface SubFormControlSchema extends FormBaseControlSchema {
   /**
    * 子表单详情
    */
-  form?: Omit<FormSchema, 'type'>;
+  form?: AMISFormBase;
 
   scaffold?: any;
 }
@@ -109,6 +113,7 @@ export interface SubFormProps extends FormControlProps {
   minLength?: number;
   maxLength?: number;
   labelField?: string;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export interface SubFormState {
@@ -142,7 +147,7 @@ export default class SubFormControl extends React.PureComponent<
     addButtonClassName: '',
     itemClassName: '',
     labelField: 'label',
-    btnLabel: 'SubForm.button',
+    defaultLabel: 'SubForm.button',
     placeholder: 'placeholder.empty'
   };
 
@@ -152,6 +157,7 @@ export default class SubFormControl extends React.PureComponent<
   dragTip?: HTMLElement;
   sortable?: Sortable;
   id: string = guid();
+  tempValue: any;
   constructor(props: SubFormProps) {
     super(props);
 
@@ -211,6 +217,7 @@ export default class SubFormControl extends React.PureComponent<
       return;
     }
 
+    this.tempValue = value[index];
     this.setState({
       dialogData: createObject(this.props.data, value[index]),
       dialogCtx: {
@@ -255,6 +262,36 @@ export default class SubFormControl extends React.PureComponent<
     this.close();
   }
 
+  @autobind
+  handlePopupConfirm() {
+    const values = this.tempValue;
+    const {multiple, onChange, value} = this.props;
+    const ctx = this.state.dialogCtx;
+
+    if (multiple) {
+      let newValue = Array.isArray(value) ? value.concat() : [];
+
+      if (ctx?.mode === 'add') {
+        newValue.push({
+          ...values
+        });
+      } else {
+        newValue[ctx!.index!] = {
+          ...newValue[ctx!.index!],
+          ...values
+        };
+      }
+      onChange(newValue);
+    } else {
+      onChange({
+        ...value,
+        ...values
+      });
+    }
+
+    this.close();
+  }
+
   dragTipRef(ref: any) {
     if (!this.dragTip && ref) {
       this.initDragging();
@@ -281,11 +318,15 @@ export default class SubFormControl extends React.PureComponent<
           if (e.newIndex === e.oldIndex) {
             return;
           }
-
           // 换回来
           const parent = e.to as HTMLElement;
           if (e.oldIndex < parent.childNodes.length - 1) {
-            parent.insertBefore(e.item, parent.childNodes[e.oldIndex]);
+            parent.insertBefore(
+              e.item,
+              parent.childNodes[
+                e.oldIndex > e.newIndex ? e.oldIndex + 1 : e.oldIndex
+              ]
+            );
           } else {
             parent.appendChild(e.item);
           }
@@ -327,8 +368,34 @@ export default class SubFormControl extends React.PureComponent<
       type: 'dialog',
       body: {
         type: 'form',
-        ...omit(form, dialogProps)
+        canAccessSuperData: false,
+        ...omit(form, dialogProps),
+        inheritData: false
       }
+    };
+  }
+
+  buildFormSchema() {
+    let {form} = this.props;
+
+    const dialogProps = [
+      'title',
+      'actions',
+      'name',
+      'size',
+      'closeOnEsc',
+      'closeOnOutside',
+      'showErrorMsg',
+      'showCloseButton',
+      'bodyClassName',
+      'type'
+    ];
+
+    return {
+      type: 'form',
+      canAccessSuperData: false,
+      ...omit(form, dialogProps),
+      inheritData: false
     };
   }
 
@@ -340,6 +407,7 @@ export default class SubFormControl extends React.PureComponent<
       disabled,
       maxLength,
       labelField,
+      defaultLabel,
       value,
       btnLabel,
       render,
@@ -352,7 +420,8 @@ export default class SubFormControl extends React.PureComponent<
       addable,
       removable,
       minLength,
-      addButtonText
+      addButtonText,
+      testIdBuilder
     } = this.props;
 
     return (
@@ -369,6 +438,7 @@ export default class SubFormControl extends React.PureComponent<
                   itemClassName
                 )}
                 key={key}
+                {...testIdBuilder?.getChild(`item-${key}`).getTestId()}
               >
                 {draggable && value.length > 1 ? (
                   <a className={cx('SubForm-valueDragBar')}>
@@ -377,10 +447,7 @@ export default class SubFormControl extends React.PureComponent<
                 ) : null}
 
                 <span className={cx('SubForm-valueLabel')}>
-                  {(item &&
-                    labelField &&
-                    item[labelField] &&
-                    stripTag(item[labelField])) ||
+                  {btnLabel &&
                     render(
                       'label',
                       {
@@ -391,6 +458,12 @@ export default class SubFormControl extends React.PureComponent<
                         data: createObject(data, item)
                       }
                     )}
+                  {!btnLabel &&
+                    ((item &&
+                      labelField &&
+                      item[labelField] &&
+                      stripTag(item[labelField])) ||
+                      __(defaultLabel))}
                 </span>
                 <a
                   data-index={key}
@@ -433,6 +506,7 @@ export default class SubFormControl extends React.PureComponent<
                   value.length >= maxLength
                 )
               }
+              {...testIdBuilder?.getChild('add-button').getTestId()}
             >
               <Icon icon="plus" className="icon" />
               <span>{__(addButtonText || 'SubForm.add')}</span>
@@ -457,11 +531,15 @@ export default class SubFormControl extends React.PureComponent<
       disabled,
       value,
       labelField,
+      defaultLabel,
       btnLabel,
       render,
       data,
-      translate: __
+      translate: __,
+      testIdBuilder
     } = this.props;
+
+    const tIdBuilder = testIdBuilder?.getChild('edit-single');
 
     return (
       <div className={cx('SubForm-values', itemsClassName)} key="values">
@@ -476,12 +554,10 @@ export default class SubFormControl extends React.PureComponent<
           onClick={this.editSingle}
           data-tooltip={__('SubForm.editDetail')}
           data-position="bottom"
+          {...tIdBuilder?.getTestId()}
         >
           <span className={cx('SubForm-valueLabel')}>
-            {(value &&
-              labelField &&
-              value[labelField] &&
-              stripTag(value[labelField])) ||
+            {btnLabel &&
               render(
                 'label',
                 {
@@ -492,8 +568,17 @@ export default class SubFormControl extends React.PureComponent<
                   data: createObject(data, value)
                 }
               )}
+            {!btnLabel &&
+              ((value &&
+                labelField &&
+                value[labelField] &&
+                stripTag(value[labelField])) ||
+                __(defaultLabel))}
           </span>
-          <a className={cx('SubForm-valueEdit')}>
+          <a
+            className={cx('SubForm-valueEdit')}
+            {...tIdBuilder?.getChild('icon').getTestId()}
+          >
             <Icon icon="pencil" className="icon" />
           </a>
         </div>
@@ -502,20 +587,54 @@ export default class SubFormControl extends React.PureComponent<
   }
 
   render() {
-    const {multiple, classPrefix: ns, className, render} = this.props;
+    const {
+      multiple,
+      classPrefix: ns,
+      className,
+      style,
+      render,
+      mobileUI,
+      env,
+      popOverContainer
+    } = this.props;
     const dialogData = this.state.dialogData;
     const dialogCtx = this.state.dialogCtx;
 
     return (
       <div className={cx(`${ns}SubFormControl`, className)}>
         {multiple ? this.renderMultipe() : this.renderSingle()}
-        {render(`modal`, this.buildDialogSchema(), {
-          show: !!dialogCtx,
-          onClose: this.close,
-          onConfirm: this.handleDialogConfirm,
-          data: dialogData,
-          formStore: undefined
-        })}
+        {!mobileUI ? (
+          render(`modal`, this.buildDialogSchema(), {
+            show: !!dialogCtx,
+            onClose: this.close,
+            onConfirm: this.handleDialogConfirm,
+            data: dialogData,
+            formStore: undefined
+          })
+        ) : (
+          <PopUp
+            isShow={!!dialogCtx}
+            showConfirm
+            onConfirm={this.handlePopupConfirm}
+            onHide={this.close}
+            container={
+              mobileUI
+                ? env?.getModalContainer
+                : popOverContainer || env.getModalContainer
+            }
+          >
+            <div className="flex-1 pl-10 pr-10">
+              {render('form', this.buildFormSchema(), {
+                data: dialogData,
+                formStore: undefined,
+                wrapWithPanel: false,
+                onChange: (val: any) => {
+                  this.tempValue = val;
+                }
+              })}
+            </div>
+          </PopUp>
+        )}
       </div>
     );
   }

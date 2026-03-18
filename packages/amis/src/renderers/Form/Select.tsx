@@ -1,93 +1,103 @@
 import React from 'react';
 import cx from 'classnames';
+import find from 'lodash/find';
+import debounce from 'lodash/debounce';
 import {
   OptionsControl,
   OptionsControlProps,
   Option,
-  FormOptionsControl,
-  resolveEventData
+  resolveEventData,
+  str2function,
+  Api,
+  ActionObject,
+  normalizeOptions,
+  isEffectiveApi,
+  isApiOutdated,
+  createObject,
+  autobind,
+  TestIdBuilder,
+  getVariable,
+  CustomStyle,
+  setThemeClassName,
+  AMISFormItemWithOptions,
+  AMISSpinnerConfig
 } from 'amis-core';
-import {normalizeOptions} from 'amis-core';
-import find from 'lodash/find';
-import debouce from 'lodash/debounce';
-import {Api, ActionObject} from 'amis-core';
-import {isEffectiveApi, isApiOutdated} from 'amis-core';
-import {isEmpty, createObject, autobind, isMobile} from 'amis-core';
-
+import {TransferDropDown, Spinner, Select, SpinnerExtraProps} from 'amis-ui';
 import {FormOptionsSchema, SchemaApi} from '../../Schema';
-import {Spinner, Select} from 'amis-ui';
-import {BaseTransferRenderer, TransferControlSchema} from './Transfer';
-import {TransferDropDown} from 'amis-ui';
-
-import type {SchemaClassName} from '../../Schema';
-import type {TooltipObject} from 'amis-ui/lib/components/TooltipWrapper';
+import {BaseTransferRenderer, AMISTransferSchema} from './Transfer';
 import {supportStatic} from './StaticHoc';
 
+import type {AMISClassName} from '../../Schema';
+import type {TooltipObject} from 'amis-ui/lib/components/TooltipWrapper';
+
 /**
- * Select 下拉选择框。
- * 文档：https://baidu.gitee.io/amis/docs/components/form/select
+ * 下拉选择框，支持单选/多选、异步加载选项、搜索过滤等功能。
  */
-export interface SelectControlSchema extends FormOptionsSchema {
+export interface AMISSelectSchema
+  extends AMISFormItemWithOptions,
+    AMISSpinnerConfig {
+  /**
+   * 指定为 select 组件
+   */
   type: 'select' | 'multi-select';
 
   /**
-   * 自动完成 API，当输入部分文字的时候，会将这些文字通过 ${term} 可以取到，发送给接口。
-   * 接口可以返回匹配到的选项，帮助用户输入。
+   * 自动完成 API
    */
   autoComplete?: SchemaApi;
 
   /**
-   * 可以自定义菜单展示。
+   * 菜单模板
    */
   menuTpl?: string;
 
   /**
-   * 当在value值未匹配到当前options中的选项时，是否value值对应文本飘红显示
+   * 是否高亮无效值
    */
-  showInvalidMatch: boolean;
+  showInvalidMatch?: boolean;
 
   /**
-   * 边框模式，全边框，还是半边框，或者没边框。
+   * 边框模式
    */
   borderMode?: 'full' | 'half' | 'none';
 
   /**
-   * 勾选展示模式
+   * 选择模式
    */
   selectMode?: 'table' | 'group' | 'tree' | 'chained' | 'associated';
 
   /**
-   * 当 selectMode 为 associated 时用来定义左侧的选项
+   * 左侧选项
    */
   leftOptions?: Array<Option>;
 
   /**
-   * 当 selectMode 为 associated 时用来定义左侧的选择模式
+   * 左侧模式
    */
   leftMode?: 'tree' | 'list';
 
   /**
-   * 当 selectMode 为 associated 时用来定义右侧的选择模式
+   * 右侧模式
    */
   rightMode?: 'table' | 'list' | 'tree' | 'chained';
 
   /**
-   * 搜索结果展示模式
+   * 搜索结果模式
    */
   searchResultMode?: 'table' | 'list' | 'tree' | 'chained';
 
   /**
-   * 当 selectMode 为 table 时定义表格列信息。
+   * 列配置
    */
   columns?: Array<any>;
 
   /**
-   * 当 searchResultMode 为 table 时定义表格列信息。
+   * 搜索结果列配置
    */
   searchResultColumns?: Array<any>;
 
   /**
-   * 可搜索？
+   * 是否支持搜索
    */
   searchable?: boolean;
 
@@ -97,50 +107,71 @@ export interface SelectControlSchema extends FormOptionsSchema {
   searchApi?: SchemaApi;
 
   /**
-   * 单个选项的高度，主要用于虚拟渲染
+   * 选项高度
    */
   itemHeight?: number;
 
   /**
-   * 在选项数量达到多少时开启虚拟渲染
+   * 虚拟渲染阈值
    */
   virtualThreshold?: number;
 
   /**
-   * 可多选条件下，是否可全选
+   * 是否可全选
    */
   checkAll?: boolean;
   /**
-   * 可多选条件下，是否默认全选中所有值
+   * 是否默认全选
    */
   defaultCheckAll?: boolean;
   /**
-   * 可多选条件下，全选项文案，默认 ”全选“
+   * 全选文案
    */
   checkAllLabel?: string;
 
   /**
-   * 标签的最大展示数量，超出数量后以收纳浮层的方式展示，仅在多选模式开启后生效
+   * 最大标签数量
    */
   maxTagCount?: number;
 
   /**
-   * 收纳标签的Popover配置
+   * 收纳标签配置
    */
   overflowTagPopover?: object;
 
   /**
-   * 选项的自定义CSS类名
+   * 选项CSS类名
    */
-  optionClassName?: SchemaClassName;
+  optionClassName?: AMISClassName;
+
+  /**
+   * 下拉框 Popover 设置
+   */
+  overlay?: {
+    /**
+     * 下拉框 Popover 的宽度设置，支持单位 '%'、'px'、'rem'、'em'、'vw', 支持相对写法如 '+20px'
+     */
+    width?: number | string;
+    /**
+     * 下拉框 Popover 的对齐方式
+     */
+    align?: 'left' | 'center' | 'right';
+
+    /**
+     * 检索函数
+     */
+    filterOption?: 'string';
+  };
+
+  testIdBuilder?: TestIdBuilder;
 }
 
-export interface SelectProps extends OptionsControlProps {
+export interface SelectProps extends OptionsControlProps, SpinnerExtraProps {
   autoComplete?: Api;
   searchable?: boolean;
   showInvalidMatch?: boolean;
   defaultOpen?: boolean;
-  useMobileUI?: boolean;
+  mobileUI?: boolean;
   maxTagCount?: number;
   overflowTagPopover?: TooltipObject;
 }
@@ -168,7 +199,7 @@ export default class SelectControl extends React.Component<SelectProps, any> {
     super(props);
 
     this.changeValue = this.changeValue.bind(this);
-    this.lazyloadRemote = debouce(this.loadRemote.bind(this), 250, {
+    this.lazyloadRemote = debounce(this.loadRemote.bind(this), 250, {
       trailing: true,
       leading: false
     });
@@ -193,14 +224,15 @@ export default class SelectControl extends React.Component<SelectProps, any> {
 
   componentWillUnmount() {
     this.unHook && this.unHook();
+    this.fetchCancel = null;
   }
 
   inputRef(ref: any) {
     this.input = ref;
   }
 
-  foucs() {
-    this.input && this.input.focus();
+  focus() {
+    this.input && this.input?.focus?.();
   }
 
   getValue(
@@ -251,21 +283,17 @@ export default class SelectControl extends React.Component<SelectProps, any> {
 
   async dispatchEvent(eventName: SelectRendererEvent, eventData: any = {}) {
     const event = 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1);
-    const {dispatchEvent, options, data} = this.props;
+    const {dispatchEvent, options, value, multiple, selectedOptions} =
+      this.props;
     // 触发渲染器事件
     const rendererEvent = await dispatchEvent(
       eventName,
-      resolveEventData(
-        this.props,
-        {
-          options,
-          items: options, // 为了保持名字统一
-          value: ['onEdit', 'onDelete'].includes(event)
-            ? eventData
-            : eventData && eventData.value
-        },
-        'value'
-      )
+      resolveEventData(this.props, {
+        options,
+        items: options, // 为了保持名字统一
+        value,
+        selectedItems: multiple ? selectedOptions : selectedOptions[0]
+      })
     );
     if (rendererEvent?.prevented) {
       return;
@@ -278,6 +306,7 @@ export default class SelectControl extends React.Component<SelectProps, any> {
     const {onChange, setOptions, options, data, dispatchEvent} = this.props;
 
     let additonalOptions: Array<any> = [];
+
     let newValue: string | Option | Array<Option> | void = this.getValue(
       value,
       additonalOptions
@@ -288,15 +317,12 @@ export default class SelectControl extends React.Component<SelectProps, any> {
 
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(
-        this.props,
-        {
-          value: newValue,
-          options,
-          items: options // 为了保持名字统一
-        },
-        'value'
-      )
+      resolveEventData(this.props, {
+        value: newValue,
+        options,
+        items: options, // 为了保持名字统一
+        selectedItems: value
+      })
     );
     if (rendererEvent?.prevented) {
       return;
@@ -305,7 +331,9 @@ export default class SelectControl extends React.Component<SelectProps, any> {
     onChange?.(newValue);
   }
 
-  async loadRemote(input: string) {
+  fetchCancel: Function | null = null;
+
+  async loadRemote(input: string, force = false) {
     const {
       autoComplete,
       env,
@@ -320,9 +348,12 @@ export default class SelectControl extends React.Component<SelectProps, any> {
       throw new Error('fetcher is required');
     }
 
-    if (!formInited) {
+    if (!force && formInited === false && addHook) {
       this.unHook && this.unHook();
-      return (this.unHook = addHook(this.loadRemote.bind(this, input), 'init'));
+      return (this.unHook = addHook(
+        this.loadRemote.bind(this, input, true),
+        'init'
+      ));
     }
 
     this.lastTerm = input;
@@ -337,12 +368,22 @@ export default class SelectControl extends React.Component<SelectProps, any> {
       });
     }
 
+    if (this.fetchCancel) {
+      this.fetchCancel?.('autoComplete request cancelled.');
+      this.fetchCancel = null;
+      setLoading(false);
+    }
+
     setLoading(true);
     try {
-      const ret = await env.fetcher(autoComplete, ctx);
+      const ret = await env.fetcher(autoComplete, ctx, {
+        cancelExecutor: (executor: Function) => (this.fetchCancel = executor)
+      });
+      this.fetchCancel = null;
 
-      let options = (ret.data && (ret.data as any).options) || ret.data || [];
-      let combinedOptions = this.mergeOptions(options);
+      const options = (ret.data && (ret.data as any).options) || ret.data || [];
+      const combinedOptions = this.mergeOptions(options);
+
       setOptions(combinedOptions);
 
       return {
@@ -364,7 +405,10 @@ export default class SelectControl extends React.Component<SelectProps, any> {
     if (Array.isArray(selectedOptions) && selectedOptions.length) {
       selectedOptions.forEach(option => {
         if (
-          !find(combinedOptions, (item: Option) => item.value == option.value)
+          !find(
+            combinedOptions,
+            (item: Option) => item[valueField] === option[valueField]
+          )
         ) {
           combinedOptions.push({
             ...option,
@@ -378,18 +422,21 @@ export default class SelectControl extends React.Component<SelectProps, any> {
 
   @autobind
   renderMenu(option: Option, state: any) {
-    const {menuTpl, render, data, optionClassName} = this.props;
+    const {menuTpl, render, data, optionClassName, testIdBuilder} = this.props;
 
     return render(`menu/${state.index}`, menuTpl, {
       showNativeTitle: true,
       className: cx('Select-option-content', optionClassName),
-      data: createObject(createObject(data, state), option)
+      data: createObject(createObject(data, state), option),
+      testIdBuilder: testIdBuilder?.getChild(
+        'option-' + option.value || state.index
+      )
     });
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     const reload = this.props.reloadOptions;
-    reload && reload();
+    reload && reload(subpath, query);
   }
 
   option2value() {}
@@ -405,15 +452,76 @@ export default class SelectControl extends React.Component<SelectProps, any> {
   }
 
   doAction(action: ActionObject, data: object, throwErrors: boolean): any {
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name, valueField} =
+      this.props;
     const actionType = action?.actionType as string;
 
     if (actionType === 'clear') {
       onChange?.('');
     } else if (actionType === 'reset') {
-      const value = this.getValue(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      const value = this.getValue({[valueField]: pristineVal ?? ''});
       onChange?.(value);
     }
+  }
+
+  @autobind
+  handleOptionAdd(
+    idx: number | Array<number> = -1,
+    value?: any,
+    skipForm: boolean = false,
+    callback?: (value: any) => any
+  ) {
+    const {onAdd, autoComplete} = this.props;
+
+    onAdd?.(idx, value, skipForm, async () => {
+      callback?.(value);
+
+      if (autoComplete) {
+        await this.loadRemote(this.lastTerm);
+        return false;
+      }
+
+      return;
+    });
+  }
+
+  @autobind
+  handleOptionEdit(
+    value: Option,
+    origin?: Option,
+    skipForm?: boolean,
+    callback?: (value: any) => any
+  ) {
+    const {onEdit, autoComplete} = this.props;
+
+    onEdit?.(value, origin, skipForm, async () => {
+      callback?.(value);
+
+      if (autoComplete) {
+        await this.loadRemote(this.lastTerm);
+        return false;
+      }
+
+      return;
+    });
+  }
+
+  @autobind
+  handleOptionDelete(value: any, callback?: (value: any) => any) {
+    const {onDelete, autoComplete} = this.props;
+
+    onDelete?.(value, async () => {
+      callback?.(value);
+
+      if (autoComplete) {
+        await this.loadRemote(this.lastTerm);
+        return false;
+      }
+
+      return;
+    });
   }
 
   @supportStatic()
@@ -424,6 +532,8 @@ export default class SelectControl extends React.Component<SelectProps, any> {
       showInvalidMatch,
       options,
       className,
+      popoverClassName,
+      style,
       loading,
       value,
       selectedOptions,
@@ -441,18 +551,22 @@ export default class SelectControl extends React.Component<SelectProps, any> {
       borderMode,
       selectMode,
       env,
-      useMobileUI,
+      mobileUI,
+      overlay,
+      filterOption,
       ...rest
     } = this.props;
+    const {classPrefix: ns, themeCss} = this.props;
 
     if (noResultsText) {
       noResultsText = render('noResultText', noResultsText);
     }
 
-    const mobileUI = useMobileUI && isMobile();
-
     return (
-      <div className={cx(`${classPrefix}SelectControl`, className)}>
+      <div
+        className={cx(`${classPrefix}SelectControl`, className)}
+        style={style}
+      >
         {['table', 'list', 'group', 'tree', 'chained', 'associated'].includes(
           selectMode
         ) ? (
@@ -460,20 +574,43 @@ export default class SelectControl extends React.Component<SelectProps, any> {
         ) : (
           <Select
             {...rest}
-            useMobileUI={useMobileUI}
+            onAdd={this.handleOptionAdd}
+            onEdit={this.handleOptionEdit}
+            onDelete={this.handleOptionDelete}
+            className={cx(
+              setThemeClassName({
+                ...this.props,
+                name: 'selectControlClassName',
+                id,
+                themeCss: themeCss
+              })
+            )}
+            popoverClassName={cx(
+              popoverClassName,
+              setThemeClassName({
+                ...this.props,
+                name: 'selectPopoverClassName',
+                id,
+                themeCss: themeCss
+              })
+            )}
+            mobileUI={mobileUI}
             popOverContainer={
-              mobileUI && env && env.getModalContainer
-                ? env.getModalContainer
-                : mobileUI
-                ? undefined
-                : rest.popOverContainer
+              mobileUI
+                ? env?.getModalContainer
+                : rest.popOverContainer || env.getModalContainer
             }
             borderMode={borderMode}
-            placeholder={placeholder}
+            placeholder={placeholder as string}
             multiple={multiple || multi}
             ref={this.inputRef}
             value={selectedOptions}
             options={options}
+            filterOption={
+              typeof filterOption === 'string'
+                ? str2function(filterOption, 'options', 'inputValue', 'option')
+                : filterOption
+            }
             loadOptions={
               isEffectiveApi(autoComplete) ? this.lazyloadRemote : undefined
             }
@@ -483,38 +620,76 @@ export default class SelectControl extends React.Component<SelectProps, any> {
             onChange={this.changeValue}
             onBlur={(e: any) => this.dispatchEvent('blur', e)}
             onFocus={(e: any) => this.dispatchEvent('focus', e)}
-            onAdd={() => this.dispatchEvent('add')}
-            onEdit={(item: any) => this.dispatchEvent('edit', item)}
-            onDelete={(item: any) => this.dispatchEvent('delete', item)}
             loading={loading}
             noResultsText={noResultsText}
             renderMenu={menuTpl ? this.renderMenu : undefined}
+            overlay={overlay}
           />
         )}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss,
+            classNames: [
+              {
+                key: 'selectControlClassName',
+                weights: {
+                  focused: {
+                    suf: '.is-opened:not(.is-mobile)'
+                  },
+                  disabled: {
+                    suf: '.is-disabled'
+                  }
+                }
+              },
+              {
+                key: 'selectPopoverClassName',
+                weights: {
+                  default: {
+                    suf: ` .${ns}Select-option`
+                  },
+                  hover: {
+                    suf: ` .${ns}Select-option.is-highlight`
+                  },
+                  focused: {
+                    inner: `.${ns}Select-option.is-active`
+                  }
+                }
+              }
+            ],
+            id: id
+          }}
+          env={env}
+        />
       </div>
     );
   }
 }
-
 export interface TransferDropDownProps
   extends OptionsControlProps,
     Omit<
-      TransferControlSchema,
+      AMISTransferSchema,
       | 'type'
       | 'options'
       | 'inputClassName'
       | 'className'
       | 'descriptionClassName'
-    > {
+    >,
+    SpinnerExtraProps {
   borderMode?: 'full' | 'half' | 'none';
-  useMobileUI?: boolean;
+  mobileUI?: boolean;
 }
 
 class TransferDropdownRenderer extends BaseTransferRenderer<TransferDropDownProps> {
   @autobind
   renderItem(item: Option): any {
-    const {labelField} = this.props;
-    return `${item.scopeLabel || ''}${item[labelField || 'label']}`;
+    const {labelField, menuTpl, data, render} = this.props;
+
+    return menuTpl
+      ? render(`option/${item.value}`, menuTpl, {
+          data: createObject(data, item)
+        })
+      : `${item.scopeLabel || ''}${item[labelField || 'label']}`;
   }
 
   render() {
@@ -536,11 +711,22 @@ class TransferDropdownRenderer extends BaseTransferRenderer<TransferDropDownProp
       columns,
       leftMode,
       borderMode,
-      useMobileUI,
+      mobileUI,
+      env,
       popOverContainer,
       maxTagCount,
       overflowTagPopover,
-      placeholder
+      placeholder,
+      itemHeight,
+      virtualThreshold,
+      rightMode,
+      loadingConfig,
+      labelField,
+      showInvalidMatch,
+      checkAll,
+      checkAllLabel,
+      overlay,
+      valueField
     } = this.props;
 
     // 目前 LeftOptions 没有接口可以动态加载
@@ -570,6 +756,7 @@ class TransferDropdownRenderer extends BaseTransferRenderer<TransferDropDownProp
           options={options}
           onChange={this.handleChange}
           option2value={this.option2value}
+          optionItemRender={this.renderItem}
           itemRender={this.renderItem}
           sortable={sortable}
           searchResultMode={searchResultMode}
@@ -580,16 +767,31 @@ class TransferDropdownRenderer extends BaseTransferRenderer<TransferDropDownProp
           multiple={multiple}
           columns={columns}
           leftMode={leftMode}
+          rightMode={rightMode}
           leftOptions={leftOptions}
           borderMode={borderMode}
-          useMobileUI={useMobileUI}
-          popOverContainer={popOverContainer}
+          mobileUI={mobileUI}
+          popOverContainer={popOverContainer || env.getModalContainer}
           maxTagCount={maxTagCount}
           overflowTagPopover={overflowTagPopover}
-          placeholder={placeholder}
+          placeholder={placeholder as string}
+          itemHeight={itemHeight}
+          virtualThreshold={virtualThreshold}
+          virtualListHeight={266}
+          labelField={labelField}
+          showInvalidMatch={showInvalidMatch}
+          checkAllLabel={checkAllLabel}
+          checkAll={checkAll}
+          overlay={overlay}
+          valueField={valueField}
         />
 
-        <Spinner overlay key="info" show={loading} />
+        <Spinner
+          overlay
+          key="info"
+          show={loading}
+          loadingConfig={loadingConfig}
+        />
       </>
     );
   }

@@ -1,62 +1,28 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
-import {Api, SchemaNode, Schema, ActionObject} from 'amis-core';
-import cx from 'classnames';
+import {AMISRemarkBase, Renderer, RendererProps} from 'amis-core';
 import {TooltipWrapper} from 'amis-ui';
-import {filter, generateIcon} from 'amis-core';
+import {filter} from 'amis-core';
 import {ClassNamesFn, themeable} from 'amis-core';
 import {hasIcon, Icon} from 'amis-ui';
-import {BaseSchema, SchemaClassName, SchemaIcon, SchemaTpl} from '../Schema';
-import {autobind, isMobile} from 'amis-core';
+import {BaseSchema, AMISClassName, SchemaIcon, SchemaTpl} from '../Schema';
+import {autobind, AMISSchemaBase} from 'amis-core';
 import type {TooltipObject} from 'amis-ui/lib/components/TooltipWrapper';
 
 /**
  * 提示渲染器，默认会显示个小图标，鼠标放上来的时候显示配置的内容。
  */
-export interface RemarkSchema extends BaseSchema {
+export interface AMISRemarkSchema extends AMISRemarkBase {
   /**
    * 指定为提示类型
    */
   type: 'remark';
-
-  label?: string;
-
-  icon?: SchemaIcon;
-
-  tooltipClassName?: SchemaClassName;
-
-  /**
-   * 触发规则
-   */
-  trigger?: Array<'click' | 'hover' | 'focus'>;
-
-  /**
-   * 提示标题
-   */
-  title?: string;
-
-  /**
-   * 提示内容
-   */
-  content: SchemaTpl;
-
-  /**
-   * 显示位置
-   */
-  placement?: 'top' | 'right' | 'bottom' | 'left';
-
-  /**
-   * 点击其他内容时是否关闭弹框信息
-   */
-  rootClose?: boolean;
-
-  /**
-   * icon的形状
-   */
-  shape?: 'circle' | 'square';
 }
 
-export type SchemaRemark = string | Omit<RemarkSchema, 'type'>;
+// 保留原来的叫法
+export type BaseRemarkSchema = AMISRemarkBase;
+export type RemarkSchema = AMISRemarkSchema;
+export type SchemaRemark = AMISRemarkObject;
+export type AMISRemarkObject = string | AMISRemarkBase;
 
 export function filterContents(
   tooltip:
@@ -130,21 +96,9 @@ class Remark extends React.Component<RemarkProps> {
     return (
       <>
         {finalLabel ? <span>{finalLabel}</span> : null}
-        {finalIcon ? (
-          typeof finalIcon === 'object' ? (
-            generateIcon(cx, finalIcon)
-          ) : hasIcon(finalIcon) ? (
-            <span className={cx('Remark-icon', shapeClass)}>
-              <Icon icon={finalIcon} />
-            </span>
-          ) : (
-            <i className={cx('Remark-icon', finalIcon)} />
-          )
-        ) : finalIcon === false && finalLabel ? null : (
-          <span className={cx('Remark-icon icon', shapeClass)}>
-            <Icon icon="question-mark" />
-          </span>
-        )}
+        <span className={cx('Remark-icon', shapeClass)}>
+          <Icon cx={cx} icon={finalIcon || 'question-mark'} />
+        </span>
       </>
     );
   }
@@ -152,6 +106,7 @@ class Remark extends React.Component<RemarkProps> {
   render() {
     const {
       className,
+      style,
       icon,
       label,
       shape,
@@ -160,13 +115,14 @@ class Remark extends React.Component<RemarkProps> {
       rootClose,
       trigger,
       container,
+      popOverContainer,
       classPrefix: ns,
       classnames: cx,
       content,
       data,
       env,
       tooltipClassName,
-      useMobileUI
+      mobileUI
     } = this.props;
 
     const finalIcon = tooltip?.icon ?? icon;
@@ -175,13 +131,14 @@ class Remark extends React.Component<RemarkProps> {
     const parsedTip = filterContents(tooltip || content, data);
 
     // 移动端使用弹框提示
-    if (isMobile() && useMobileUI) {
+    if (mobileUI) {
       return (
         <div
           className={cx(
             `Remark`,
             (tooltip && tooltip.className) || className || `Remark--warning`
           )}
+          style={style}
           onClick={this.showModalTip(parsedTip)}
         >
           {this.renderLabel(finalIcon, finalLabel, cx, finalShape)}
@@ -200,7 +157,7 @@ class Remark extends React.Component<RemarkProps> {
         placement={(tooltip && tooltip.placement) || placement}
         rootClose={(tooltip && tooltip.rootClose) || rootClose}
         trigger={(tooltip && tooltip.trigger) || trigger}
-        container={container || env.getModalContainer}
+        container={container || popOverContainer || env.getModalContainer}
         delay={tooltip && tooltip.delay}
       >
         <div
@@ -208,6 +165,7 @@ class Remark extends React.Component<RemarkProps> {
             `Remark`,
             (tooltip && tooltip.className) || className || `Remark--warning`
           )}
+          style={style}
         >
           {this.renderLabel(finalIcon, finalLabel, cx, finalShape)}
         </div>

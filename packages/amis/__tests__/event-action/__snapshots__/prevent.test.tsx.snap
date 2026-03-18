@@ -13,6 +13,7 @@ exports[`EventAction:prevent 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <button
             class="cxd-Button cxd-Button--primary cxd-Button--size-default ml-2"
@@ -57,6 +58,7 @@ exports[`EventAction:prevent 1`] = `
       </div>
       <div
         class="cxd-Modal-body"
+        role="dialog-body"
       >
         <div
           class="cxd-Alert cxd-Alert--warning"
@@ -68,7 +70,7 @@ exports[`EventAction:prevent 1`] = `
               class="cxd-Alert-desc"
             >
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   确认后将不关闭弹窗

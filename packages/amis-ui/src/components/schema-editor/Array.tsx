@@ -1,8 +1,9 @@
 import React from 'react';
 import {autobind} from 'amis-core';
 import {Icon} from '../icons';
-import {SchemaEditorItemCommon} from './Common';
+import {ITEMMAP, SchemaEditorItemCommon} from './Common';
 import {SchemaEditorItem} from './Item';
+import {Controller} from '../FormField';
 
 export class SchemaEditorItemArray extends SchemaEditorItemCommon {
   state = {
@@ -39,7 +40,11 @@ export class SchemaEditorItemArray extends SchemaEditorItemCommon {
       showInfo,
       types,
       onTypeChange,
-      enableAdvancedSetting
+      enableAdvancedSetting,
+      popOverContainer,
+      placeholder,
+      mobileUI,
+      mini
     } = this.props;
     const items = value?.items || {
       type: 'string'
@@ -52,8 +57,12 @@ export class SchemaEditorItemArray extends SchemaEditorItemCommon {
         })}
       >
         <SchemaEditorItem
+          dataName={this.props.dataName}
           types={types}
           onTypeChange={onTypeChange}
+          label={
+            types?.find(item => item.value === (items as any)?.type)?.label
+          }
           prefix={
             <div className={cx('SchemaEditor-itemsLabel')}>
               {__('JSONSchema.array_items')}
@@ -69,31 +78,85 @@ export class SchemaEditorItemArray extends SchemaEditorItemCommon {
           classPrefix={classPrefix}
           disabled={disabled || !!(items as any)?.$ref}
           enableAdvancedSetting={enableAdvancedSetting}
+          popOverContainer={popOverContainer}
+          placeholder={placeholder}
+          mobileUI={mobileUI}
+          mini={mini}
         />
       </div>
     );
   }
 
   render() {
-    const {classnames: cx, showInfo, disabled} = this.props;
+    const {
+      classnames: cx,
+      showInfo,
+      formMode,
+      mini,
+      disabled,
+      mobileUI,
+      locale,
+      classPrefix,
+      types,
+      translate: __,
+      placeholder
+    } = this.props;
+
+    if (formMode) {
+      return this.renderForm({
+        formAffixRender: methods => {
+          return (
+            <>
+              <Controller
+                label={__('JSONSchema.array_items')}
+                name="items"
+                control={methods.control}
+                render={({field}) => (
+                  <SchemaEditorItem
+                    {...field}
+                    types={types}
+                    placeholder={placeholder}
+                    mobileUI={mobileUI}
+                    locale={locale}
+                    translate={__}
+                    classnames={cx}
+                    classPrefix={classPrefix}
+                    mini={false}
+                  />
+                )}
+              />
+            </>
+          );
+        }
+      });
+    }
 
     return (
-      <div className={cx('SchemaEditorItem SchemaEditorArray')}>
+      <div
+        className={cx('SchemaEditorItem SchemaEditorArray', {
+          'SchemaEditorItem--mini': mini
+        })}
+        data-amis-name={this.props.dataName}
+      >
         {showInfo !== false ? (
           <>
-            <a
-              className={cx('SchemaEditor-caret', {
-                'is-collapsed': this.state.collapsed
-              })}
-              onClick={this.toggleCollapsed}
-            >
-              <Icon icon="caret" className="icon" />
-            </a>
+            {mini ? null : (
+              <a
+                className={cx('SchemaEditor-caret', {
+                  'is-collapsed': this.state.collapsed
+                })}
+                onClick={this.toggleCollapsed}
+              >
+                <Icon icon="caret" className="icon" />
+              </a>
+            )}
             {this.renderCommon()}
           </>
         ) : null}
-        {this.state.collapsed ? null : this.renderItems()}
+        {this.state.collapsed || mini ? null : this.renderItems()}
       </div>
     );
   }
 }
+
+ITEMMAP.array = SchemaEditorItemArray;

@@ -2,20 +2,28 @@
  * @file 用来展示用户头像
  */
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {
+  AMISBadgeBase,
+  AMISSchemaBase,
+  Renderer,
+  RendererProps
+} from 'amis-core';
 import {Avatar} from 'amis-ui';
 import {BadgeObject, withBadge} from 'amis-ui';
-import {BaseSchema, SchemaClassName} from '../Schema';
-import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
+import {BaseSchema, AMISClassName} from '../Schema';
+import {isPureVariable, resolveVariableAndFilter, autobind} from 'amis-core';
 
-export interface AvatarSchema extends BaseSchema {
+/**
+ * 头像组件，用于展示用户头像或图标。
+ */
+export interface AMISAvatarSchema extends AMISSchemaBase {
   // 指定类型
   type: 'avatar';
 
   /**
    * 类名
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
 
   /**
    * 自定义样式
@@ -27,12 +35,17 @@ export interface AvatarSchema extends BaseSchema {
   /**
    * 角标
    */
-  badge?: BadgeObject;
+  badge?: AMISBadgeBase;
 
   /**
    * 图片地址
    */
   src?: string;
+
+  /**
+   * 默认头像
+   */
+  defaultAvatar?: string;
 
   /**
    * 图标
@@ -80,22 +93,40 @@ export interface AvatarSchema extends BaseSchema {
   crossOrigin: 'anonymous' | 'use-credentials' | '';
 
   /**
-   * 图片加载失败的是否默认处理，字符串函数
+   * 图片加载失败的是否默认处理
    */
   onError?: string;
 }
 
 export interface AvatarProps
   extends RendererProps,
-    Omit<AvatarSchema, 'type' | 'className'> {}
+    Omit<AMISAvatarSchema, 'type' | 'className'> {}
 
 export class AvatarField extends React.Component<AvatarProps> {
+  @autobind
+  handleClick(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
+
+  @autobind
+  handleMouseEnter(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
+
+  @autobind
+  handleMouseLeave(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
   render() {
     let {
       style = {},
       className,
       classnames: cx,
       src,
+      defaultAvatar,
       icon = 'fa fa-user',
       fit,
       shape,
@@ -136,7 +167,7 @@ export class AvatarField extends React.Component<AvatarProps> {
         style={style}
         className={className}
         classnames={cx}
-        src={src}
+        src={src || defaultAvatar}
         icon={icon}
         fit={fit}
         shape={shape}
@@ -147,6 +178,9 @@ export class AvatarField extends React.Component<AvatarProps> {
         draggable={draggable}
         crossOrigin={crossOrigin}
         onError={errHandler}
+        onClick={this.handleClick}
+        onMouseEnter={this.handleMouseEnter}
+        onMouseLeave={this.handleMouseLeave}
       />
     );
   }
@@ -155,5 +189,6 @@ export class AvatarField extends React.Component<AvatarProps> {
 @Renderer({
   type: 'avatar'
 })
+// @ts-ignore
 @withBadge
 export class AvatarFieldRenderer extends AvatarField {}

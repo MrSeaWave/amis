@@ -1,13 +1,13 @@
 import React from 'react';
-import {findDOMNode} from 'react-dom';
-
+import {findDomCompat as findDOMNode} from 'amis-core';
+import {observer} from 'mobx-react';
 import {
   RendererProps,
   ActionObject,
   setVariable,
   createObject,
-  ITableStore2,
-  ClassNamesFn
+  ClassNamesFn,
+  ITableStore2
 } from 'amis-core';
 import {Icon, HeadCellDropDown} from 'amis-ui';
 import type {FilterDropdownProps} from 'amis-ui/lib/components/table/HeadCellDropDown';
@@ -23,16 +23,14 @@ export interface QuickSearchConfig {
 export interface HeadCellSearchProps extends RendererProps {
   name: string;
   searchable: boolean | QuickSearchConfig;
-  onSearch?: (values: object) => void;
+  onSearch?: Function; // (values: object) => void;
   onAction?: Function;
-  store: ITableStore2;
   sortable?: boolean;
   label?: string;
-  orderBy: string;
-  orderDir: string;
   popOverContainer?: any;
   classnames: ClassNamesFn;
   classPrefix: string;
+  store: ITableStore2;
 }
 
 export class HeadCellSearchDropDown extends React.Component<
@@ -48,7 +46,14 @@ export class HeadCellSearchDropDown extends React.Component<
   }
 
   buildSchema() {
-    const {searchable, sortable, name, label, translate: __} = this.props;
+    const {
+      searchable,
+      sortable,
+      name,
+      label,
+      translate: __,
+      testIdBuilder
+    } = this.props;
 
     let schema: any;
 
@@ -60,7 +65,8 @@ export class HeadCellSearchDropDown extends React.Component<
             type: 'text',
             name,
             placeholder: label,
-            clearable: true
+            clearable: true,
+            testid: testIdBuilder?.getChild(name)?.getTestIdValue()
           }
         ]
       };
@@ -73,6 +79,8 @@ export class HeadCellSearchDropDown extends React.Component<
             ? searchable.controls.concat()
             : undefined
         };
+      } else if (searchable?.type === 'form') {
+        schema = searchable;
       } else {
         schema = {
           title: '',
@@ -81,6 +89,9 @@ export class HeadCellSearchDropDown extends React.Component<
             {
               type: searchable.type || 'text',
               name: searchable.name || name,
+              testid: testIdBuilder
+                ?.getChild(searchable.name || name)
+                ?.getTestIdValue(),
               placeholder: label,
               ...searchable
             }
@@ -115,36 +126,44 @@ export class HeadCellSearchDropDown extends React.Component<
     }
 
     if (schema) {
+      // 如果schema是直接配置的{type: 'form', body: []}
       const formItems: Array<string> = [];
-      schema.controls?.forEach(
+      (schema.controls || schema.body || []).forEach(
         (item: any) =>
           item.name &&
           item.name !== 'orderBy' &&
           item.name !== 'order' &&
           formItems.push(item.name)
       );
+
       this.formItems = formItems;
       schema = {
         ...schema,
         type: 'form',
         wrapperComponent: 'div',
+        wrapWithPanel: true,
+        title: false,
+        testid: testIdBuilder?.getChild('form')?.getTestIdValue(),
         actions: [
           {
             type: 'button',
             label: __('reset'),
-            actionType: 'clear-and-submit'
+            actionType: 'clear-and-submit',
+            testid: testIdBuilder?.getChild('btn-reset')?.getTestIdValue()
           },
 
           {
             type: 'button',
             label: __('cancel'),
-            actionType: 'cancel'
+            actionType: 'cancel',
+            testid: testIdBuilder?.getChild('btn-cancel')?.getTestIdValue()
           },
 
           {
             label: __('search'),
             type: 'submit',
-            primary: true
+            primary: true,
+            testid: testIdBuilder?.getChild('btn-search')?.getTestIdValue()
           }
         ]
       };
@@ -191,7 +210,7 @@ export class HeadCellSearchDropDown extends React.Component<
   }
 
   async handleReset() {
-    const {onSearch, data, name, store} = this.props;
+    const {onSearch, data, name} = this.props;
     const values = {...data};
 
     this.formItems.forEach(key => setVariable(values, key, undefined));
@@ -201,13 +220,13 @@ export class HeadCellSearchDropDown extends React.Component<
       values.order = 'asc';
     }
 
-    store.updateQuery(values);
+    onSearch && (await onSearch(name, values));
 
     onSearch && onSearch(values);
   }
 
   async handleSubmit(values: any, confirm: Function) {
-    const {onSearch, name, store, dispatchEvent, data} = this.props;
+    const {onSearch, name} = this.props;
 
     if (values.order) {
       values = {
@@ -216,28 +235,13 @@ export class HeadCellSearchDropDown extends React.Component<
       };
     }
 
-    const rendererEvent = await dispatchEvent(
-      'columnSearch',
-      createObject(data, {
-        searchName: name,
-        searchValue: values
-      })
-    );
-
-    if (rendererEvent?.prevented) {
-      return;
-    }
-
-    store.updateQuery(values);
-
-    onSearch && onSearch(values);
+    onSearch && (await onSearch(name, values));
 
     confirm();
   }
 
   isActive() {
     const {data, name, orderBy} = this.props;
-
     return (
       (orderBy && orderBy === name) || this.formItems.some(key => data?.[key])
     );
@@ -249,11 +253,12 @@ export class HeadCellSearchDropDown extends React.Component<
       name,
       data,
       searchable,
-      store,
+      order,
       orderBy,
       popOverContainer,
       classPrefix: ns,
-      classnames: cx
+      classnames: cx,
+      testIdBuilder
     } = this.props;
 
     const formSchema = this.buildSchema();
@@ -267,7 +272,14 @@ export class HeadCellSearchDropDown extends React.Component<
           (searchable as any).className
         )}
         active={isActive}
-        filterIcon={<Icon icon="search" className="icon" />}
+        filterIcon={
+          <Icon
+            icon="search"
+            className="icon"
+            iconContent="table-search-icon"
+            testIdBuilder={testIdBuilder?.getChild('search-icon')}
+          />
+        }
         popOverContainer={
           popOverContainer ? popOverContainer : () => findDOMNode(this)
         }
@@ -281,8 +293,7 @@ export class HeadCellSearchDropDown extends React.Component<
             data: {
               ...data,
               orderBy,
-              order:
-                orderBy && orderBy === name ? (store as ITableStore2).order : ''
+              order: orderBy && orderBy === name ? order : ''
             },
             onSubmit: (values: object) => this.handleSubmit(values, confirm),
             onAction: (e: any, action: ActionObject, ctx: object) => {
@@ -290,7 +301,21 @@ export class HeadCellSearchDropDown extends React.Component<
             }
           }) as JSX.Element;
         }}
+        testIdBuilder={testIdBuilder}
       ></HeadCellDropDown>
     );
   }
 }
+
+export default observer((props: HeadCellSearchProps) => {
+  const store = props.store;
+
+  return (
+    <HeadCellSearchDropDown
+      {...props}
+      data={store.query}
+      orderBy={store.orderBy}
+      order={store.order}
+    />
+  );
+});

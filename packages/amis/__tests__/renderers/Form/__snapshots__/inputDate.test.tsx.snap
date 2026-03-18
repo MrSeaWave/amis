@@ -4,7 +4,7 @@ exports[`Renderer:inputDate 1`] = `
 <div>
   <div
     class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-    style="position: relative;"
+    data-role="container"
   >
     <div
       class="cxd-Panel-heading"
@@ -13,7 +13,7 @@ exports[`Renderer:inputDate 1`] = `
         class="cxd-Panel-title"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           <span>
             The form
@@ -34,6 +34,7 @@ exports[`Renderer:inputDate 1`] = `
         />
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="a"
           data-role="form-item"
         >
           <label
@@ -41,7 +42,7 @@ exports[`Renderer:inputDate 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   date
@@ -84,50 +85,11 @@ exports[`Renderer:inputDate 1`] = `
         </div>
       </form>
     </div>
-    <div
-      class="resize-sensor"
-      style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-    >
-      
-  
-      <div
-        class="resize-sensor-expand"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-shrink"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-appear"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-      />
-    </div>
   </div>
 </div>
 `;
 
-exports[`Renderer:inputDate with clearable: clearable false 1`] = `
+exports[`Renderer:inputDate compatible with format & inputFormat 1`] = `
 <div>
   <div
     class="cxd-Page"
@@ -140,10 +102,11 @@ exports[`Renderer:inputDate with clearable: clearable false 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -152,7 +115,7 @@ exports[`Renderer:inputDate with clearable: clearable false 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -173,6 +136,7 @@ exports[`Renderer:inputDate with clearable: clearable false 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date1"
                   data-role="form-item"
                 >
                   <label
@@ -180,7 +144,244 @@ exports[`Renderer:inputDate with clearable: clearable false 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
+                      >
+                        <span>
+                          日期
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                  <div
+                    class="cxd-Form-value"
+                  >
+                    <div
+                      class="cxd-DateControl is-date cxd-Form-control"
+                    >
+                      <div
+                        class="cxd-DatePicker"
+                        tabindex="0"
+                      >
+                        <input
+                          autocomplete="off"
+                          class="cxd-DatePicker-input"
+                          placeholder="请选择日期"
+                          type="text"
+                          value="19/08-2022"
+                        />
+                        <a
+                          class="cxd-DatePicker-clear"
+                        >
+                          <icon-mock
+                            classname="icon icon-input-clear"
+                            icon="input-clear"
+                          />
+                        </a>
+                        <a
+                          class="cxd-DatePicker-toggler"
+                        >
+                          <icon-mock
+                            classname="icon icon-date"
+                            icon="date"
+                          />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date1"
+                  data-role="form-item"
+                >
+                  <label
+                    class="cxd-Form-label cxd-Form-itemColumn--normal"
+                  >
+                    <span />
+                  </label>
+                  <div
+                    class="cxd-Form-value"
+                  >
+                    <div
+                      class="cxd-Form-static"
+                    >
+                      <div
+                        class="cxd-Form-control"
+                      >
+                        <span
+                          class="cxd-PlainField"
+                        >
+                          今天是2022年, 08月, 19日
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date2"
+                  data-role="form-item"
+                >
+                  <label
+                    class="cxd-Form-label cxd-Form-itemColumn--normal"
+                  >
+                    <span>
+                      <span
+                        class="cxd-TplField fr-view"
+                      >
+                        <span>
+                          日期
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                  <div
+                    class="cxd-Form-value"
+                  >
+                    <div
+                      class="cxd-DateControl is-date cxd-Form-control"
+                    >
+                      <div
+                        class="cxd-DatePicker"
+                        tabindex="0"
+                      >
+                        <input
+                          autocomplete="off"
+                          class="cxd-DatePicker-input"
+                          placeholder="请选择日期"
+                          type="text"
+                          value="19/08-2022"
+                        />
+                        <a
+                          class="cxd-DatePicker-clear"
+                        >
+                          <icon-mock
+                            classname="icon icon-input-clear"
+                            icon="input-clear"
+                          />
+                        </a>
+                        <a
+                          class="cxd-DatePicker-toggler"
+                        >
+                          <icon-mock
+                            classname="icon icon-date"
+                            icon="date"
+                          />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date2"
+                  data-role="form-item"
+                >
+                  <label
+                    class="cxd-Form-label cxd-Form-itemColumn--normal"
+                  >
+                    <span />
+                  </label>
+                  <div
+                    class="cxd-Form-value"
+                  >
+                    <div
+                      class="cxd-Form-static"
+                    >
+                      <div
+                        class="cxd-Form-control"
+                      >
+                        <span
+                          class="cxd-PlainField"
+                        >
+                          今天是2022年, 08月, 19日
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div
+              class="cxd-Panel-footerWrap"
+            >
+              <div
+                class="cxd-Panel-btnToolbar cxd-Panel-footer"
+              >
+                <button
+                  class="cxd-Button cxd-Button--primary cxd-Button--size-default"
+                  type="submit"
+                >
+                  <span>
+                    Submit
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:inputDate with clearable: clearable false 1`] = `
+<div>
+  <div
+    class="cxd-Page"
+  >
+    <div
+      class="cxd-Page-content"
+    >
+      <div
+        class="cxd-Page-main"
+      >
+        <div
+          class="cxd-Page-body"
+          role="page-body"
+        >
+          <div
+            class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+            data-role="container"
+          >
+            <div
+              class="cxd-Panel-heading"
+            >
+              <h3
+                class="cxd-Panel-title"
+              >
+                <span
+                  class="cxd-TplField fr-view"
+                >
+                  <span>
+                    表单
+                  </span>
+                </span>
+              </h3>
+            </div>
+            <div
+              class="cxd-Panel-body"
+            >
+              <form
+                class="cxd-Form cxd-Form--horizontal"
+                novalidate=""
+              >
+                <input
+                  style="display: none;"
+                  type="submit"
+                />
+                <div
+                  class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date"
+                  data-role="form-item"
+                >
+                  <label
+                    class="cxd-Form-label cxd-Form-itemColumn--normal"
+                  >
+                    <span>
+                      <span
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           日期
@@ -235,45 +436,6 @@ exports[`Renderer:inputDate with clearable: clearable false 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -295,10 +457,11 @@ exports[`Renderer:inputDate with clearable: clearable true 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -307,7 +470,7 @@ exports[`Renderer:inputDate with clearable: clearable true 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -328,6 +491,7 @@ exports[`Renderer:inputDate with clearable: clearable true 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date"
                   data-role="form-item"
                 >
                   <label
@@ -335,7 +499,7 @@ exports[`Renderer:inputDate with clearable: clearable true 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           日期
@@ -374,6 +538,7 @@ exports[`Renderer:inputDate with clearable: clearable true 1`] = `
                 </div>
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date"
                   data-role="form-item"
                 >
                   <label
@@ -421,45 +586,6 @@ exports[`Renderer:inputDate with clearable: clearable true 1`] = `
                 </button>
               </div>
             </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -468,7 +594,7 @@ exports[`Renderer:inputDate with clearable: clearable true 1`] = `
 </div>
 `;
 
-exports[`Renderer:inputDate with format & inputFormat 1`] = `
+exports[`Renderer:inputDate with valueFormat & displayFormat 1`] = `
 <div>
   <div
     class="cxd-Page"
@@ -481,10 +607,11 @@ exports[`Renderer:inputDate with format & inputFormat 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-            style="position: relative;"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -493,7 +620,7 @@ exports[`Renderer:inputDate with format & inputFormat 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -514,6 +641,7 @@ exports[`Renderer:inputDate with format & inputFormat 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date"
                   data-role="form-item"
                 >
                   <label
@@ -521,7 +649,7 @@ exports[`Renderer:inputDate with format & inputFormat 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           日期
@@ -568,6 +696,7 @@ exports[`Renderer:inputDate with format & inputFormat 1`] = `
                 </div>
                 <div
                   class="cxd-Form-item cxd-Form-item--horizontal"
+                  data-amis-name="date"
                   data-role="form-item"
                 >
                   <label
@@ -610,45 +739,6 @@ exports[`Renderer:inputDate with format & inputFormat 1`] = `
                   </span>
                 </button>
               </div>
-            </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
             </div>
           </div>
         </div>

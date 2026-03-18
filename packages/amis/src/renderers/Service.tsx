@@ -1,7 +1,7 @@
 import React from 'react';
 import extend from 'lodash/extend';
 import cloneDeep from 'lodash/cloneDeep';
-import {Renderer, RendererProps} from 'amis-core';
+import {Renderer, RendererProps, filterTarget} from 'amis-core';
 import {ServiceStore, IServiceStore} from 'amis-core';
 import {Api, RendererData, ActionObject} from 'amis-core';
 import {filter, evalExpression} from 'amis-core';
@@ -12,7 +12,7 @@ import {
   isEffectiveApi,
   str2AsyncFunction
 } from 'amis-core';
-import {Spinner} from 'amis-ui';
+import {Spinner, SpinnerExtraProps, Alert2 as Alert} from 'amis-ui';
 import {
   autobind,
   isObject,
@@ -20,20 +20,27 @@ import {
   isObjectShallowModified,
   isVisible,
   qsstringify,
-  createObject
+  createObject,
+  extendObject,
+  TestIdBuilder
 } from 'amis-core';
 import {
   BaseSchema,
   SchemaApi,
-  SchemaCollection,
   SchemaExpression,
   SchemaMessage,
   SchemaName
 } from '../Schema';
 import {IIRendererStore} from 'amis-core';
 
-import type {ListenerAction} from 'amis-core';
-import type {ScopedComponentType} from 'amis-core/lib/Scoped';
+import type {
+  AMISSchemaCollection,
+  AMISExpression,
+  ListenerAction
+} from 'amis-core';
+import type {ScopedComponentType} from 'amis-core';
+import isPlainObject from 'lodash/isPlainObject';
+import {isAlive} from 'mobx-state-tree';
 
 export const eventTypes = [
   /* 初始化时执行，默认 */
@@ -46,104 +53,113 @@ export const eventTypes = [
   'onWsFetched'
 ] as const;
 
-export type ProviderEventType = typeof eventTypes[number];
+export type ProviderEventType = (typeof eventTypes)[number];
 
 export type DataProviderCollection = Partial<
   Record<ProviderEventType, DataProvider>
 >;
 
-export type DataProvider = string | Function;
+export type DataProvider = string;
 
 export type ComposedDataProvider = DataProvider | DataProviderCollection;
 
 /**
- * Service 服务类控件。
- * 文档：https://baidu.gitee.io/amis/docs/components/service
+ * 服务组件，用于数据获取和处理。支持 API 调用、数据转换、条件渲染等。
  */
-export interface ServiceSchema extends BaseSchema {
-  /**
-   * 指定为 Service 数据拉取控件。
-   */
+export interface AMISServiceSchema extends BaseSchema, SpinnerExtraProps {
   type: 'service';
 
   /**
-   * 页面初始化的时候，可以设置一个 API 让其取拉取，发送数据会携带当前 data 数据（包含地址栏参数），获取得数据会合并到 data 中，供组件内使用。
+   * API 接口配置
    */
   api?: SchemaApi;
 
   /**
-   * WebScocket 地址，用于实时获取数据
+   * WebSocket 地址
    */
   ws?: string;
 
   /**
-   * 通过调用外部函数来获取数据
+   * 数据提供者函数
    */
   dataProvider?: ComposedDataProvider;
 
   /**
-   * 内容区域
+   * 内容区域配置
    */
-  body?: SchemaCollection;
+  body?: AMISSchemaCollection;
 
   /**
-   * @deprecated 改成 api 的 sendOn。
+   * 数据拉取条件表达式
+   * @deprecated 建议使用 api 的 sendOn 属性
    */
-  fetchOn?: SchemaExpression;
+  fetchOn?: AMISExpression;
 
   /**
-   * 是否默认就拉取？
+   * 是否在组件初始化时自动拉取数据
    */
   initFetch?: boolean;
 
   /**
-   * 是否默认就拉取？通过表达式来决定.
-   *
-   * @deprecated 改成 api 的 sendOn。
+   * 通过表达式控制是否在初始化时拉取数据
+   * @deprecated 建议使用 api 的 sendOn 属性
    */
-  initFetchOn?: SchemaExpression;
+  initFetchOn?: AMISExpression;
 
   /**
-   * 用来获取远程 Schema 的 api
+   * 用于获取远程 Schema 的 API 配置
    */
   schemaApi?: SchemaApi;
 
   /**
-   * 是否默认加载 schemaApi
+   * 是否在组件初始化时自动加载 schemaApi
    */
   initFetchSchema?: boolean;
 
   /**
-   * 用表达式来配置。
-   * @deprecated 改成 api 的 sendOn。
+   * 通过表达式控制是否加载 schemaApi
+   * @deprecated 建议使用 api 的 sendOn 属性
    */
-  initFetchSchemaOn?: SchemaExpression;
+  initFetchSchemaOn?: AMISExpression;
 
   /**
-   * 是否轮询拉取
+   * 轮询间隔时间（毫秒），设置为 0 时停止轮询
    */
   interval?: number;
 
   /**
-   * 是否静默拉取
+   * 是否静默轮询，不显示加载状态
    */
   silentPolling?: boolean;
 
   /**
-   * 关闭轮询的条件。
+   * 停止自动刷新的条件表达式
    */
-  stopAutoRefreshWhen?: SchemaExpression;
+  stopAutoRefreshWhen?: AMISExpression;
 
+  /**
+   * 消息配置，用于显示成功或失败提示
+   */
   messages?: SchemaMessage;
 
+  /**
+   * 组件名称，用于组件通信和数据绑定
+   */
   name?: SchemaName;
+
+  /**
+   * 是否以 Alert 形式显示 API 接口响应的错误信息
+   * @default true
+   */
+  showErrorMsg?: boolean;
 }
 
 export interface ServiceProps
   extends RendererProps,
-    Omit<ServiceSchema, 'type' | 'className'> {
+    Omit<AMISServiceSchema, 'type' | 'className'> {
   store: IServiceStore;
   messages: SchemaMessage;
+  testIdBuilder?: TestIdBuilder;
 }
 export default class Service extends React.Component<ServiceProps> {
   timer: ReturnType<typeof setTimeout>;
@@ -161,7 +177,8 @@ export default class Service extends React.Component<ServiceProps> {
   static defaultProps: Partial<ServiceProps> = {
     messages: {
       fetchFailed: 'fetchFailed'
-    }
+    },
+    showErrorMsg: true
   };
 
   static propsList: Array<string> = [];
@@ -182,8 +199,15 @@ export default class Service extends React.Component<ServiceProps> {
     this.dataProviderSetData = this.dataProviderSetData.bind(this);
   }
 
-  componentDidMount() {
+  async componentDidMount() {
+    const {data, dispatchEvent} = this.props;
     this.mounted = true;
+    const rendererEvent = await dispatchEvent('init', data, this);
+
+    if (rendererEvent?.prevented) {
+      return;
+    }
+
     this.initFetch();
   }
 
@@ -201,7 +225,10 @@ export default class Service extends React.Component<ServiceProps> {
       }
     }
 
-    isApiOutdated(prevProps.api, props.api, prevProps.data, props.data) &&
+    if (
+      isApiOutdated(prevProps.api, props.api, prevProps.data, props.data) &&
+      isEffectiveApi(props.api, store.data)
+    ) {
       store
         .fetchData(props.api as Api, store.data, {
           successMessage: fetchSuccess,
@@ -211,13 +238,17 @@ export default class Service extends React.Component<ServiceProps> {
           this.runDataProvider('onApiFetched');
           this.afterDataFetch(res);
         });
+    }
 
-    isApiOutdated(
-      prevProps.schemaApi,
-      props.schemaApi,
-      prevProps.data,
-      props.data
-    ) &&
+    if (
+      isApiOutdated(
+        prevProps.schemaApi,
+        props.schemaApi,
+        prevProps.data,
+        props.data
+      ) &&
+      isEffectiveApi(props.schemaApi, store.data)
+    ) {
       store
         .fetchSchema(props.schemaApi as Api, store.data, {
           successMessage: fetchSuccess,
@@ -227,6 +258,7 @@ export default class Service extends React.Component<ServiceProps> {
           this.runDataProvider('onSchemaApiFetched');
           this.afterSchemaFetch(res);
         });
+    }
 
     if (props.ws && prevProps.ws !== props.ws) {
       if (this.socket) {
@@ -249,7 +281,12 @@ export default class Service extends React.Component<ServiceProps> {
     }
   }
 
-  doAction(action: ListenerAction, args: any) {
+  doAction(
+    action: ListenerAction,
+    data: any,
+    throwErrors: boolean = false,
+    args?: any
+  ) {
     if (action?.actionType === 'rebuild') {
       const {
         schemaApi,
@@ -327,14 +364,16 @@ export default class Service extends React.Component<ServiceProps> {
    */
   @autobind
   initDataProviders(provider?: ComposedDataProvider) {
-    const dataProvider = cloneDeep(provider);
+    const dataProvider = isPlainObject(provider)
+      ? cloneDeep(provider)
+      : provider;
     let fnCollection: DataProviderCollection = {};
 
     if (dataProvider) {
-      if (typeof dataProvider === 'object' && isObject(dataProvider)) {
+      if (isPlainObject(dataProvider)) {
         Object.keys(dataProvider).forEach((event: ProviderEventType) => {
           const normalizedProvider = this.normalizeProvider(
-            dataProvider[event],
+            (dataProvider as DataProviderCollection)[event],
             event
           );
 
@@ -392,7 +431,7 @@ export default class Service extends React.Component<ServiceProps> {
     const dataProviders = this.dataProviders;
 
     if (dataProviders && ~eventTypes.indexOf(event)) {
-      const fn = dataProviders[event];
+      const fn = dataProviders[event] as any;
 
       if (fn && typeof fn === 'function') {
         const unsubscribe = await fn(
@@ -472,12 +511,12 @@ export default class Service extends React.Component<ServiceProps> {
         if ('status' in data && 'data' in data) {
           returndata = data.data;
           if (data.status !== 0) {
-            store.updateMessage(data.msg, true);
-            env.notify('error', data.msg);
+            store.updateMessage(wsApi?.messages?.failed ?? data.msg, true);
+            env.notify('error', wsApi?.messages?.failed ?? data.msg);
             return;
           }
         }
-        store.updateData(returndata, undefined, false);
+        store.updateData(returndata, undefined, false, wsApi.concatDataFields);
         store.setHasRemoteData();
 
         this.runDataProvider('onWsFetched');
@@ -495,22 +534,44 @@ export default class Service extends React.Component<ServiceProps> {
     // todo 应该统一这块
     // 初始化接口返回的是整个 response，
     // 保存 ajax 请求的时候返回时数据部分。
-    const data = result?.hasOwnProperty('ok') ? result.data : result;
-    const {onBulkChange, dispatchEvent} = this.props;
-
-    dispatchEvent?.('fetchInited', data);
-
-    if (!isEmpty(data) && onBulkChange) {
-      onBulkChange(data);
+    const data = result?.hasOwnProperty('ok') ? result.data ?? {} : result;
+    const {onBulkChange, dispatchEvent, store, formStore} = this.props;
+    if (!isAlive(store)) {
+      return;
     }
 
-    this.initInterval(data);
+    dispatchEvent?.(
+      'fetchInited',
+      createObject(this.props.data, {
+        ...data,
+        __response: {msg: store.msg, error: store.error}, // 保留，兼容历史
+        responseData: data,
+        responseStatus:
+          result?.status === undefined ? (store.error ? 1 : 0) : result?.status,
+        responseMsg: store.msg
+      })
+    );
+
+    if (!isEmpty(data) && onBulkChange && formStore) {
+      onBulkChange(data, false, {
+        type: 'api'
+      });
+    }
+
+    result?.ok && this.initInterval(data);
   }
 
   afterSchemaFetch(schema: any) {
-    const {onBulkChange, formStore, dispatchEvent} = this.props;
+    const {onBulkChange, formStore, dispatchEvent, store} = this.props;
 
-    dispatchEvent?.('fetchSchemaInited', schema);
+    dispatchEvent?.('fetchSchemaInited', {
+      ...schema,
+      __response: {msg: store.msg, error: store.error}, // 保留，兼容历史
+      responseData: schema,
+      responseStatus:
+        schema?.status === undefined ? (store.error ? 1 : 0) : schema?.status,
+      responseMsg: store.msg
+    });
 
     if (formStore && schema?.data && onBulkChange) {
       onBulkChange && onBulkChange(schema.data);
@@ -535,13 +596,13 @@ export default class Service extends React.Component<ServiceProps> {
     return value;
   }
 
-  reload(
+  async reload(
     subpath?: string,
     query?: any,
     ctx?: RendererData,
     silent?: boolean,
     replace?: boolean
-  ) {
+  ): Promise<any> {
     if (query) {
       return this.receive(query, undefined, replace);
     }
@@ -560,51 +621,70 @@ export default class Service extends React.Component<ServiceProps> {
     clearTimeout(this.timer);
 
     if (isEffectiveApi(schemaApi, store.data)) {
-      store
-        .fetchSchema(schemaApi, store.data, {
-          successMessage: fetchSuccess,
-          errorMessage: fetchFailed
-        })
-        .then(res => {
-          this.runDataProvider('onApiFetched');
-          this.afterSchemaFetch(res);
-        });
+      const res = await store.fetchSchema(schemaApi, store.data, {
+        successMessage: fetchSuccess,
+        errorMessage: fetchFailed
+      });
+      await this.runDataProvider('onApiFetched');
+      this.afterSchemaFetch(res);
     }
 
     if (isEffectiveApi(api, store.data)) {
-      store
-        .fetchData(api, store.data, {
-          silent,
-          successMessage: fetchSuccess,
-          errorMessage: fetchFailed
-        })
-        .then(res => {
-          this.runDataProvider('onSchemaApiFetched');
-          this.afterDataFetch(res);
-        });
+      const res = await store.fetchData(api, store.data, {
+        silent,
+        successMessage: fetchSuccess,
+        errorMessage: fetchFailed
+      });
+      await this.runDataProvider('onSchemaApiFetched');
+      this.afterDataFetch(res);
     }
 
     if (dataProvider) {
-      this.runDataProvider('inited');
+      await this.runDataProvider('inited');
     }
+
+    return store.data;
   }
 
   silentReload(target?: string, query?: any) {
     this.reload(target, query, undefined, true);
   }
 
-  receive(values: object, subPath?: string, replace?: boolean) {
+  async receive(values: object, subPath?: string, replace?: boolean) {
     const {store} = this.props;
 
     store.updateData(values, undefined, replace);
-    this.reload();
+    return this.reload();
   }
 
   handleQuery(query: any) {
     if (this.props.api || this.props.schemaApi) {
+      // 如果是分页动作，则看接口里面有没有用，没用则  return false
+      // 让组件自己去排序
+      if (
+        query?.hasOwnProperty('orderBy') &&
+        [this.props.api, this.props.schemaApi].every(
+          api =>
+            !api ||
+            !isApiOutdated(
+              api,
+              api,
+              this.props.store.data,
+              createObject(this.props.store.data, query)
+            )
+        )
+      ) {
+        return false;
+      }
+
       this.receive(query);
+      return;
+    }
+
+    if (this.props.onQuery) {
+      return this.props.onQuery(query);
     } else {
-      this.props.onQuery?.(query);
+      return false;
     }
   }
 
@@ -620,7 +700,7 @@ export default class Service extends React.Component<ServiceProps> {
     targets: Array<any>
   ) {
     const {store} = this.props;
-    store.closeDialog(true);
+    store.closeDialog(true, values);
   }
 
   @autobind
@@ -633,14 +713,22 @@ export default class Service extends React.Component<ServiceProps> {
     return new Promise(resolve => {
       const {store} = this.props;
 
-      store.setCurrentAction({
-        type: 'button',
-        actionType: 'dialog',
-        dialog: dialog
-      });
-      store.openDialog(ctx, undefined, confirmed => {
-        resolve(confirmed);
-      });
+      store.setCurrentAction(
+        {
+          type: 'button',
+          actionType: 'dialog',
+          dialog: dialog
+        },
+        this.props.resolveDefinitions
+      );
+      store.openDialog(
+        ctx,
+        undefined,
+        confirmed => {
+          resolve(confirmed);
+        },
+        this.context as any
+      );
     });
   }
 
@@ -654,8 +742,8 @@ export default class Service extends React.Component<ServiceProps> {
     const {onAction, store, env, api, translate: __} = this.props;
 
     if (api && action.actionType === 'ajax') {
-      store.setCurrentAction(action);
-      store
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return store
         .saveRemote(action.api as string, data, {
           successMessage: __(action.messages && action.messages.success),
           errorMessage: __(action.messages && action.messages.failed)
@@ -669,8 +757,12 @@ export default class Service extends React.Component<ServiceProps> {
 
           const redirect =
             action.redirect && filter(action.redirect, store.data);
-          redirect && env.jumpTo(redirect, action);
-          action.reload && this.reloadTarget(action.reload, store.data);
+          redirect && env.jumpTo(redirect, action, store.data);
+          action.reload &&
+            this.reloadTarget(
+              filterTarget(action.reload, store.data),
+              store.data
+            );
         })
         .catch(e => {
           if (throwErrors || action.countDown) {
@@ -678,7 +770,7 @@ export default class Service extends React.Component<ServiceProps> {
           }
         });
     } else {
-      onAction(e, action, data, throwErrors, delegate || this.context);
+      return onAction(e, action, data, throwErrors, delegate || this.context);
     }
   }
 
@@ -716,37 +808,50 @@ export default class Service extends React.Component<ServiceProps> {
   render() {
     const {
       className,
+      style,
       store,
       render,
+      env,
       classPrefix: ns,
-      classnames: cx
+      classnames: cx,
+      loadingConfig,
+      showErrorMsg,
+      testIdBuilder
     } = this.props;
 
     return (
-      <div className={cx(`${ns}Service`, className)}>
-        {store.error ? (
-          <div className={cx(`Alert Alert--danger`)}>
-            <button
-              className={cx('Alert-close')}
-              onClick={() => store.updateMessage('')}
-              type="button"
-            >
-              <span>×</span>
-            </button>
+      <div
+        className={cx(`${ns}Service`, className)}
+        style={style}
+        {...testIdBuilder?.getTestId()}
+      >
+        {!env.forceSilenceInsideError &&
+        store.error &&
+        showErrorMsg !== false ? (
+          <Alert
+            level="danger"
+            showCloseButton
+            onClose={() => store.updateMessage('')}
+          >
             {store.msg}
-          </div>
+          </Alert>
         ) : null}
 
         {this.renderBody()}
 
-        <Spinner size="lg" overlay key="info" show={store.loading} />
+        <Spinner
+          size="lg"
+          overlay
+          key="info"
+          show={store.loading}
+          loadingConfig={loadingConfig}
+        />
 
         {render(
           // 单独给 feedback 服务的，handleAction 里面先不要处理弹窗
           'modal',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).dialog as object)),
+            ...store.dialogSchema,
             type: 'dialog'
           },
           {
@@ -778,7 +883,7 @@ export class ServiceRenderer extends Service {
     scoped.registerComponent(this as ScopedComponentType);
   }
 
-  reload(
+  async reload(
     subpath?: string,
     query?: any,
     ctx?: any,
@@ -796,7 +901,7 @@ export class ServiceRenderer extends Service {
     return super.reload(subpath, query, ctx, silent, replace);
   }
 
-  receive(values: any, subPath?: string, replace?: boolean) {
+  async receive(values: any, subPath?: string, replace?: boolean) {
     const scoped = this.context as IScopedContext;
     if (subPath) {
       return scoped.send(subPath, values);
@@ -818,5 +923,10 @@ export class ServiceRenderer extends Service {
 
   setData(values: object, replace?: boolean) {
     return this.props.store.updateData(values, undefined, replace);
+  }
+
+  getData() {
+    const {store} = this.props;
+    return store.data;
   }
 }

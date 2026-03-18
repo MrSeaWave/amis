@@ -1,6 +1,6 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
-import {autobind, getPropValue} from 'amis-core';
+import {AMISSchemaBase, ClassName, Renderer, RendererProps} from 'amis-core';
+import {autobind, getPropValue, BaseSchemaWithoutType} from 'amis-core';
 import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
 import {
   BaseSchema,
@@ -14,7 +14,7 @@ import {BadgeObject} from 'amis-ui';
 import {handleAction} from 'amis-core';
 import {validations} from 'amis-core';
 
-export interface ListItemSchema extends Omit<BaseSchema, 'type'> {
+export interface ListItemSchema extends AMISSchemaBase {
   /**
    * 单项点击事件
    */
@@ -53,9 +53,15 @@ export interface ListItemSchema extends Omit<BaseSchema, 'type'> {
 
 /**
  * List 列表展示控件。
- * 文档：https://baidu.gitee.io/amis/docs/components/card
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/card
  */
-export interface ListSchema extends BaseSchema {
+/**
+ * 网格导航组件，用于宫格样式的导航入口。支持图标与描述。
+ */
+/**
+ * 网格导航组件，用于宫格样式的导航入口。支持图标与描述。
+ */
+export interface AMISGridNavSchema extends AMISSchemaBase {
   /**
    * 指定为 List 列表展示控件。
    */
@@ -64,7 +70,12 @@ export interface ListSchema extends BaseSchema {
   /**
    * 列表项类名
    */
-  itemClassName?: string;
+  itemClassName?: ClassName;
+
+  /**
+   * 列表项内容类名
+   */
+  contentClassName?: ClassName;
 
   /**
    * 静态图片列表配置
@@ -121,7 +132,7 @@ export interface Column {
 
 export interface ListProps
   extends RendererProps,
-    Omit<ListSchema, 'type' | 'className'> {
+    Omit<AMISGridNavSchema, 'type' | 'className'> {
   handleClick: (item?: ListItemSchema) => void;
 }
 
@@ -149,12 +160,20 @@ export default class List extends React.Component<ListProps, object> {
       } else {
         action = item.clickAction!;
       }
-      handleAction(e, action as ActionSchema, this.props);
+      handleAction(e, action as ActionSchema, this.props, item);
     };
   }
 
   render() {
-    const {itemClassName, source, data, options, classnames} = this.props;
+    const {
+      itemClassName,
+      style,
+      contentClassName,
+      source,
+      data,
+      options,
+      classnames
+    } = this.props;
 
     let value = getPropValue(this.props);
     let list: any = [];
@@ -184,6 +203,7 @@ export default class List extends React.Component<ListProps, object> {
               item.clickAction || item.link ? this.handleClick(item) : undefined
             }
             className={itemClassName}
+            contentClassName={contentClassName}
             text={item.text}
             icon={item.icon}
             classnames={classnames}

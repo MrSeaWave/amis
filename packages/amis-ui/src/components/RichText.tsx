@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import isEqual from 'lodash/isEqual';
 
 // @ts-ignore
 import FroalaEditor from 'froala-editor';
@@ -49,6 +50,7 @@ export interface FroalaEditorComponentProps {
   config: any;
   model: string;
   onModelChange: (value: string) => void;
+  children?: React.ReactNode;
 }
 
 // 代码来源于：https://github.com/froala/react-froala-wysiwyg/blob/master/lib/FroalaEditorFunctionality.jsx
@@ -91,11 +93,16 @@ class FroalaEditorComponent extends React.Component<FroalaEditorComponentProps> 
     this.destroyEditor();
   }
 
-  componentDidUpdate() {
-    if (JSON.stringify(this.oldModel) == JSON.stringify(this.props.model)) {
+  componentDidUpdate(prevProps: Readonly<FroalaEditorComponentProps>) {
+    if (!isEqual(this.props.config, prevProps.config)) {
+      this.destroyEditor();
+      this.createEditor();
       return;
     }
 
+    if (JSON.stringify(this.oldModel) == JSON.stringify(this.props.model)) {
+      return;
+    }
     this.setContent();
   }
 
@@ -237,8 +244,10 @@ class FroalaEditorComponent extends React.Component<FroalaEditorComponentProps> 
       modelContent = returnedHtml;
     }
 
-    this.oldModel = modelContent;
-    this.props.onModelChange(modelContent);
+    if (this.oldModel !== modelContent) {
+      this.oldModel = modelContent;
+      this.props.onModelChange(modelContent);
+    }
   }
 
   initListeners() {
@@ -310,3 +319,5 @@ export default class extends React.Component<any, any> {
     );
   }
 }
+
+export {FroalaEditor};

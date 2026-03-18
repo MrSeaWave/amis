@@ -2,27 +2,39 @@
  * @file Tag
  */
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
-import {BaseSchema, SchemaClassName, SchemaIcon} from '../Schema';
+import {
+  autobind,
+  createObject,
+  labelToString,
+  Renderer,
+  RendererProps
+} from 'amis-core';
+import {BaseSchema, AMISClassName, SchemaIcon} from '../Schema';
 import {getPropValue} from 'amis-core';
 import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
 
 import {Tag} from 'amis-ui';
+import {AMISSchemaBase} from 'amis-core';
 
 /**
  * Tag
  */
-export interface TagSchema extends BaseSchema {
+/**
+ * 标签组件，用于展示标记或状态。支持多色彩与关闭操作。
+ */
+export interface AMISTagSchema extends AMISSchemaBase {
   type: 'tag';
   /**
    * 类名
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
 
   /**
    * 自定义样式
    */
-  style?: React.CSSProperties;
+  style?: {
+    [propName: string]: any;
+  };
 
   /**
    * 标签颜色
@@ -74,16 +86,58 @@ export interface TagSchema extends BaseSchema {
 
 export interface TagProps
   extends RendererProps,
-    Omit<TagSchema, 'type' | 'className'> {}
+    Omit<AMISTagSchema, 'type' | 'className'> {
+  onClick?: (params: {[propName: string]: any}) => void;
+  onClose?: (params: {[propName: string]: any}) => void;
+}
 
 export class TagField extends React.Component<TagProps, object> {
   static defaultProps: Partial<TagProps> = {
     displayMode: 'normal'
   };
 
+  @autobind
+  handleClick(nativeEvent: React.MouseEvent<any>) {
+    const {dispatchEvent, onClick} = this.props;
+    const params = this.getResolvedEventParams();
+
+    dispatchEvent(nativeEvent, params);
+    onClick?.(params);
+  }
+
+  @autobind
+  handleMouseEnter(e: React.MouseEvent<any>) {
+    const {dispatchEvent} = this.props;
+    const params = this.getResolvedEventParams();
+
+    dispatchEvent(e, params);
+  }
+
+  @autobind
+  handleMouseLeave(e: React.MouseEvent<any>) {
+    const {dispatchEvent} = this.props;
+    const params = this.getResolvedEventParams();
+
+    dispatchEvent(e, params);
+  }
+
+  @autobind
+  handleClose(nativeEvent: React.MouseEvent<HTMLElement>) {
+    const {dispatchEvent, onClose} = this.props;
+    const params = this.getResolvedEventParams();
+
+    dispatchEvent(
+      {
+        ...nativeEvent,
+        type: 'close'
+      },
+      params
+    );
+    onClose?.(params);
+  }
+
   render() {
     let {
-      label,
       icon,
       displayMode,
       color,
@@ -93,9 +147,7 @@ export class TagField extends React.Component<TagProps, object> {
       style = {}
     } = this.props;
 
-    label =
-      getPropValue(this.props) ||
-      (label ? resolveVariableAndFilter(label, data, '| raw') : null);
+    const label = labelToString(this.resolveLabel());
 
     if (isPureVariable(icon)) {
       icon = resolveVariableAndFilter(icon, data);
@@ -117,10 +169,33 @@ export class TagField extends React.Component<TagProps, object> {
         icon={icon}
         closable={closable}
         style={style}
+        onClick={this.handleClick}
+        onMouseEnter={this.handleMouseEnter}
+        onMouseLeave={this.handleMouseLeave}
+        onClose={this.handleClose}
       >
         {label}
       </Tag>
     );
+  }
+
+  private resolveLabel() {
+    const {label, data} = this.props;
+    return (
+      getPropValue(this.props) ||
+      (label ? resolveVariableAndFilter(label, data, '| raw') : null)
+    );
+  }
+
+  private getResolvedEventParams<T>() {
+    const {data} = this.props;
+
+    return createObject(data, {
+      label: this.resolveLabel()
+    }) as {
+      [propName: string]: any;
+      label: string;
+    };
   }
 }
 

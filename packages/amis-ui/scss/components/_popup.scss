@@ -120,14 +120,24 @@
   }
 
   &-confirm {
+    color: var(--PopUp-confirmAction-color);
     margin-right: var(--gap-sm);
+    border: none;
   }
 
   &-content {
     overflow-y: auto;
     height: 100%;
     display: flex;
+    min-width: 0;
+    min-height: 0;
     flex: 1;
+
+    > div {
+      min-width: 0;
+      min-height: 0;
+      flex: 1;
+    }
   }
 
   & > * {
@@ -155,6 +165,7 @@
     margin-top: px2rem(-4px);
   }
   &-safearea {
-    height: px2rem(16px);
+    padding-bottom: constant(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }

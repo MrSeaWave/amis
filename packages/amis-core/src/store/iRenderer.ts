@@ -10,6 +10,16 @@ import {
 import {dataMapping} from '../utils/tpl-builtin';
 import {SimpleMap} from '../utils/SimpleMap';
 import {StoreNode} from './node';
+import {IScopedContext} from '../Scoped';
+import {IRootStore} from './root';
+import {
+  concatData,
+  createObjectFromChain,
+  extractObjectChain,
+  injectObjectChain
+} from '../utils';
+import {DataChangeReason} from '../types';
+import findLastIndex from 'lodash/findLastIndex';
 
 export const iRendererStore = StoreNode.named('iRendererStore')
   .props({
@@ -17,10 +27,14 @@ export const iRendererStore = StoreNode.named('iRendererStore')
     data: types.optional(types.frozen(), {}),
     initedAt: 0, // 初始 init 的时刻
     updatedAt: 0, // 从服务端更新时刻
-    pristine: types.optional(types.frozen(), {}),
+    pristine: types.optional(types.frozen(), {}), // pristine 的数据可能会被表单项的默认值，form 的 initApi 等修改
+    pristineRaw: types.optional(types.frozen(), {}), // pristine的原始值
+    upStreamData: types.optional(types.frozen(), {}), // 最原始的数据，只有由上游同步下来时才更新。用来判断是否变化过
     action: types.optional(types.frozen(), undefined),
+    dialogSchema: types.frozen(),
     dialogOpen: false,
     dialogData: types.optional(types.frozen(), undefined),
+    drawerSchema: types.frozen(),
     drawerOpen: false,
     drawerData: types.optional(types.frozen(), undefined)
   })
@@ -31,28 +45,112 @@ export const iRendererStore = StoreNode.named('iRendererStore')
 
     getPristineValueByName(name: string) {
       return getVariable(self.pristine, name, false);
+    },
+
+    get pristineDiff() {
+      const data: any = {};
+      Object.keys(self.pristine).forEach(key => {
+        if (self.pristine[key] !== self.pristineRaw[key]) {
+          data[key] = self.pristine[key];
+        }
+      });
+      return data;
     }
   }))
   .actions(self => {
-    const dialogCallbacks = new SimpleMap<(result?: any) => void>();
+    const dialogCallbacks = new SimpleMap<
+      (confirmed?: any, value?: any) => void
+    >();
+    let dialogScoped: IScopedContext | null = null;
+    let drawerScoped: IScopedContext | null = null;
+    let top: IRootStore | null = null;
 
     return {
-      initData(data: object = {}, skipSetPristine = false) {
+      setTopStore(value: any) {
+        top = value;
+      },
+
+      initData(
+        data: object = {},
+        skipSetPristine = false,
+        changeReason?: DataChangeReason
+      ) {
         self.initedAt = Date.now();
 
-        !skipSetPristine && (self.pristine = data);
+        if (self.data.__tag) {
+          data = injectObjectChain(data, self.data.__tag);
+        }
+
+        if (!skipSetPristine) {
+          self.pristine = data;
+          self.pristineRaw = data;
+        }
+
+        changeReason &&
+          Object.isExtensible(data) &&
+          !(data as any).__changeReason &&
+          Object.defineProperty(data, '__changeReason', {
+            value: changeReason,
+            enumerable: false,
+            configurable: false,
+            writable: false
+          });
+
         self.data = data;
+        self.upStreamData = data;
+      },
+
+      // 临时更新全局变量
+      temporaryUpdateGlobalVars(globalVar: any) {
+        const chain = extractObjectChain(self.data).filter(
+          (item: any) => !item.hasOwnProperty('__isTempGlobalLayer')
+        );
+        const idx = findLastIndex(
+          chain,
+          item =>
+            item.hasOwnProperty('global') || item.hasOwnProperty('globalState')
+        );
+
+        if (idx !== -1) {
+          chain.splice(idx + 1, 0, {
+            ...globalVar,
+            __isTempGlobalLayer: true
+          });
+        }
+
+        self.data = createObjectFromChain(chain);
+      },
+
+      // 撤销临时更新全局变量
+      unDoTemporaryUpdateGlobalVars() {
+        const chain = extractObjectChain(self.data).filter(
+          (item: any) => !item.hasOwnProperty('__isTempGlobalLayer')
+        );
+        self.data = createObjectFromChain(chain);
       },
 
       reset() {
         self.data = self.pristine;
       },
 
-      updateData(data: object = {}, tag?: object, replace?: boolean) {
+      updateData(
+        data: object = {},
+        tag?: object,
+        replace?: boolean,
+        concatFields?: string | string[],
+        changeReason?: DataChangeReason
+      ) {
+        if (concatFields) {
+          data = concatData(data, self.data, concatFields);
+        }
+
         const prev = self.data;
         let newData;
         if (tag) {
-          let proto = createObject((self.data as any).__super || null, tag);
+          let proto = createObject((self.data as any).__super || null, {
+            ...tag,
+            __tag: tag
+          });
           newData = createObject(proto, {
             ...(replace ? {} : self.data),
             ...data
@@ -68,6 +166,16 @@ export const iRendererStore = StoreNode.named('iRendererStore')
           writable: false
         });
 
+        changeReason &&
+          Object.isExtensible(newData) &&
+          !(newData as any).__changeReason &&
+          Object.defineProperty(newData, '__changeReason', {
+            value: changeReason,
+            enumerable: false,
+            configurable: false,
+            writable: false
+          });
+
         self.data = newData;
       },
 
@@ -76,7 +184,8 @@ export const iRendererStore = StoreNode.named('iRendererStore')
         value: any,
         changePristine?: boolean,
         force?: boolean,
-        otherModifier?: (data: Object) => void
+        otherModifier?: (data: Object) => void,
+        changeReason?: DataChangeReason
       ) {
         if (!name) {
           return;
@@ -90,7 +199,7 @@ export const iRendererStore = StoreNode.named('iRendererStore')
 
         const prev = self.data;
         const data = cloneObject(self.data);
-        if (prev.__prev) {
+        if (prev.hasOwnProperty('__prev')) {
           // 基于之前的 __prev 改
           const prevData = cloneObject(prev.__prev);
           setVariable(prevData, name, origin);
@@ -133,26 +242,56 @@ export const iRendererStore = StoreNode.named('iRendererStore')
           });
         }
 
+        changeReason &&
+          Object.isExtensible(data) &&
+          !data.__changeReason &&
+          Object.defineProperty(data, '__changeReason', {
+            value: changeReason,
+            enumerable: false,
+            configurable: false,
+            writable: false
+          });
+
         self.data = data;
       },
 
-      setCurrentAction(action: object) {
+      setCurrentAction(action: any, resolveDefinitions?: (schema: any) => any) {
+        // 处理 $ref
+        resolveDefinitions &&
+          ['dialog', 'drawer'].forEach(key => {
+            if (action[key]?.$ref) {
+              action = {
+                ...action,
+                [key]: {
+                  ...resolveDefinitions(action[key].$ref),
+                  ...action[key]
+                }
+              };
+            }
+          });
+
         self.action = action;
       },
 
-      openDialog(ctx: any, additonal?: object, callback?: (ret: any) => void) {
-        let proto = ctx.__super ? ctx.__super : self.data;
-
+      openDialog(
+        ctx: any,
+        additonal?: object,
+        callback?: (confirmed: boolean, values: any) => void,
+        scoped?: IScopedContext
+      ) {
+        const chain = extractObjectChain(ctx);
+        chain.length === 1 && chain.unshift(self.data);
         if (additonal) {
-          proto = createObject(proto, additonal);
+          chain.splice(chain.length - 1, 0, additonal);
         }
 
-        const data = createObject(proto, {
-          ...ctx
-        });
-
-        if (self.action.dialog && self.action.dialog.data) {
-          self.dialogData = dataMapping(self.action.dialog.data, data);
+        const data = createObjectFromChain(chain);
+        const mappingData = self.action.data ?? self.action.dialog?.data;
+        if (mappingData) {
+          self.dialogData = createObjectFromChain([
+            top?.downStream,
+            dataMapping(mappingData, data)
+          ]);
 
           const clonedAction = {
             ...self.action,
@@ -165,61 +304,88 @@ export const iRendererStore = StoreNode.named('iRendererStore')
         } else {
           self.dialogData = data;
         }
+        self.dialogSchema = self.action.dialog;
         self.dialogOpen = true;
         callback && dialogCallbacks.set(self.dialogData, callback);
+        dialogScoped = scoped || null;
       },
 
-      closeDialog(result?: any) {
+      closeDialog(confirmed?: any, data?: any) {
         const callback = dialogCallbacks.get(self.dialogData);
 
+        // 不要过早的清空，否则内部组件提前销毁，会出现 store 异常读取问题
+        // self.dialogSchema = null;
         self.dialogOpen = false;
+        dialogScoped = null;
 
         if (callback) {
           dialogCallbacks.delete(self.dialogData);
-          setTimeout(() => callback(result), 200);
+          setTimeout(() => callback(confirmed, data), 200);
         }
       },
 
-      openDrawer(ctx: any, additonal?: object, callback?: (ret: any) => void) {
-        let proto = ctx.__super ? ctx.__super : self.data;
-
+      openDrawer(
+        ctx: any,
+        additonal?: object,
+        callback?: (confirmed: boolean, ret: any) => void,
+        scoped?: IScopedContext
+      ) {
+        const chain = extractObjectChain(ctx);
+        chain.length === 1 && chain.unshift(self.data);
         if (additonal) {
-          proto = createObject(proto, additonal);
+          chain.splice(chain.length - 1, 0, additonal);
         }
 
-        const data = createObject(proto, {
-          ...ctx
-        });
+        const data = createObjectFromChain(chain);
 
-        if (self.action.drawer.data) {
-          self.drawerData = dataMapping(self.action.drawer.data, data);
+        const mappingData = self.action.data ?? self.action.drawer.data;
+        if (mappingData) {
+          self.drawerData = createObjectFromChain([
+            top?.downStream,
+            dataMapping(mappingData, data)
+          ]);
 
           const clonedAction = {
             ...self.action,
-            dialog: {
-              ...self.action.dialog
+            drawer: {
+              ...self.action.drawer
             }
           };
-          delete clonedAction.dialog.data;
+          delete clonedAction.drawer.data;
           self.action = clonedAction;
         } else {
           self.drawerData = data;
         }
+        self.drawerSchema = self.action.drawer;
         self.drawerOpen = true;
 
         if (callback) {
           dialogCallbacks.set(self.drawerData, callback);
         }
+
+        drawerScoped = scoped || null;
       },
 
-      closeDrawer(result?: any) {
+      closeDrawer(confirmed?: any, data?: any) {
         const callback = dialogCallbacks.get(self.drawerData);
+
+        // 不要过早的清空，否则内部组件提前销毁，会出现 store 异常读取问题
+        // self.drawerSchema = null;
         self.drawerOpen = false;
+        drawerScoped = null;
 
         if (callback) {
           dialogCallbacks.delete(self.drawerData);
-          setTimeout(() => callback(result), 200);
+          setTimeout(() => callback(confirmed, data), 200);
         }
+      },
+
+      getDialogScoped() {
+        return dialogScoped;
+      },
+
+      getDrawerScoped() {
+        return drawerScoped;
       }
     };
   });

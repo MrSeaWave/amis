@@ -2,20 +2,28 @@
  * amis 运行时调试功能，为了避免循环引用，这个组件不要依赖 amis 里的组件
  */
 
-import React, {Component, useEffect, useRef, useState} from 'react';
+import React, {Component, useEffect, useRef, useState, version} from 'react';
 import cx from 'classnames';
-import {findDOMNode, render} from 'react-dom';
-import JsonView from 'react-json-view';
-import {autorun, observable} from 'mobx';
+import {render, unmountComponentAtNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from './findDomCompat';
+// import {createRoot} from 'react-dom/client';
+import {autorun, observable, action} from 'mobx';
 import {observer} from 'mobx-react';
-import {uuidv4} from './helper';
+import {uuidv4, importLazyComponent} from './helper';
 import position from './position';
+import {resolveVariableAndFilter} from './resolveVariableAndFilter';
+import {callStrFunction} from './api';
+import isPlainObject from 'lodash/isPlainObject';
+
+export const JsonView = React.lazy(() =>
+  import('react-json-view').then(importLazyComponent)
+);
 
 class Log {
   @observable cat = '';
   @observable level = '';
   @observable msg = '';
-  @observable ext? = '';
+  @observable ext?: any = '';
 }
 
 class AMISDebugStore {
@@ -58,6 +66,25 @@ class AMISDebugStore {
    * 字段值文本最大展示长度
    */
   @observable ellipsisThreshold: number;
+
+  @action.bound
+  open() {
+    this.isExpanded = true;
+    this.inspectMode = true;
+  }
+
+  @action.bound
+  close() {
+    this.isExpanded = false;
+    this.activeId = '';
+    this.hoverId = '';
+    this.inspectMode = false;
+  }
+
+  @action.bound
+  toggleInspectMode() {
+    this.inspectMode = !this.inspectMode;
+  }
 }
 
 const store = new AMISDebugStore();
@@ -77,23 +104,35 @@ const LogView = observer(({store}: {store: AMISDebugStore}) => {
   return (
     <>
       {logs.map((log, index) => {
+        let ext =
+          typeof log.ext === 'string' &&
+          (log.ext.startsWith('{') || log.ext.startsWith('['))
+            ? parseJson(log.ext)
+            : typeof log.ext === 'object'
+            ? normalizeDataForLog(log.ext)
+            : log.ext;
+
         return (
           <div className="AMISDebug-logLine" key={`log-${index}`}>
             <div className="AMISDebug-logLineMsg">
               [{log.cat}] {log.msg}
             </div>
-            {log.ext ? (
-              <JsonView
-                name={null}
-                theme="monokai"
-                src={JSON.parse(log.ext)}
-                collapsed={true}
-                enableClipboard={false}
-                displayDataTypes={false}
-                collapseStringsAfterLength={ellipsisThreshold}
-                iconStyle="square"
-              />
-            ) : null}
+            {typeof ext === 'object' ? (
+              <React.Suspense fallback={<div>Loading...</div>}>
+                <JsonView
+                  name={null}
+                  theme="monokai"
+                  src={ext}
+                  collapsed={true}
+                  enableClipboard={false}
+                  displayDataTypes={false}
+                  collapseStringsAfterLength={ellipsisThreshold}
+                  iconStyle="square"
+                />
+              </React.Suspense>
+            ) : (
+              <pre className="AMISDebug-value">{JSON.stringify(ext)}</pre>
+            )}
           </div>
         );
       })}
@@ -125,23 +164,25 @@ const AMISDebug = observer(({store}: {store: AMISDebugStore}) => {
       stackDataView.push(
         <div key={`data-${level}`}>
           <h3>Data Level-{level}</h3>
-          <JsonView
-            key={`dataview-${stack}`}
-            name={null}
-            theme="monokai"
-            src={stack}
-            collapsed={level === 0 ? false : true}
-            enableClipboard={false}
-            displayDataTypes={false}
-            iconStyle="square"
-          />
+          <React.Suspense fallback={<div>Loading...</div>}>
+            <JsonView
+              key={`dataview-${stack}`}
+              name={null}
+              theme="monokai"
+              src={stack}
+              collapsed={level === 0 ? false : true}
+              enableClipboard={false}
+              displayDataTypes={false}
+              iconStyle="square"
+            />
+          </React.Suspense>
         </div>
       );
       level += 1;
     }
   }
 
-  const panelRef = useRef(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const [isResizing, setResizing] = useState(false);
 
@@ -180,6 +221,49 @@ const AMISDebug = observer(({store}: {store: AMISDebugStore}) => {
     };
   }, [isResizing]);
 
+  // 避免触发 modal 的 closeOnOutside 逻辑
+  useEffect(() => {
+    const handlePanelMouseUp = (e: Event) => {
+      e.preventDefault();
+    };
+
+    panelRef.current!.addEventListener('mouseup', handlePanelMouseUp);
+
+    return () => {
+      panelRef.current?.removeEventListener('mouseup', handlePanelMouseUp);
+    };
+  }, []);
+
+  const handleInputKeyUp = React.useCallback((e: React.KeyboardEvent<any>) => {
+    if (e.key === 'Enter') {
+      const input = e.target as HTMLInputElement;
+      const expression = input.value;
+      input.value = '';
+
+      try {
+        const activeId = store.activeId;
+        const ctx = ComponentInfo[activeId]?.component.props.data || {};
+        const result = expression.startsWith('${')
+          ? resolveVariableAndFilter(expression, ctx, '| raw')
+          : callStrFunction(
+              new Function('data', `with(data) {return ${expression};}`),
+              ['data'],
+              ctx
+            );
+
+        debug('debug', `evaluate expression \`${expression}\``, result);
+      } catch (e) {
+        debug(
+          'error',
+          `evaluate expression \`${expression}\``,
+          `Error: ${e.message}`
+        );
+      } finally {
+        store.tab = 'log';
+      }
+    }
+  }, []);
+
   return (
     <div
       className={cx('AMISDebug', {
@@ -188,109 +272,128 @@ const AMISDebug = observer(({store}: {store: AMISDebugStore}) => {
       })}
       ref={panelRef}
     >
-      <div
-        className="AMISDebug-toggle"
-        title="open debug"
-        onClick={() => {
-          store.isExpanded = true;
-        }}
-      >
+      <div className="AMISDebug-toggle" title="open debug" onClick={store.open}>
         {store.isExpanded ? (
           <i className="fas fa-times"></i>
         ) : (
           <i className="fas fa-bug"></i>
         )}
       </div>
-      <div className={cx('AMISDebug-content')}>
-        <div
-          className="AMISDebug-close"
-          title="Close"
-          onClick={() => {
-            store.isExpanded = false;
-            store.activeId = '';
-            store.hoverId = '';
-          }}
-        >
-          <i className="fas fa-times" />
-        </div>
-        <div
-          className="AMISDebug-resize"
-          onMouseDown={event => {
-            setStartX(event.clientX);
-            setPanelWidth(
-              parseInt(
-                getComputedStyle(panelRef.current!).getPropertyValue('width'),
-                10
-              )
-            );
-            setResizing(true);
-          }}
-        ></div>
-        <div className="AMISDebug-tab">
-          <button
-            className={cx({active: store.tab === 'log'})}
-            onClick={() => {
-              store.tab = 'log';
+      {store.isExpanded ? (
+        <div className={cx('AMISDebug-content')}>
+          <div className="AMISDebug-close" title="Close" onClick={store.close}>
+            <i className="fas fa-times" />
+          </div>
+          <div
+            className="AMISDebug-resize"
+            onMouseDown={event => {
+              setStartX(event.clientX);
+              setPanelWidth(
+                parseInt(
+                  getComputedStyle(panelRef.current!).getPropertyValue('width'),
+                  10
+                )
+              );
+              setResizing(true);
             }}
-          >
-            Log
-          </button>
-          <button
-            className={cx({active: store.tab === 'inspect'})}
-            onClick={() => {
-              store.tab = 'inspect';
-            }}
-          >
-            Inspect
-          </button>
-        </div>
-        <div className="AMISDebug-changePosition">
-          {store.position === 'right' ? (
-            <i
-              className="fas fa-chevron-left"
-              title="move to left"
-              onClick={() => {
-                store.position = 'left';
-              }}
-            />
-          ) : (
-            <i
-              className="fas fa-chevron-right"
-              title="move to right"
-              onClick={() => {
-                store.position = 'right';
-              }}
-            />
-          )}
-        </div>
-        {store.tab === 'log' ? (
-          <div className="AMISDebug-log">
+          ></div>
+          <div className="AMISDebug-tab">
             <button
+              className={cx({active: store.tab === 'log'})}
               onClick={() => {
-                store.logs = [];
+                store.tab = 'log';
               }}
             >
-              Clear Log
+              Log({store.logs.length})
             </button>
-            <LogView store={store} />
+            <button
+              className={cx({active: store.tab === 'inspect'})}
+              onClick={() => {
+                store.tab = 'inspect';
+              }}
+            >
+              Inspect
+            </button>
           </div>
-        ) : null}
-        {store.tab === 'inspect' ? (
-          <div className="AMISDebug-inspect">
-            {activeId ? (
-              <>
-                <h3>
-                  Component:{' '}
-                  <span className="primary">{activeComponentInspect.name}</span>
-                </h3>
-                {stackDataView}
-              </>
+          <div className="AMISDebug-changePosition">
+            {store.position === 'right' ? (
+              <i
+                className="fas fa-chevron-left"
+                title="move to left"
+                onClick={() => {
+                  store.position = 'left';
+                }}
+              />
             ) : (
-              'Click component to display inspect'
+              <i
+                className="fas fa-chevron-right"
+                title="move to right"
+                onClick={() => {
+                  store.position = 'right';
+                }}
+              />
             )}
           </div>
-        ) : null}
-      </div>
+          {store.tab === 'log' ? (
+            <div className="AMISDebug-log">
+              <button
+                onClick={() => {
+                  store.logs = [];
+                }}
+              >
+                Clear Log
+              </button>
+              <LogView store={store} />
+            </div>
+          ) : null}
+          {store.tab === 'inspect' ? (
+            <div className="AMISDebug-inspect">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                viewBox="0 0 1024 1024"
+                className={`AMISDebug-inspectIcon ${
+                  store.inspectMode ? 'is-active' : ''
+                }`}
+                onClick={store.toggleInspectMode}
+              >
+                <path d="M64 192L128 128h768l64 64v384H896v-384H128v512h320V768H128l-64-64v-512z m941.226667 621.226667L576 384v602.496l173.226667-173.226667h256zM640 832v-293.504l210.773333 210.773333h-128L640 832z" />
+              </svg>
+              {store.inspectMode ? (
+                <span>Select an element in the page to inspect it.</span>
+              ) : (
+                <span>Click to inspect an element.</span>
+              )}
+              {activeId ? (
+                <>
+                  <h3>
+                    Component:{' '}
+                    <span className="primary">
+                      {activeComponentInspect?.name}
+                    </span>
+                  </h3>
+                  {stackDataView}
+                </>
+              ) : null}
+            </div>
+          ) : null}
+          {activeId ? (
+            <div className="AMISDebug-footer">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                viewBox="0 0 1024 1024"
+              >
+                <path
+                  d="M724.48 521.728c-1.8432 7.7824-5.7344 14.848-11.3664 20.48l-341.9136 342.016c-16.6912 16.6912-43.7248 16.6912-60.3136 0s-16.6912-43.7248 0-60.3136L622.6944 512 310.8864 200.0896c-16.6912-16.6912-16.6912-43.7248 0-60.3136 16.6912-16.6912 43.7248-16.6912 60.3136 0l341.9136 341.9136c10.8544 10.8544 14.6432 26.112 11.3664 40.0384z"
+                  fill="currentColor"
+                ></path>
+              </svg>
+              <input type="text" placeholder="" onKeyUp={handleInputKeyUp} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 });
@@ -299,7 +402,7 @@ const AMISDebug = observer(({store}: {store: AMISDebugStore}) => {
  * 鼠标移动到某个组件的效果
  */
 function handleMouseMove(e: MouseEvent) {
-  if (!store.isExpanded) {
+  if (!store.inspectMode) {
     return;
   }
   const dom = e.target as HTMLElement;
@@ -313,14 +416,16 @@ function handleMouseMove(e: MouseEvent) {
  *  点选某个组件
  */
 function handleMouseclick(e: MouseEvent) {
-  if (!store.isExpanded) {
+  if (!store.inspectMode) {
     return;
   }
+  e.preventDefault();
   const dom = e.target as HTMLElement;
   const target = dom.closest(`[data-debug-id]`);
-  if (target) {
+  if (target && !target.closest('.AMISDebug')) {
     store.activeId = target.getAttribute('data-debug-id')!;
     store.tab = 'inspect';
+    store.inspectMode = false;
   }
 }
 
@@ -329,6 +434,7 @@ const amisHoverBox = document.createElement('div');
 amisHoverBox.className = 'AMISDebug-hoverBox';
 const amisActiveBox = document.createElement('div');
 amisActiveBox.className = 'AMISDebug-activeBox';
+let timer: ReturnType<typeof setTimeout> | null = null;
 
 autorun(() => {
   const hoverId = store.hoverId;
@@ -358,6 +464,12 @@ autorun(() => {
     amisActiveBox.style.left = `${offset.left}px`;
     amisActiveBox.style.width = `${offset.width}px`;
     amisActiveBox.style.height = `${offset.height}px`;
+    amisActiveBox.classList.add('shake');
+
+    clearTimeout(timer!);
+    timer = setTimeout(() => {
+      amisActiveBox.classList.remove('shake');
+    }, 500);
   } else {
     amisActiveBox.style.top = '-999999px';
   }
@@ -365,6 +477,7 @@ autorun(() => {
 
 // 页面中只能有一个实例
 let isEnabled = false;
+let unmount: () => void;
 
 export function enableDebug() {
   if (isEnabled) {
@@ -375,16 +488,43 @@ export function enableDebug() {
   const amisDebugElement = document.createElement('div');
   document.body.appendChild(amisDebugElement);
   const element = <AMISDebug store={store} />;
+
+  // if (parseInt(version.split('.')[0], 10) >= 18) {
+  //   const root = createRoot(amisDebugElement);
+  //   root.render(element);
+  //   unmount = () => {
+  //     root.unmount();
+  //     document.body.removeChild(amisDebugElement);
+  //   };
+  // } else {
   render(element, amisDebugElement);
+  unmount = () => {
+    unmountComponentAtNode(amisDebugElement);
+    document.body.removeChild(amisDebugElement);
+  };
+  // }
 
   document.body.appendChild(amisHoverBox);
   document.body.appendChild(amisActiveBox);
   document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('click', handleMouseclick);
+  document.addEventListener('click', handleMouseclick, true);
+}
+
+export function disableDebug() {
+  if (!isEnabled) {
+    return;
+  }
+  isEnabled = false;
+  unmount?.();
+  document.body.removeChild(amisHoverBox);
+  document.body.removeChild(amisActiveBox);
+  document.removeEventListener('mousemove', handleMouseMove);
+  document.removeEventListener('click', handleMouseclick);
 }
 
 interface DebugWrapperProps {
   renderer: any;
+  children?: React.ReactNode;
 }
 
 export class DebugWrapper extends Component<DebugWrapperProps> {
@@ -415,6 +555,12 @@ export class DebugWrapper extends Component<DebugWrapperProps> {
 
   componentWillUnmount() {
     delete ComponentInfo[this.debugId];
+    if (this.debugId === store.activeId) {
+      store.activeId = '';
+    }
+    if (this.debugId === store.hoverId) {
+      store.hoverId = '';
+    }
   }
 
   render() {
@@ -422,28 +568,73 @@ export class DebugWrapper extends Component<DebugWrapperProps> {
   }
 }
 
-type Category = 'api' | 'event';
+type Category = 'api' | 'event' | 'action' | 'debug' | 'error';
+
+function parseJson(str: string) {
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return e;
+  }
+}
+
+function normalizeDataForLog(data: any) {
+  try {
+    return parseJson(JSON.stringify(data));
+  } catch {
+    let ret: any = {};
+
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        !isPlainObject(value)
+      ) {
+        ret[key] = '[complicated data]';
+      } else {
+        ret[key] = value;
+      }
+    });
+
+    return ret;
+  }
+}
+
+export function safeStringify(data: any) {
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return data;
+  }
+}
 
 /**
  * 一般调试日志
  * @param msg 简单消息
  * @param ext 扩展信息
  */
-export function debug(cat: Category, msg: string, ext?: object) {
+export function debug(cat: Category, msg: string, ext?: any) {
   if (!isEnabled) {
     return;
   }
+
+  console.groupCollapsed('[amis debug]', msg);
+  console.debug(ext);
+  console.groupEnd();
+
   const log = {
     cat,
     level: 'debug',
     msg: msg,
-    ext: JSON.stringify(ext)
+    ext: safeStringify(ext) // 因为 mobx 会加工，导致性能问题，所以转成字符串最简单
   };
-  console.groupCollapsed('amis debug', msg);
-  console.trace(log);
-  console.groupEnd();
-
   store.logs.push(log);
+  // 不要超过 200 条，担心性能问题
+  if (store.logs.length > 200) {
+    store.logs.splice(0, store.logs.length - 200);
+  }
 }
 
 /**
@@ -451,19 +642,47 @@ export function debug(cat: Category, msg: string, ext?: object) {
  * @param msg 简单消息
  * @param ext 扩展信息
  */
-export function warning(cat: Category, msg: string, ext?: object) {
+export function warning(cat: Category, msg: string, ext?: any) {
   if (!isEnabled) {
     return;
   }
-  const log = {
+
+  const log: Log = {
     cat,
     level: 'warn',
     msg: msg,
-    ext: JSON.stringify(ext)
+    ext: ext
   };
 
   console.groupCollapsed('amis debug', msg);
   console.trace(log);
   console.groupEnd();
   store.logs.push(log);
+}
+
+// 辅助定位是因为什么属性变化导致了组件更新
+export function traceProps(props: any, prevProps: any, componentName: string) {
+  console.log(
+    componentName,
+    Object.keys(props)
+      .map(key => {
+        if (props[key] !== prevProps[key]) {
+          if (key === 'data') {
+            return `data[${Object.keys(props[key])
+              .map(item => {
+                if (props[key][item] !== prevProps[key][item]) {
+                  return `${item}`;
+                }
+                return '';
+              })
+              .filter(item => item)
+              .join(', ')}]`;
+          }
+
+          return key;
+        }
+        return '';
+      })
+      .filter(item => item)
+  );
 }

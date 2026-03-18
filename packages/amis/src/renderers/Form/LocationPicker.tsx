@@ -1,15 +1,31 @@
 import React from 'react';
-import {themeable, ClassNamesFn, ThemeProps, Overlay, PopOver, autobind} from 'amis-core';
-import {FormItem, FormBaseControl, FormControlProps} from 'amis-core';
+import {
+  themeable,
+  ClassNamesFn,
+  ThemeProps,
+  Overlay,
+  PopOver,
+  autobind,
+  getVariable,
+  AMISFormItem
+} from 'amis-core';
+import {
+  FormItem,
+  FormBaseControl,
+  FormControlProps,
+  resolveEventData
+} from 'amis-core';
+import {Api, ActionObject} from 'amis-core';
 import {LocationPicker, Alert2, BaiduMapPicker, Icon} from 'amis-ui';
 import {filter} from 'amis-core';
 import {FormBaseControlSchema} from '../../Schema';
 import {supportStatic} from './StaticHoc';
+import {isMobile} from 'amis-core';
 /**
  * Location 选点组件
- * 文档：https://baidu.gitee.io/amis/docs/components/form/location
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/location
  */
-export interface LocationControlSchema extends FormBaseControlSchema {
+export interface AMISLocationPickerSchema extends AMISFormItem {
   type: 'location-picker';
 
   /**
@@ -21,13 +37,33 @@ export interface LocationControlSchema extends FormBaseControlSchema {
    * 有的地图需要设置 ak 信息
    */
   ak?: string;
+
+  /**
+   * 是否自动选中当前地理位置
+   */
+  autoSelectCurrentLoc?: boolean;
+
+  /**
+   * 是否限制只能选中当前地理位置
+   */
+  onlySelectCurrentLoc?: boolean;
+
+  /**
+   * 开启只读模式后的占位提示
+   */
+  getLocationPlaceholder?: string;
+
+  /**
+   * 是否隐藏地图控制组件
+   */
+  hideViewControl?: boolean;
 }
 
 export interface LocationControlProps
   extends FormControlProps,
     Omit<ThemeProps, 'className'>,
     Omit<
-      LocationControlSchema,
+      AMISLocationPickerSchema,
       'type' | 'className' | 'descriptionClassName' | 'inputClassName'
     > {
   value: any;
@@ -67,6 +103,19 @@ export class LocationControl extends React.Component<LocationControlProps> {
   }
 
   @autobind
+  async handleChange(value: any) {
+    const {dispatchEvent, onChange} = this.props;
+    const dispatcher = await dispatchEvent(
+      'change',
+      resolveEventData(this.props, {value})
+    );
+    if (dispatcher?.prevented) {
+      return;
+    }
+    onChange(value);
+  }
+
+  @autobind
   getParent() {
     return this.domRef.current?.parentElement;
   }
@@ -76,14 +125,32 @@ export class LocationControl extends React.Component<LocationControlProps> {
     return this.domRef.current;
   }
 
+  doAction(action: ActionObject, data: object, throwErrors: boolean): any {
+    const {resetValue, onChange, formStore, store, name} = this.props;
+    const actionType = action?.actionType as string;
+    switch (actionType) {
+      case 'clear':
+        onChange('');
+        break;
+      case 'reset':
+        onChange?.(
+          getVariable(formStore?.pristine ?? store?.pristine, name) ??
+            resetValue ??
+            ''
+        );
+        break;
+    }
+  }
+
   renderStatic(displayValue = '-') {
     const {
       classnames: cx,
       value,
-      vendor,
+      staticSchema,
       ak,
       coordinatesType,
-      popOverContainer,
+      hideViewControl = false,
+      mobileUI
     } = this.props;
     const __ = this.props.translate;
 
@@ -92,45 +159,51 @@ export class LocationControl extends React.Component<LocationControlProps> {
     }
 
     return (
-      <div className={this.props.classnames('LocationControl')} ref={this.domRef}>
-        <span>{value.address}</span>
-        <a className={cx('LocationPicker-toggler', 'ml-1')} onClick={this.handleClick}>
-          <Icon icon="location" className="icon" />
-        </a>
-        <Overlay
-          target={this.getTarget}
-          container={popOverContainer || this.getParent}
-          rootClose={false}
-          show={this.state.isOpened}
-        >
-          <PopOver
-            className={cx('LocationPicker-popover')}
-            onHide={this.close}
-            overlay
-            style={{width: this.getTarget()?.offsetWidth}}
-          >
-            {vendor === 'baidu' ? (
-              <BaiduMapPicker
-                ak={ak}
-                value={value}
-                coordinatesType={coordinatesType}
-              />
-            ) : (
-              <Alert2>{__('${vendor} 地图控件不支持', {vendor})}</Alert2>
+      <div
+        className={this.props.classnames('LocationControl', {
+          'is-mobile': mobileUI
+        })}
+        ref={this.domRef}
+      >
+        {staticSchema?.embed ? (
+          <>
+            {staticSchema.showAddress === false ? null : (
+              <div className="mb-2">{value.address}</div>
             )}
-          </PopOver>
-        </Overlay>
+            <BaiduMapPicker
+              ak={ak}
+              value={value}
+              coordinatesType={coordinatesType}
+              autoSelectCurrentLoc={false}
+              onlySelectCurrentLoc={true}
+              showSug={false}
+              showGeoLoc={staticSchema.showGeoLoc}
+              mapStyle={staticSchema.mapStyle}
+              hideViewControl={hideViewControl}
+            />
+          </>
+        ) : (
+          <span>{value.address}</span>
+        )}
       </div>
     );
   }
 
   @supportStatic()
   render() {
+    const {style, env, mobileUI} = this.props;
+    const ak = filter(this.props.ak, this.props.data) || env.locationPickerAK!;
     return (
-      <div className={this.props.classnames('LocationControl')}>
+      <div
+        className={this.props.classnames('LocationControl', {
+          'is-mobile': mobileUI
+        })}
+      >
         <LocationPicker
           {...this.props}
+          placeholder={this.props.placeholder as string}
           ak={filter(this.props.ak, this.props.data)}
+          onChange={this.handleChange}
         />
       </div>
     );

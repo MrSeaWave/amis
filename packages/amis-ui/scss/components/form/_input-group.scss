@@ -2,6 +2,13 @@
   display: inline-flex;
   flex-wrap: nowrap;
 
+  &:hover {
+    div,
+    button {
+      border-color: var(--colors-brand-5) !important;
+    }
+  }
+
   &.#{$ns}Form-control--sizeXs,
   &.#{$ns}Form-control--sizeSm,
   &.#{$ns}Form-control--sizeMd,
@@ -14,6 +21,11 @@
     display: inline-block;
     white-space: nowrap;
   }
+
+  // & > .#{$ns}Form-control {
+  //   flex: 1;
+  //   min-width: 0;
+  // }
 
   &-addOn {
     background: var(--InputGroup-addOn-bg);
@@ -69,14 +81,18 @@
     }
   }
 
-  .#{$ns}TextControl-input {
+  .#{$ns}TextControl-input,
+  .#{$ns}SearchBox {
     flex-basis: 0;
     flex-grow: 1;
+    min-width: 0;
     display: inline-flex;
+    margin: 0;
 
     &:not(:first-child) {
       border-top-left-radius: 0;
       border-bottom-left-radius: 0;
+      border-left: none;
     }
 
     &:not(:last-child) {
@@ -86,7 +102,28 @@
     }
   }
 
-  .#{$ns}SelectControl {
+  .#{$ns}MixedInput-input {
+    flex-basis: 0;
+    flex-grow: 1;
+    min-width: 0;
+    display: inline-flex;
+    margin: 0;
+
+    &:not(:first-child) > * {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      border-left: none;
+    }
+
+    &:not(:last-child) > * {
+      border-right-width: 0;
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+  }
+
+  .#{$ns}SelectControl,
+  .#{$ns}MixedInput-select {
     .#{$ns}Select {
       background: var(--InputGroup-select-bg);
       border: var(--InputGroup-select-borderWidth) solid
@@ -128,21 +165,22 @@
     .#{$ns}InputGroup-addOn,
     .#{$ns}TextControl-input,
     .#{$ns}Select,
+    .#{$ns}SearchBox,
     .#{$ns}InputGroup-btn .#{$ns}Button {
       border-color: var(--InputGroup-addOn-onFocused-borderColor);
     }
 
-    .#{$ns}Select {
-      background: var(--InputGroup-select-onFocused-bg);
-    }
+    // .#{$ns}Select {
+    //   background: var(--InputGroup-select-onFocused-bg);
+    // }
 
-    .#{$ns}Select {
-      color: var(--InputGroup-select-onFocused-color);
-    }
+    // .#{$ns}Select {
+    //   color: var(--InputGroup-select-onFocused-color);
+    // }
 
-    .#{$ns}Select-arrow {
-      color: var(--InputGroup-select-onFocused-arrowColor);
-    }
+    // .#{$ns}Select-arrow {
+    //   color: var(--InputGroup-select-onFocused-arrowColor);
+    // }
 
     .#{$ns}InputGroup-addOn {
       color: var(--primary);
@@ -151,8 +189,25 @@
   .#{$ns}Form-static {
     margin-right: var(--gap-xs);
   }
+
+  &.is-mobile {
+    .#{$ns}Form-control {
+      display: inline-flex;
+    }
+  }
 }
 
 .#{$ns}InputGroup:not(.is-inline) {
   display: flex;
+}
+
+.#{$ns}InputGroup-validation--full.is-error > .#{$ns}Form-control {
+  border-color: var(--Form-input-onError-borderColor);
+  transition: all var(--animation-duration);
+}
+
+.#{$ns}InputGroup-validation--partial.is-error > .#{$ns}Form-control.is-error {
+  border-color: var(--Form-input-onError-borderColor);
+  background: var(--Form-input-onError-bg);
+  transition: all var(--animation-duration);
 }

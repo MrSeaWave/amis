@@ -3,7 +3,8 @@ import {
   FormItem,
   FormControlProps,
   FormBaseControl,
-  resolveEventData
+  resolveEventData,
+  getVariable
 } from 'amis-core';
 import {autobind, createObject, filter, toNumber} from 'amis-core';
 import {ActionObject} from 'amis-core';
@@ -11,12 +12,16 @@ import {Rating} from 'amis-ui';
 import type {textPositionType} from 'amis-ui/lib/components/Rating';
 import {FormBaseControlSchema} from '../../Schema';
 import {supportStatic} from './StaticHoc';
+import {AMISFormItem} from 'amis-core';
 
 /**
  * Rating
- * 文档：https://baidu.gitee.io/amis/docs/components/form/rating
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/rating
  */
-export interface RatingControlSchema extends FormBaseControlSchema {
+/**
+ * 评分组件，用于展示和录入评分，支持自定义分数、半星、只读模式、颜色和提示文字等配置。
+ */
+export interface AMISInputRatingSchema extends AMISFormItem {
   type: 'input-rating';
 
   /**
@@ -42,14 +47,10 @@ export interface RatingControlSchema extends FormBaseControlSchema {
   /**
    * 星星被选中的颜色
    */
-  // colors?: string | {
-  //   [propName: string | number]: string;
-  // };
-
   colors?: string | {[propName: string]: string};
 
   /**
-   * 未被选中的星星的颜色
+   * 未被选中的星星颜色
    */
   inactiveColor?: string;
 
@@ -59,7 +60,7 @@ export interface RatingControlSchema extends FormBaseControlSchema {
   texts?: {[propName: string]: string};
 
   /**
-   * 文字的位置
+   * 文字位置
    */
   textPosition?: textPositionType;
 
@@ -96,12 +97,14 @@ export default class RatingControl extends React.Component<RatingProps, any> {
 
   doAction(action: ActionObject, data: object, throwErrors: boolean) {
     const actionType = action?.actionType as string;
-    const {onChange, resetValue} = this.props;
+    const {onChange, resetValue, formStore, store, name} = this.props;
 
     if (actionType === 'clear') {
       onChange?.('');
     } else if (actionType === 'reset') {
-      onChange?.(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange?.(pristineVal ?? '');
     }
   }
 
@@ -111,7 +114,7 @@ export default class RatingControl extends React.Component<RatingProps, any> {
 
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value}, 'value')
+      resolveEventData(this.props, {value})
     );
 
     if (rendererEvent?.prevented) {
@@ -124,6 +127,7 @@ export default class RatingControl extends React.Component<RatingProps, any> {
   renderStatic() {
     const {
       className,
+      style,
       value,
       count,
       half,

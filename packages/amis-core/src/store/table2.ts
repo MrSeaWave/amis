@@ -24,19 +24,29 @@ import {
   immutableExtends,
   isEmpty,
   extendObject,
-  findTree
+  findTree,
+  difference
 } from '../utils/helper';
 import {normalizeApiResponseData} from '../utils/api';
 import {Api, Payload, fetchOptions, ApiObject} from '../types';
 import {ServiceStore} from './service';
+import {IFormStore} from './form';
+import {getPageId} from '../utils/getPageId';
+import {filter} from '../utils/tpl';
 
 class ServerError extends Error {
   type = 'ServerError';
+
+  constructor(msg: string) {
+    super(msg);
+    Object.setPrototypeOf(this, ServerError.prototype);
+  }
 }
 
 export const Column = types
   .model('Column', {
     title: types.optional(types.frozen(), undefined),
+    label: types.optional(types.frozen(), undefined),
     name: '',
     toggled: false,
     breakpoint: types.optional(types.frozen(), undefined),
@@ -211,13 +221,15 @@ export const TableStore2 = ServiceStore.named('TableStore2')
     pageNo: 1,
     pageSize: 10,
     dragging: false,
-    keepItemSelectionOnPageChange: false,
-    maxKeepItemSelectionLength: 0
+    rowSelectionKeyField: 'id',
+    formsRef: types.optional(types.array(types.frozen()), []),
+    canAccessSuperData: false,
+    persistKey: ''
   })
   .views(self => {
     function getToggable() {
       if (self.columnsTogglable === 'auto') {
-        return self.columns.filter.length > 10;
+        return self.columns.filter(item => !/^__/.test(item.type)).length > 5;
       }
 
       return !!self.columnsTogglable;
@@ -278,12 +290,17 @@ export const TableStore2 = ServiceStore.named('TableStore2')
       });
     }
 
-    function getRowByIndex(rowIndex: number, levels?: Array<string>): IRow2 {
+    function getRowByIndex(
+      rowIndex: number,
+      levels?: Array<number>,
+      rows?: Array<IRow2>
+    ): IRow2 {
+      rows = rows || self.rows;
       if (levels && levels.length > 0) {
         const index = +(levels.shift() || 0);
-        return getRowByIndex(index, levels);
+        return getRowByIndex(rowIndex, levels, rows[index].children);
       }
-      return self.rows[rowIndex];
+      return rows[rowIndex];
     }
 
     function isSelected(row: IRow2): boolean {
@@ -296,6 +313,25 @@ export const TableStore2 = ServiceStore.named('TableStore2')
 
     function getMoved() {
       return getMovedRows().length;
+    }
+
+    function getModifiedRows(rows: IRow2[] = [], modifiedRows: IRow2[] = []) {
+      rows = rows && rows.length ? rows : self.rows;
+      rows.forEach((item: IRow2) => {
+        if (item.children && item.children.length) {
+          getModifiedRows(item.children, modifiedRows);
+        }
+        let diff = difference(item.data, item.pristine);
+        let hasDifference = Object.keys(diff).length;
+        if (hasDifference) {
+          modifiedRows.push(item);
+        }
+      });
+      return modifiedRows;
+    }
+
+    function getModified() {
+      return getModifiedRows().length;
     }
 
     return {
@@ -320,10 +356,19 @@ export const TableStore2 = ServiceStore.named('TableStore2')
       },
 
       get dataSource() {
-        return self.rows.map(item => item.data);
+        return self.rows.map(item =>
+          self.canAccessSuperData ? item.locals : item.data
+        );
       },
 
       get currentSelectedRowKeys() {
+        if (self.data && self.data.selectedItems) {
+          return (
+            self.data.selectedItems.map(
+              (item: any) => item[self.rowSelectionKeyField]
+            ) || []
+          );
+        }
         return self.selectedRowKeys.map(item => item);
       },
 
@@ -356,32 +401,69 @@ export const TableStore2 = ServiceStore.named('TableStore2')
 
       get movedRows() {
         return getMovedRows();
+      },
+
+      get keyField() {
+        return self.rowSelectionKeyField;
+      },
+
+      get modified() {
+        return getModified();
+      },
+
+      get modifiedRows() {
+        return getModifiedRows();
       }
     };
   })
   .actions(self => {
-    function updateColumns(columns: Array<SColumn2>) {
+    function updateColumns(
+      columns: Array<SColumn2>,
+      options?: {
+        resolveDefinitions?: (ref: string) => any;
+      }
+    ) {
       if (columns && Array.isArray(columns)) {
         let cols: Array<SColumn2> = columns.filter(column => column).concat();
 
-        cols = cols.map((item, index) => ({
-          ...item,
-          index,
-          type: item.type || 'plain',
-          pristine: item,
-          toggled: item.toggled !== false,
-          breakpoint: item.breakpoint,
-          children: item.children ? updateColumns(item.children) : []
-        }));
+        cols = cols.map((item, index) => {
+          if (
+            options?.resolveDefinitions &&
+            typeof (item as any)?.$ref == 'string' &&
+            (item as any).$ref
+          ) {
+            item = {
+              ...options.resolveDefinitions((item as any).$ref),
+              ...item
+            };
+          }
+          return {
+            ...item,
+            index,
+            type: item.type || 'plain',
+            pristine: item,
+            toggled: item.toggled !== false,
+            breakpoint: item.breakpoint,
+            children: item.children ? updateColumns(item.children, options) : []
+          };
+        });
 
         return cols;
       }
       return;
     }
 
-    function update(config: Partial<STableStore2>) {
+    function update(
+      config: Partial<STableStore2>,
+      options?: {
+        resolveDefinitions?: (ref: string) => any;
+      }
+    ) {
       config.columnsTogglable !== void 0 &&
         (self.columnsTogglable = config.columnsTogglable);
+      config.canAccessSuperData !== undefined &&
+        (self.canAccessSuperData = !!config.canAccessSuperData);
+      config.persistKey !== undefined && (self.persistKey = config.persistKey);
 
       if (typeof config.orderBy === 'string') {
         setOrderByInfo(
@@ -390,26 +472,20 @@ export const TableStore2 = ServiceStore.named('TableStore2')
         );
       }
 
-      config.maxKeepItemSelectionLength !== void 0 &&
-        (self.maxKeepItemSelectionLength = config.maxKeepItemSelectionLength);
-      config.keepItemSelectionOnPageChange !== void 0 &&
-        (self.keepItemSelectionOnPageChange =
-          config.keepItemSelectionOnPageChange);
+      if (config.rowSelectionKeyField) {
+        self.rowSelectionKeyField = config.rowSelectionKeyField;
+      }
 
       if (config.columns && Array.isArray(config.columns)) {
-        self.columns.replace(updateColumns(config.columns) as any);
+        self.columns.replace(updateColumns(config.columns, options) as any);
       }
     }
 
     function exchange(fromIndex: number, toIndex: number, item?: IRow2) {
       item = item || self.rows[fromIndex];
 
-      if (item.parentId) {
+      if (item?.parentId) {
         const parent: IRow2 = self.getRowById(item.parentId) as any;
-        const offset = parent.children.indexOf(item) - fromIndex;
-        toIndex += offset;
-        fromIndex += offset;
-
         const newRows = parent.children.concat();
         newRows.splice(fromIndex, 1);
         newRows.splice(toIndex, 0, item);
@@ -421,7 +497,6 @@ export const TableStore2 = ServiceStore.named('TableStore2')
       const newRows = self.rows.concat();
       newRows.splice(fromIndex, 1);
       newRows.splice(toIndex, 0, item);
-
       newRows.forEach((item, index) => (item.newIndex = index));
       self.rows.replace(newRows);
     }
@@ -440,11 +515,20 @@ export const TableStore2 = ServiceStore.named('TableStore2')
       persistSaveToggledColumns();
     }
 
+    function getPersistKey() {
+      if (self.persistKey) {
+        return filter(self.persistKey, self.data);
+      }
+
+      const fn = getEnv(self).getPageId || getPageId;
+      return fn() + self.path;
+    }
+
     function persistSaveToggledColumns() {
       const key =
-        location.pathname +
-        self.path +
+        getPersistKey() +
         self.toggableColumns.map(item => item.name || item.index).join('-');
+
       localStorage.setItem(
         key,
         JSON.stringify(self.activeToggaleColumns.map(item => item.index))
@@ -486,51 +570,48 @@ export const TableStore2 = ServiceStore.named('TableStore2')
         setTimeout(updater.bind(null, `?${qsstringify(self.query)}`), 4);
     }
 
-    function updateSelectedRows(
-      rows: Array<any>,
-      selectedKeys: Array<any>,
-      keyField?: string
-    ) {
+    function updateSelectedRows(rows: Array<any>, selectedKeys: Array<any>) {
+      const rowSelectionKeyField = self.rowSelectionKeyField;
       eachTree(rows, item => {
-        if (~selectedKeys.indexOf(item.pristine[keyField || 'key'])) {
+        if (~selectedKeys.indexOf(item.pristine[rowSelectionKeyField])) {
           self.selectedRows.push(item.id);
-          self.selectedRowKeys.push(item.pristine[keyField || 'key']);
+          self.selectedRowKeys.push(item.pristine[rowSelectionKeyField]);
         } else if (
-          find(selectedKeys, a => a && a == item.pristine[keyField || 'key'])
+          find(selectedKeys, a => a && a == item.pristine[rowSelectionKeyField])
         ) {
           self.selectedRows.push(item.id);
-          self.selectedRowKeys.push(item.pristine[keyField || 'key']);
+          self.selectedRowKeys.push(item.pristine[rowSelectionKeyField]);
         } else if (item.children) {
-          updateSelectedRows(item.children, selectedKeys, keyField);
+          updateSelectedRows(item.children, selectedKeys);
         }
       });
     }
 
-    function updateSelected(selectedKeys: Array<any>, keyField?: string) {
+    function updateSelected(selectedKeys: Array<any>) {
       self.selectedRows.clear();
       self.selectedRowKeys.clear();
 
-      updateSelectedRows(self.rows, selectedKeys, keyField);
+      updateSelectedRows(self.rows, selectedKeys);
     }
 
-    function updateSelectedAll(keyField?: string) {
+    function updateSelectedAll() {
       const selectedKeys: Array<any> = [];
       eachTree(self.rows, item =>
-        selectedKeys.push(item.pristine[keyField || 'key'])
+        selectedKeys.push(item.pristine[self.rowSelectionKeyField])
       );
-      updateSelectedRows(self.rows, selectedKeys, keyField);
+      updateSelectedRows(self.rows, selectedKeys);
     }
 
-    function updateExpanded(expandedRowKeys: Array<any>, keyField?: string) {
+    function updateExpanded(expandedRowKeys: Array<any>, keyField: string) {
       self.expandedRowKeys.clear();
 
       eachTree(self.rows, item => {
-        if (~expandedRowKeys.indexOf(item.pristine[keyField || 'key'])) {
-          self.expandedRowKeys.push(item.pristine[keyField || 'key']);
+        if (~expandedRowKeys.indexOf(item.pristine[keyField])) {
+          self.expandedRowKeys.push(item.pristine[keyField]);
         } else if (
-          find(expandedRowKeys, a => a && a == item.pristine[keyField || 'key'])
+          find(expandedRowKeys, a => a && a == item.pristine[keyField])
         ) {
-          self.expandedRowKeys.push(item.pristine[keyField || 'key']);
+          self.expandedRowKeys.push(item.pristine[keyField]);
         }
       });
     }
@@ -630,7 +711,6 @@ export const TableStore2 = ServiceStore.named('TableStore2')
               : []
         };
       });
-
       replaceRow(arr, reUseRow);
     }
 
@@ -659,30 +739,38 @@ export const TableStore2 = ServiceStore.named('TableStore2')
             {
               __saved: Date.now()
             },
-            !!api && (api as ApiObject).replaceData
+            !!api && (api as ApiObject).replaceData,
+            (api as ApiObject)?.concatDataFields
           );
           self.updatedAt = Date.now();
         }
 
         if (!json.ok) {
           self.updateMessage(
-            json.msg ?? options.errorMessage ?? self.__('saveFailed'),
+            (api as ApiObject)?.messages?.failed ??
+              json.msg ??
+              options.errorMessage ??
+              self.__('saveFailed'),
             true
           );
-          getEnv(self).notify(
-            'error',
-            self.msg,
-            json.msgTimeout !== undefined
-              ? {
-                  closeButton: true,
-                  timeout: json.msgTimeout
-                }
-              : undefined
-          );
+          !(api as ApiObject)?.silent &&
+            getEnv(self).notify(
+              'error',
+              self.msg,
+              json.msgTimeout !== undefined
+                ? {
+                    closeButton: true,
+                    timeout: json.msgTimeout
+                  }
+                : undefined
+            );
           throw new ServerError(self.msg);
         } else {
           self.updateMessage(
-            json.msg ?? options.successMessage ?? json.defaultMsg
+            (api as ApiObject)?.messages?.success ??
+              json.msg ??
+              options.successMessage ??
+              json.defaultMsg
           );
           self.msg &&
             getEnv(self).notify(
@@ -704,7 +792,9 @@ export const TableStore2 = ServiceStore.named('TableStore2')
           return;
         }
 
-        e.type !== 'ServerError' && getEnv(self).notify('error', e.message);
+        !(api as ApiObject)?.silent &&
+          e.type !== 'ServerError' &&
+          getEnv(self).notify('error', e.message);
         throw e;
       }
     });
@@ -723,6 +813,13 @@ export const TableStore2 = ServiceStore.named('TableStore2')
       rows = rows.sort((a, b) => a.index - b.index);
       self.rows.replace(rows);
       self.dragging = false;
+    }
+
+    function addForm(form: IFormStore, rowIndex: number) {
+      self.formsRef.push({
+        id: form.id,
+        rowIndex
+      });
     }
 
     return {
@@ -745,8 +842,7 @@ export const TableStore2 = ServiceStore.named('TableStore2')
             return;
           }
           const key =
-            location.pathname +
-            self.path +
+            getPersistKey() +
             self.toggableColumns.map(item => item.name || item.index).join('-');
 
           const data = localStorage.getItem(key);
@@ -759,7 +855,8 @@ export const TableStore2 = ServiceStore.named('TableStore2')
           }
         }, 200);
       },
-      saveRemote
+      saveRemote,
+      addForm
     };
   });
 

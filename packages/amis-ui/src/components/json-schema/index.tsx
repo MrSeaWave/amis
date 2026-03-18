@@ -6,7 +6,8 @@ import {
   themeable,
   ThemeProps
 } from 'amis-core';
-import {InputJSONSchemaItem} from './Item';
+import InputJSONSchemaItem from './Item';
+import {FormulaPickerProps} from '../formula/Picker';
 
 export interface InputJSONSchemaItemProps extends ThemeProps, LocaleProps {
   schema: JSONSchema & {
@@ -29,6 +30,11 @@ export interface InputJSONSchemaItemProps extends ThemeProps, LocaleProps {
   ) => JSX.Element;
   collapsable?: boolean;
   placeholder?: string;
+  required?: boolean;
+  addButtonText?: string;
+  formula?: FormulaPickerProps;
+  popOverContainer?: any;
+  autoCreateMembers?: boolean;
 }
 
 export interface InputJSONSchemaProps
@@ -36,13 +42,23 @@ export interface InputJSONSchemaProps
   schema?: any;
 }
 
-function InputJSONSchema(props: InputJSONSchemaProps) {
+function InputJSONSchema(props: InputJSONSchemaProps, ref: any) {
   const schema = props.schema || {
     type: 'object',
     properties: {}
   };
 
-  return <InputJSONSchemaItem {...props} schema={schema} />;
+  const childRef = React.useRef<any>();
+
+  React.useImperativeHandle(ref, () => {
+    return {
+      validate() {
+        return childRef.current?.validate();
+      }
+    };
+  });
+
+  return <InputJSONSchemaItem {...props} schema={schema} ref={childRef} />;
 }
 
-export default themeable(localeable(InputJSONSchema));
+export default themeable(localeable(React.forwardRef(InputJSONSchema)));

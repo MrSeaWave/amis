@@ -20,14 +20,28 @@ export function withRootStore<
 
   const result = hoistNonReactStatic(
     class extends React.Component<OuterProps> {
-      static displayName = `WithRootStore(${
+      static displayName: string = `WithRootStore(${
         ComposedComponent.displayName || ComposedComponent.name
       })`;
       static contextType = RootStoreContext;
       static ComposedComponent = ComposedComponent as React.ComponentType<T>;
+      ref: any;
+
+      constructor(props: OuterProps) {
+        super(props);
+        this.refFn = this.refFn.bind(this);
+      }
+
+      getWrappedInstance() {
+        return this.ref.control;
+      }
+
+      refFn(ref: any) {
+        this.ref = ref;
+      }
 
       render() {
-        const rootStore = this.context;
+        const rootStore: IRendererStore = this.context as any;
         const injectedProps: {
           rootStore: IRendererStore;
         } = {
@@ -41,6 +55,7 @@ export function withRootStore<
               React.ComponentProps<T>
             > as any)}
             {...injectedProps}
+            ref={this.refFn}
           />
         );
       }

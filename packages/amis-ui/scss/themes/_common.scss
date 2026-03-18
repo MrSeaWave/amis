@@ -5,18 +5,20 @@
 @import '../base/normalize';
 @import '../base/typography';
 @import '../base/common';
+@import '../base/animate';
 
 @import '../layout/layout';
 @import '../layout/grid';
 @import '../layout/aside';
 @import '../layout/hbox';
 @import '../layout/vbox';
-@import '../components/button'; // 这个要放在最前面
+@import '../components/button';
 @import '../components/avatar';
 @import '../components/breadcrumb';
 @import '../components/badge';
 @import '../components/modal';
 @import '../components/drawer';
+@import '../components/dropdown-context-menus';
 @import '../components/tooltip';
 @import '../components/tpl';
 @import '../components/popover';
@@ -33,6 +35,7 @@
 @import '../components/chart';
 @import '../components/video';
 @import '../components/audio';
+@import '../components/auto-folder';
 @import '../components/panel';
 @import '../components/service';
 @import '../components/sparkline';
@@ -81,6 +84,9 @@
 @import '../components/steps';
 @import '../components/portlet';
 @import '../components/grid-nav';
+@import '../components/shape';
+@import '../components/slider';
+@import '../components/horizontal-scroll';
 
 @import '../components/form/fieldset';
 @import '../components/form/group';
@@ -126,6 +132,8 @@
 @import '../components/form/icon-select';
 @import '../components/form/form';
 @import '../components/form/user-select';
+@import '../components/form/input-table';
+
 @import '../components/anchor-nav';
 @import '../components/markdown';
 @import '../components/link';
@@ -138,3 +146,12 @@
 @import '../components/multiline-text';
 
 @import '../components/debug';
+@import '../components/menu';
+@import '../components/overflow-tpl';
+@import '../components/pdf_viewer';
+@import '../components/signature';
+
+@import '../components/print';
+@import '../components/verificationCode';
+
+@import '../components/mobile-dev-tool';

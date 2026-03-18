@@ -4,6 +4,7 @@ import omit from 'lodash/omit';
 import find from 'lodash/find';
 import isEqual from 'lodash/isEqual';
 import findIndex from 'lodash/findIndex';
+import merge from 'lodash/merge';
 import {
   OptionsControl,
   OptionsControlProps,
@@ -20,16 +21,31 @@ import {
   resolveVariableAndFilter,
   isApiOutdated,
   isEffectiveApi,
-  resolveEventData
+  resolveEventData,
+  CustomStyle,
+  isIntegerInRange,
+  setThemeClassName
 } from 'amis-core';
-import {Html, Icon} from 'amis-ui';
+import {Html, Icon, OverflowTpl, TooltipWrapper} from 'amis-ui';
 import {FormOptionsSchema, SchemaTpl} from '../../Schema';
+import intersectionWith from 'lodash/intersectionWith';
+import type {AMISTooltipWrapperSchema} from '../TooltipWrapper';
+import type {AMISFormItemWithOptions, Option} from 'amis-core';
+import {supportStatic} from './StaticHoc';
+import {reaction} from 'mobx';
+import {AutoFoldedList} from 'amis-ui';
 
 /**
  * Picker
- * 文档：https://baidu.gitee.io/amis/docs/components/form/picker
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/picker
  */
-export interface PickerControlSchema extends FormOptionsSchema {
+/**
+ * Picker 选择器组件，用于表单中弹窗选择数据，可通过弹窗（Dialog/Drawer）或内嵌模式展示配置的选择内容，支持自定义标签显示与选项描述。
+ */
+export interface AMISPickerSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 picker 组件
+   */
   type: 'picker';
 
   /**
@@ -38,34 +54,74 @@ export interface PickerControlSchema extends FormOptionsSchema {
   labelTpl?: SchemaTpl;
 
   /**
-   * 建议用 labelTpl
    * 选中一个字段名用来作为值的描述文字
    */
   labelField?: string;
 
   /**
-   * 选一个可以用来作为值的字段。
+   * 选一个可以用来作为值的字段
    */
   valueField?: string;
 
   /**
-   * 弹窗选择框详情。
+   * 弹窗选择框详情
    */
   pickerSchema?: any; // Omit<CRUDSchema, 'type'>;
 
   /**
-   * 弹窗模式，dialog 或者 drawer
+   * 弹窗模式
    */
   modalMode?: 'dialog' | 'drawer';
 
   /**
-   * 内嵌模式，也就是说不弹框了。
+   * 弹窗的尺寸
+   */
+  modalSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+  /**
+   * 弹窗的标题
+   */
+  modalTitle?: string;
+
+  /**
+   * 内嵌模式
    */
   embed?: boolean;
+
+  /**
+   * 开启最大标签展示数量的相关配置
+   */
+  overflowConfig: {
+    /**
+     * 标签的最大展示数量
+     */
+    maxTagCount?: number;
+
+    /**
+     * 收纳标签生效的位置
+     */
+    displayPosition?: ('select' | 'crud')[];
+
+    /**
+     * 开启最大标签展示数量后，选择器内收纳标签的Popover配置
+     */
+    overflowTagPopover?: AMISTooltipWrapperSchema;
+
+    /**
+     * 开启最大标签展示数量后，CRUD顶部内收纳标签的Popover配置
+     */
+    overflowTagPopoverInCRUD?: AMISTooltipWrapperSchema;
+  };
+
+  /**
+   * 选中项可删除，默认为true
+   */
+  itemClearable?: boolean;
 }
 
 export interface PickerProps extends OptionsControlProps {
   modalMode: 'dialog' | 'drawer';
+  modalSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
   pickerSchema: PlainObject;
   labelField: string;
 }
@@ -81,7 +137,9 @@ export default class PickerControl extends React.PureComponent<
   any
 > {
   static propsList: Array<string> = [
+    'modalTitle',
     'modalMode',
+    'modalSize',
     'pickerSchema',
     'labelField',
     'onChange',
@@ -101,12 +159,26 @@ export default class PickerControl extends React.PureComponent<
     labelField: 'label',
     valueField: 'value',
     pickerSchema: {
-      mode: 'list',
-      listItem: {
-        title: '${label|raw}'
-      }
+      mode: 'list'
     },
-    embed: false
+    embed: false,
+    overflowConfig: {
+      /** 默认值为-1，不开启 */
+      maxTagCount: -1,
+      displayPosition: ['select', 'crud'],
+      overflowTagPopover: {
+        placement: 'top',
+        trigger: 'hover',
+        showArrow: false,
+        offset: [0, -5]
+      },
+      overflowTagPopoverInCRUD: {
+        placement: 'bottom',
+        trigger: 'hover',
+        showArrow: false,
+        offset: [0, 0]
+      }
+    }
   };
 
   state: PickerState = {
@@ -116,9 +188,36 @@ export default class PickerControl extends React.PureComponent<
   };
 
   input: React.RefObject<HTMLInputElement> = React.createRef();
+  toDispose: Array<() => void> = [];
+  mounted = false;
 
-  componentDidMount() {
-    this.fetchOptions();
+  constructor(props: PickerProps) {
+    super(props);
+
+    const {formInited, addHook, formItem} = props;
+
+    const onIninted = async () => {
+      await this.fetchOptions();
+
+      this.mounted &&
+        this.toDispose.push(
+          reaction(
+            () => JSON.stringify(formItem?.tmpValue),
+            () => this.fetchOptions()
+          )
+        );
+    };
+
+    formItem &&
+      this.toDispose.push(
+        formInited || !addHook
+          ? formItem.addInitHook(onIninted)
+          : addHook(onIninted, 'init')
+      );
+  }
+
+  componentDidMount(): void {
+    this.mounted = true;
   }
 
   componentDidUpdate(prevProps: PickerProps) {
@@ -130,17 +229,20 @@ export default class PickerControl extends React.PureComponent<
         schema: this.buildSchema(props)
       });
     } else if (
-      JSON.stringify(props.value) !== JSON.stringify(prevProps.value)
-    ) {
-      this.fetchOptions();
-    } else if (
       isApiOutdated(prevProps.source, props.source, prevProps.data, props.data)
     ) {
-      this.fetchOptions();
+      props.formItem?.inited && this.fetchOptions();
     }
   }
 
-  fetchOptions() {
+  componentWillUnmount(): void {
+    this.toDispose.forEach(fn => fn());
+    this.toDispose = [];
+    this.mounted = false;
+  }
+
+  @autobind
+  fetchOptions(): any {
     const {value, formItem, valueField, labelField, source, data} = this.props;
     let selectedOptions: any;
 
@@ -158,13 +260,14 @@ export default class PickerControl extends React.PureComponent<
 
     const ctx = createObject(data, {
       value: value,
+      [valueField || 'value']: value,
       op: 'loadOptions'
     });
 
     if (isPureVariable(source)) {
       formItem.setOptions(resolveVariableAndFilter(source, data, '| raw'));
     } else if (isEffectiveApi(source, ctx)) {
-      formItem.loadOptions(source, ctx, {
+      return formItem.loadOptions(source, ctx, {
         autoAppend: true
       });
     }
@@ -175,11 +278,15 @@ export default class PickerControl extends React.PureComponent<
 
     return {
       checkOnItemClick: true,
+      listItem: {
+        title: `\${${props.labelField || 'label'}|raw}`
+      },
       ...props.pickerSchema,
       labelTpl: props.pickerSchema?.labelTpl ?? props.labelTpl,
       type: 'crud',
       pickerMode: true,
       syncLocation: false,
+      filterCanAccessSuperData: false,
       api: isScopeData ? null : props.source,
       source: isScopeData ? props.source : null,
       keepItemSelectionOnPageChange: true,
@@ -203,12 +310,12 @@ export default class PickerControl extends React.PureComponent<
     this.crud = ref;
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     if (this.crud) {
-      this.crud.search();
+      this.crud.reload(subpath, query);
     } else {
       const reload = this.props.reloadOptions;
-      reload && reload();
+      reload && reload(subpath, query);
     }
   }
 
@@ -287,11 +394,7 @@ export default class PickerControl extends React.PureComponent<
     const option = multiple ? items : items[0];
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(
-        this.props,
-        {value, option, selectedItems: option},
-        'value'
-      )
+      resolveEventData(this.props, {value, option, selectedItems: option})
     );
     if (rendererEvent?.prevented) {
       return;
@@ -314,7 +417,7 @@ export default class PickerControl extends React.PureComponent<
     }
   }
 
-  removeItem(index: number) {
+  async removeItem(index: number) {
     const {
       selectedOptions,
       joinValues,
@@ -322,10 +425,11 @@ export default class PickerControl extends React.PureComponent<
       delimiter,
       valueField,
       onChange,
-      multiple
+      multiple,
+      dispatchEvent
     } = this.props;
     const items = selectedOptions.concat();
-    items.splice(index, 1);
+    const [option] = items.splice(index, 1);
 
     let value: any = items;
 
@@ -339,6 +443,14 @@ export default class PickerControl extends React.PureComponent<
         : (items[0] && items[0][valueField || 'value']) || '';
     } else {
       value = multiple ? items : items[0];
+    }
+
+    const rendererEvent = await dispatchEvent(
+      'change',
+      resolveEventData(this.props, {value, option, selectedItems: option})
+    );
+    if (rendererEvent?.prevented) {
+      return;
     }
 
     onChange(value);
@@ -357,7 +469,9 @@ export default class PickerControl extends React.PureComponent<
   }
 
   @autobind
-  handleFocus() {
+  handleFocus(e: React.MouseEvent<HTMLElement>) {
+    this.input.current && this.input.current.focus();
+    e.stopPropagation();
     this.setState({
       isFocused: true
     });
@@ -372,67 +486,190 @@ export default class PickerControl extends React.PureComponent<
 
   @autobind
   handleClick() {
-    this.input.current && this.input.current.focus();
     this.open();
   }
 
   @autobind
-  clearValue() {
+  clearValue(e: React.MouseEvent<HTMLElement>) {
+    e.stopPropagation();
     const {onChange, resetValue} = this.props;
 
     onChange(resetValue !== void 0 ? resetValue : '');
+  }
+
+  getOverflowConfig() {
+    const {overflowConfig} = this.props;
+
+    return merge(PickerControl.defaultProps.overflowConfig, overflowConfig);
+  }
+
+  @autobind
+  handleSelect(selectedItems: Array<any>, unSelectedItems: Array<any>) {
+    const {selectedOptions, valueField} = this.props;
+    // 选择行后，crud 会给出连续多次事件，且selectedItems会变化，会导致初始化和点击无效
+    // 过滤掉一些无用事件，否则会导致 value 错误
+    if (
+      !Array.isArray(selectedItems) ||
+      !Array.isArray(unSelectedItems) ||
+      (!selectedItems.length && !unSelectedItems.length)
+    ) {
+      return;
+    }
+
+    // 取交集，判断是否是无效事件，需要考虑顺序问题
+    const intersections = intersectionWith(
+      selectedItems,
+      selectedOptions,
+      (a: any, b: any) => {
+        // 需要考虑没有配置 valueField，而且值里面又没有 value 字段的情况
+        const aValue = a[valueField || 'value'];
+        const bValue = b[valueField || 'value'];
+        return aValue || bValue
+          ? aValue === bValue
+          : // selectedOptions 中有 Options 自动添加的 value 字段，所以去掉后才能比较
+            isEqual(omit(a, 'value'), omit(b, 'value'));
+      }
+    );
+    if (
+      // 前后数量都一样说明是重复事件
+      intersections.length === selectedItems.length &&
+      intersections.length === selectedOptions.length
+    ) {
+      return;
+    }
+
+    this.handleChange(selectedItems);
+  }
+
+  renderTag(item: Option, index: number) {
+    const {
+      itemClearable = true,
+      classPrefix: ns,
+      classnames: cx,
+      labelField,
+      labelTpl,
+      translate: __,
+      disabled,
+      env,
+      id,
+      themeCss,
+      css
+    } = this.props;
+
+    return (
+      <div
+        key={index}
+        className={cx(
+          `${ns}Picker-value`,
+          setThemeClassName({
+            ...this.props,
+            name: 'pickValueWrapClassName',
+            id,
+            themeCss: themeCss || css
+          }),
+          {
+            'is-disabled': disabled
+          }
+        )}
+      >
+        {itemClearable && (
+          <span
+            className={cx(
+              `${ns}Picker-valueIcon`,
+              setThemeClassName({
+                ...this.props,
+                name: 'pickValueIconClassName',
+                id,
+                themeCss: themeCss || css
+              })
+            )}
+            onClick={e => {
+              e.stopPropagation();
+              this.removeItem(index);
+            }}
+          >
+            ×
+          </span>
+        )}
+        <OverflowTpl
+          inline={false}
+          tooltip={getVariable(item, labelField || 'label')}
+        >
+          <span
+            className={cx(
+              `${ns}Picker-valueLabel`,
+              setThemeClassName({
+                ...this.props,
+                name: 'pickFontClassName',
+                id,
+                themeCss: themeCss || css
+              })
+            )}
+            onClick={e => {
+              e.stopPropagation();
+              this.handleItemClick(item);
+            }}
+          >
+            {labelTpl ? (
+              <Html html={filter(labelTpl, item)} />
+            ) : (
+              `${
+                getVariable(item, labelField || 'label') ||
+                getVariable(item, 'id')
+              }`
+            )}
+          </span>
+        </OverflowTpl>
+      </div>
+    );
   }
 
   renderValues() {
     const {
       classPrefix: ns,
       selectedOptions,
-      labelField,
-      labelTpl,
       translate: __,
-      disabled
+      disabled,
+      multiple,
+      popOverContainer,
+      id,
+      themeCss,
+      css
     } = this.props;
+    const {maxTagCount, overflowTagPopover} = this.getOverflowConfig();
+    let tags = selectedOptions;
+    const enableOverflow =
+      multiple !== false && typeof maxTagCount === 'number' && maxTagCount > 0;
+
+    const tooltipProps: any = {
+      tooltipClassName: cx(
+        'Picker-overflow',
+        overflowTagPopover?.tooltipClassName
+      ),
+      title: __('已选项'),
+      ...omit(overflowTagPopover, ['children', 'content', 'tooltipClassName'])
+    };
 
     return (
-      <div className={`${ns}Picker-values`}>
-        {selectedOptions.map((item, index) => (
-          <div
-            key={index}
-            className={cx(`${ns}Picker-value`, {
-              'is-disabled': disabled
-            })}
-          >
-            <span
-              data-tooltip={__('delete')}
-              data-position="bottom"
-              className={`${ns}Picker-valueIcon`}
-              onClick={e => {
-                e.stopPropagation();
-                this.removeItem(index);
-              }}
-            >
-              ×
-            </span>
-            <span
-              className={`${ns}Picker-valueLabel`}
-              onClick={e => {
-                e.stopPropagation();
-                this.handleItemClick(item);
-              }}
-            >
-              {labelTpl ? (
-                <Html html={filter(labelTpl, item)} />
-              ) : (
-                `${
-                  getVariable(item, labelField || 'label') ||
-                  getVariable(item, 'id')
-                }`
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
+      <AutoFoldedList
+        enabled={!!enableOverflow}
+        tooltipClassName={cx('Picker-overflow-wrapper')}
+        items={tags}
+        popOverContainer={popOverContainer}
+        tooltipOptions={tooltipProps}
+        maxVisibleCount={maxTagCount}
+        renderItem={(item, index, folded) => {
+          return this.renderTag(item, index);
+        }}
+      ></AutoFoldedList>
     );
+  }
+
+  @autobind
+  overrideCRUDProps() {
+    // 自定义参数，用于外部透传给 crud 组件外围需要的属性值。
+    // 需要保留这个函数和函数名存在即可，返回值是一个对象
+    return {};
   }
 
   @autobind
@@ -444,8 +681,12 @@ export default class PickerControl extends React.PureComponent<
       multiple,
       valueField,
       embed,
-      source
+      source,
+      strictMode,
+      testIdBuilder
     } = this.props;
+    const {maxTagCount, overflowTagPopoverInCRUD, displayPosition} =
+      this.getOverflowConfig();
 
     return render('modal-body', this.state.schema, {
       value: selectedOptions,
@@ -453,56 +694,49 @@ export default class PickerControl extends React.PureComponent<
       primaryField: valueField,
       options: source ? [] : options,
       multiple,
-      onSelect: embed
-        ? (selectedItems: Array<any>, unSelectedItems: Array<any>) => {
-            // 过滤掉一些无用事件，否则会导致 value 错误
-            if (
-              !Array.isArray(selectedItems) ||
-              !Array.isArray(unSelectedItems) ||
-              (!selectedItems.length && !unSelectedItems.length)
-            ) {
-              return;
-            } else if (
-              selectedItems
-                .map(item => item[valueField || 'value'])
-                .sort()
-                .join(',') ===
-              selectedOptions
-                .map(item => item[valueField || 'value'])
-                .sort()
-                .join(',')
-            ) {
-              return;
-            }
-
-            this.handleChange(selectedItems);
-          }
-        : undefined,
+      strictMode,
+      onSelect: embed ? this.handleSelect : undefined,
+      testIdBuilder: testIdBuilder?.getChild('body-schema'),
       ref: this.crudRef,
-      popOverContainer
+      popOverContainer,
+      ...(embed ||
+      (Array.isArray(displayPosition) && displayPosition.includes('crud'))
+        ? {maxTagCount, overflowTagPopover: overflowTagPopoverInCRUD}
+        : {}),
+      ...this.overrideCRUDProps()
     }) as JSX.Element;
   }
+  @supportStatic()
   render() {
     const {
       className,
+      style,
       modalClassName,
       classnames: cx,
       disabled,
       render,
       modalMode,
       source,
-      size,
+      modalSize,
       clearable,
       multiple,
       placeholder,
       embed,
       selectedOptions,
       translate: __,
-      popOverContainer
+      popOverContainer,
+      modalTitle,
+      data,
+      mobileUI,
+      env,
+      themeCss,
+      css,
+      id,
+      classPrefix: ns,
+      testIdBuilder
     } = this.props;
-
     return (
-      <div className={cx(`PickerControl`, className)}>
+      <div className={cx(`PickerControl`, {'is-mobile': mobileUI}, className)}>
         {embed ? (
           <div className={cx('Picker')}>
             {this.renderBody({popOverContainer})}
@@ -516,25 +750,42 @@ export default class PickerControl extends React.PureComponent<
               'is-disabled': disabled
             })}
           >
-            <div onClick={this.handleClick} className={cx('Picker-input')}>
+            <div
+              onClick={this.handleClick}
+              className={cx(
+                'Picker-input',
+                disabled && 'is-disabled',
+                this.state.isFocused && 'is-focused',
+                setThemeClassName({
+                  ...this.props,
+                  name: 'pickControlClassName',
+                  id,
+                  themeCss: themeCss || css
+                })
+              )}
+            >
               {!selectedOptions.length && placeholder ? (
                 <div className={cx('Picker-placeholder')}>
                   {__(placeholder)}
                 </div>
-              ) : null}
+              ) : (
+                <div
+                  className={cx('Picker-valueWrap')}
+                  {...testIdBuilder?.getTestId()}
+                >
+                  {this.renderValues()}
 
-              <div className={cx('Picker-valueWrap')}>
-                {this.renderValues()}
-
-                <input
-                  onChange={noop}
-                  value={''}
-                  ref={this.input}
-                  onKeyDown={this.handleKeyDown}
-                  onFocus={this.handleFocus}
-                  onBlur={this.handleBlur}
-                />
-              </div>
+                  <input
+                    onChange={noop}
+                    value={''}
+                    ref={this.input}
+                    onKeyDown={this.handleKeyDown}
+                    onClick={this.handleFocus}
+                    onBlur={this.handleBlur}
+                    readOnly={mobileUI}
+                  />
+                </div>
+              )}
 
               {clearable && !disabled && selectedOptions.length ? (
                 <a onClick={this.clearValue} className={cx('Picker-clear')}>
@@ -542,21 +793,41 @@ export default class PickerControl extends React.PureComponent<
                 </a>
               ) : null}
 
-              <span onClick={this.open} className={cx('Picker-btn')}>
-                <Icon icon="window-restore" className="icon" />
+              <span
+                onClick={this.open}
+                className={cx('Picker-btn')}
+                {...testIdBuilder?.getChild('picker-open-btn').getTestId()}
+              >
+                <Icon
+                  icon="window-restore"
+                  className={cx(
+                    'icon',
+                    setThemeClassName({
+                      ...this.props,
+                      name: 'pickIconClassName',
+                      id,
+                      themeCss: themeCss || css
+                    })
+                  )}
+                  iconContent="Picker-icon"
+                />
               </span>
             </div>
 
             {render(
               'modal',
               {
-                title: __('Select.placeholder'),
-                size: size,
+                title:
+                  modalTitle && typeof modalTitle === 'string'
+                    ? filter(modalTitle, data)
+                    : __('Select.placeholder'),
+                size: modalSize,
                 type: modalMode,
                 className: modalClassName,
                 body: {
                   children: this.renderBody
-                }
+                },
+                testIdBuilder: testIdBuilder?.getChild('modal')
               },
               {
                 key: 'modal',
@@ -568,6 +839,65 @@ export default class PickerControl extends React.PureComponent<
             )}
           </div>
         )}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss || css,
+            classNames: [
+              {
+                key: 'pickControlClassName',
+                weights: {
+                  default: {
+                    important: true
+                  },
+                  hover: {
+                    important: true
+                  },
+                  focused: {
+                    important: true,
+                    parent: `.${ns}Picker.is-focused >`
+                  },
+                  disabled: {
+                    important: true,
+                    parent: `.${ns}Picker.is-disabled >`
+                  }
+                }
+              },
+              {
+                key: 'pickFontClassName'
+              },
+              {
+                key: 'pickValueWrapClassName',
+                weights: {
+                  default: {
+                    important: true
+                  }
+                }
+              },
+              {
+                key: 'pickValueIconClassName',
+                weights: {
+                  default: {
+                    important: true
+                  },
+                  hover: {
+                    important: true
+                  }
+                }
+              },
+              {
+                key: 'pickIconClassName',
+                weights: {
+                  default: {
+                    suf: ' svg'
+                  }
+                }
+              }
+            ],
+            id: id
+          }}
+          env={env}
+        />
       </div>
     );
   }

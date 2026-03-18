@@ -4,7 +4,7 @@ exports[`Renderer:service 1`] = `
 <div>
   <div
     class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-    style="position: relative;"
+    data-role="container"
   >
     <div
       class="cxd-Panel-heading"
@@ -13,7 +13,7 @@ exports[`Renderer:service 1`] = `
         class="cxd-Panel-title"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           <span>
             The form
@@ -34,6 +34,7 @@ exports[`Renderer:service 1`] = `
         />
         <div
           class="cxd-Form-item cxd-Form-item--normal is-required"
+          data-amis-name="tpl"
           data-role="form-item"
         >
           <label
@@ -41,7 +42,7 @@ exports[`Renderer:service 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   模板
@@ -60,7 +61,6 @@ exports[`Renderer:service 1`] = `
             <div
               aria-expanded="false"
               aria-haspopup="listbox"
-              aria-labelledby="downshift-0-label"
               class="cxd-Select"
               role="combobox"
               tabindex="0"
@@ -90,6 +90,7 @@ exports[`Renderer:service 1`] = `
         >
           <div
             class="cxd-Form-item cxd-Form-item--normal is-required"
+            data-amis-name="dy_1"
             data-role="form-item"
           >
             <label
@@ -97,7 +98,7 @@ exports[`Renderer:service 1`] = `
             >
               <span>
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     动态字段1
@@ -130,6 +131,7 @@ exports[`Renderer:service 1`] = `
           </div>
           <div
             class="cxd-Form-item cxd-Form-item--normal"
+            data-amis-name="dy_2"
             data-role="form-item"
           >
             <label
@@ -137,7 +139,7 @@ exports[`Renderer:service 1`] = `
             >
               <span>
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     动态字段2
@@ -166,45 +168,6 @@ exports[`Renderer:service 1`] = `
         </div>
       </form>
     </div>
-    <div
-      class="resize-sensor"
-      style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-    >
-      
-  
-      <div
-        class="resize-sensor-expand"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-shrink"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-appear"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-      />
-    </div>
   </div>
 </div>
 `;
@@ -224,6 +187,7 @@ exports[`form:service:remoteData 1`] = `
     >
       <div
         class="cxd-Form-item cxd-Form-item--normal"
+        data-amis-name="child-a"
         data-role="form-item"
       >
         <div
@@ -277,6 +241,7 @@ exports[`form:service:remoteSchmea+data 1`] = `
     >
       <div
         class="cxd-Form-item cxd-Form-item--normal"
+        data-amis-name="child-a"
         data-role="form-item"
       >
         <div
@@ -299,6 +264,7 @@ exports[`form:service:remoteSchmea+data 1`] = `
       </div>
       <div
         class="cxd-Form-item cxd-Form-item--normal"
+        data-amis-name="child-b"
         data-role="form-item"
       >
         <div
@@ -352,6 +318,7 @@ exports[`form:service:super-remoteData 1`] = `
     >
       <div
         class="cxd-Form-item cxd-Form-item--normal"
+        data-amis-name="child-a"
         data-role="form-item"
       >
         <div

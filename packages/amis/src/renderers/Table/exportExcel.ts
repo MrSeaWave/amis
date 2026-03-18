@@ -2,7 +2,13 @@
  * 导出 Excel 功能
  */
 
-import {filter} from 'amis-core';
+import {
+  filter,
+  isEffectiveApi,
+  arraySlice,
+  isObject,
+  AMISSchema
+} from 'amis-core';
 import './ColumnToggler';
 import {TableStore} from 'amis-core';
 import {saveAs} from 'file-saver';
@@ -10,19 +16,19 @@ import {
   getVariable,
   removeHTMLTag,
   decodeEntity,
+  flattenTree,
   createObject
 } from 'amis-core';
 import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
 import {BaseSchema} from '../../Schema';
 import {toDataURL, getImageDimensions} from 'amis-core';
-import {TplSchema} from '../Tpl';
-import {MappingSchema} from '../Mapping';
+import memoize from 'lodash/memoize';
 import {getSnapshot} from 'mobx-state-tree';
-import {DateSchema} from '../Date';
 import moment from 'moment';
 import type {TableProps, ExportExcelToolbar} from './index';
 
 const loadDb = () => {
+  // @ts-ignore
   return import('amis-ui/lib/components/CityDB');
 };
 
@@ -38,12 +44,234 @@ const getAbsoluteUrl = (function () {
   };
 })();
 
+interface CellStyleFont {
+  name?: string;
+  color?: {argb: string};
+  underline?: boolean;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+interface CellStyleFill {
+  type?: string;
+  pattern?: string;
+  fgColor?: {argb: string};
+}
+
+interface CellStyle {
+  font?: CellStyleFont;
+  fill?: CellStyleFill;
+}
+
+/**
+ * 将 computedStyle 的 rgba 转成 argb hex
+ */
+const rgba2argb = memoize((rgba: string) => {
+  const color = `${rgba
+    .match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+\.{0,1}\d*))?\)$/)!
+    .slice(1)
+    .map((n, i) =>
+      (i === 3 ? Math.round(parseFloat(n) * 255) : parseFloat(n))
+        .toString(16)
+        .padStart(2, '0')
+        .replace('NaN', '')
+    )
+    .join('')}`;
+  if (color.length === 6) {
+    return 'FF' + color;
+  }
+  return color;
+});
+
+/**
+ * 将 classname 转成对应的 excel 样式，只支持字体颜色、粗细、背景色
+ */
+const getCellStyleByClassName = memoize((className: string): CellStyle => {
+  if (!className) return {};
+  const classNameElm = document.getElementsByClassName(className).item(0);
+  if (classNameElm) {
+    const computedStyle = getComputedStyle(classNameElm);
+    const font: CellStyleFont = {};
+    let fill: CellStyleFill = {};
+    if (computedStyle.color && computedStyle.color.indexOf('rgb') !== -1) {
+      const color = rgba2argb(computedStyle.color);
+      // 似乎不支持完全透明的情况，所以就不设置
+      if (!color.startsWith('00')) {
+        font['color'] = {argb: color};
+      }
+    }
+    if (computedStyle.fontWeight && parseInt(computedStyle.fontWeight) >= 700) {
+      font['bold'] = true;
+    }
+    if (
+      computedStyle.backgroundColor &&
+      computedStyle.backgroundColor.indexOf('rgb') !== -1
+    ) {
+      const color = rgba2argb(computedStyle.backgroundColor);
+      if (!color.startsWith('00')) {
+        fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: {argb: color}
+        };
+      }
+    }
+
+    return {font, fill};
+  }
+  return {};
+});
+
+/**
+ * 设置单元格样式
+ */
+const applyCellStyle = (
+  sheetRow: any,
+  columIndex: number,
+  schema: any,
+  data: any
+) => {
+  let cellStyle: CellStyle = {};
+  if (schema.className) {
+    for (const className of schema.className.split(/\s+/)) {
+      const style = getCellStyleByClassName(className);
+      if (style) {
+        cellStyle = {...cellStyle, ...style};
+      }
+    }
+  }
+
+  if (schema.classNameExpr) {
+    const classNames = filter(schema.classNameExpr, data);
+    if (classNames) {
+      for (const className of classNames.split(/\s+/)) {
+        const style = getCellStyleByClassName(className);
+        if (style) {
+          cellStyle = {...cellStyle, ...style};
+        }
+      }
+    }
+  }
+
+  if (cellStyle.font && Object.keys(cellStyle.font).length > 0) {
+    sheetRow.getCell(columIndex).font = cellStyle.font;
+  }
+  if (cellStyle.fill && Object.keys(cellStyle.fill).length > 0) {
+    sheetRow.getCell(columIndex).fill = cellStyle.fill;
+  }
+};
+
+/**
+ * 输出总结行
+ */
+const renderSummary = (
+  worksheet: any,
+  data: any,
+  summarySchema: any,
+  rowIndex: number
+) => {
+  if (summarySchema && summarySchema.length > 0) {
+    const firstSchema = summarySchema[0];
+    // 总结行支持二维数组，所以统一转成二维数组来方便操作
+    let affixRows = summarySchema;
+    if (!Array.isArray(firstSchema)) {
+      affixRows = [summarySchema];
+    }
+
+    for (const affix of affixRows) {
+      rowIndex += 1;
+      const sheetRow = worksheet.getRow(rowIndex);
+      let columIndex = 0;
+      for (const col of affix) {
+        columIndex += 1;
+        // 文档示例中只有这两种，所以主要支持这两种，没法支持太多，因为没法用 react 渲染结果
+        if (col.text) {
+          sheetRow.getCell(columIndex).value = col.text;
+        }
+
+        if (col.tpl) {
+          sheetRow.getCell(columIndex).value = removeHTMLTag(
+            decodeEntity(filter(col.tpl, data))
+          );
+        }
+
+        // 处理合并行
+        if (col.colSpan) {
+          worksheet.mergeCells(
+            rowIndex,
+            columIndex,
+            rowIndex,
+            columIndex + col.colSpan - 1
+          );
+          columIndex += col.colSpan - 1;
+        }
+      }
+    }
+  }
+
+  return rowIndex;
+};
+
+/**
+ * 获取 map 的映射数据
+ * @param remoteMappingCache 缓存
+ * @param env mobx env
+ * @param column 列配置
+ * @param data 上下文数据
+ * @param rowData 当前行数据
+ * @returns
+ */
+async function getMap(
+  remoteMappingCache: any,
+  env: any,
+  column: any,
+  data: any,
+  rowData: any
+) {
+  let map = column.pristine.map as Record<string, any>;
+  const source = column.pristine.source;
+  if (source) {
+    let sourceValue = source;
+    if (isPureVariable(source)) {
+      map = resolveVariableAndFilter(source as string, rowData, '| raw');
+    } else if (isEffectiveApi(source, data)) {
+      const mapKey = JSON.stringify(source);
+      if (mapKey in remoteMappingCache) {
+        map = remoteMappingCache[mapKey];
+      } else {
+        const res = await env.fetcher(sourceValue, rowData);
+        if (res.data) {
+          remoteMappingCache[mapKey] = res.data;
+          map = res.data;
+        }
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * 导出 Excel
+ * @param ExcelJS ExcelJS 对象
+ * @param props Table 组件的 props
+ * @param toolbar 导出 Excel 的 toolbar 配置
+ * @param withoutData 如果为 true 就不导出数据，只导出表头
+ */
 export async function exportExcel(
   ExcelJS: any,
   props: TableProps,
-  toolbar: ExportExcelToolbar
+  toolbar: ExportExcelToolbar,
+  withoutData: boolean = false
 ) {
-  const {store, env, classnames: cx, translate: __, data} = props;
+  const {
+    store,
+    env,
+    classnames: cx,
+    translate: __,
+    data,
+    prefixRow,
+    affixRow
+  } = props;
   let columns = store.exportColumns || [];
 
   let rows = [];
@@ -51,8 +279,24 @@ export async function exportExcel(
   let filename = 'data';
   // 支持配置 api 远程获取
   if (typeof toolbar === 'object' && toolbar.api) {
-    const res = await env.fetcher(toolbar.api, data);
-    if (!res.data) {
+    const pageField = toolbar.pageField || 'page';
+    const perPageField = toolbar.perPageField || 'perPage';
+    const ctx: any = createObject(data, {
+      ...props.query,
+      [pageField]: data.page || 1,
+      [perPageField]: data.perPage || 10
+    });
+
+    const res = await env.fetcher(toolbar.api, ctx, {
+      autoAppend: true,
+      pageField,
+      perPageField
+    });
+
+    if ((toolbar.api as any)?.responseType === 'blob') {
+      // 如果是返回的文件流就直接下载
+      return;
+    } else if (!res.data) {
       env.notify('warning', __('placeholder.noData'));
       return;
     }
@@ -109,26 +353,29 @@ export async function exportExcel(
   }
 
   // 自定义导出列配置
-  if (toolbar.exportColumns && Array.isArray(toolbar.exportColumns)) {
-    columns = toolbar.exportColumns;
+  const hasCustomExportColumns =
+    toolbar.exportColumns && Array.isArray(toolbar.exportColumns);
+  if (hasCustomExportColumns) {
+    columns = toolbar.exportColumns as any[];
     // 因为后面列 props 都是从 pristine 里获取，所以这里归一一下
     for (const column of columns) {
       column.pristine = column;
     }
   }
 
+  /** 如果非自定义导出列配置，则默认不导出操作列 */
   const filteredColumns = exportColumnNames
     ? columns.filter(column => {
         const filterColumnsNames = exportColumnNames!;
         if (column.name && filterColumnsNames.indexOf(column.name) !== -1) {
-          return true;
+          return hasCustomExportColumns ? true : column?.type !== 'operation';
         }
         return false;
       })
-    : columns;
+    : columns.filter(column => column?.type !== 'operation');
 
   const firstRowLabels = filteredColumns.map(column => {
-    return column.label;
+    return filter(column.label, data);
   });
   const firstRow = worksheet.getRow(1);
   firstRow.values = firstRowLabels;
@@ -142,10 +389,28 @@ export async function exportExcel(
       column: firstRowLabels.length
     }
   };
+
+  if (withoutData) {
+    return exportExcelWithoutData(
+      workbook,
+      worksheet,
+      filteredColumns,
+      filename,
+      env,
+      data
+    );
+  }
   // 用于 mapping source 的情况
   const remoteMappingCache: any = {};
   // 数据从第二行开始
   let rowIndex = 1;
+  if (toolbar.rowSlice) {
+    rows = arraySlice(rows, toolbar.rowSlice);
+  }
+  // 前置总结行
+  rowIndex = renderSummary(worksheet, data, prefixRow, rowIndex);
+  // children 展开
+  rows = flattenTree(rows, item => item);
   for (const row of rows) {
     const rowData = createObject(data, row.data);
     rowIndex += 1;
@@ -173,7 +438,9 @@ export async function exportExcel(
         }
       }
 
-      const type = (column as BaseSchema).type || 'plain';
+      applyCellStyle(sheetRow, columIndex, column.pristine, rowData);
+
+      const type = (column as AMISSchema).type || 'plain';
       // TODO: 这里很多组件都是拷贝对应渲染的逻辑实现的，导致每种都得实现一遍
       if ((type === 'image' || (type as any) === 'static-image') && value) {
         try {
@@ -221,10 +488,11 @@ export async function exportExcel(
             }
           });
         } catch (e) {
-          console.warn(e.stack);
+          console.warn(e);
         }
       } else if (type == 'link' || (type as any) === 'static-link') {
         const href = column.pristine.href;
+
         const linkURL =
           (typeof href === 'string' && href
             ? filter(href, rowData, '| raw')
@@ -242,29 +510,32 @@ export async function exportExcel(
           hyperlink: absoluteURL
         };
       } else if (type === 'mapping' || (type as any) === 'static-mapping') {
-        // 拷贝自 Mapping.tsx
-        let map = column.pristine.map;
-        const source = column.pristine.source;
-        if (source) {
-          let sourceValue = source;
-          if (isPureVariable(source)) {
-            sourceValue = resolveVariableAndFilter(
-              source as string,
-              rowData,
-              '| raw'
-            );
-          }
+        let map = await getMap(remoteMappingCache, env, column, data, rowData);
 
-          const mapKey = JSON.stringify(source);
-          if (mapKey in remoteMappingCache) {
-            map = remoteMappingCache[mapKey];
-          } else {
-            const res = await env.fetcher(sourceValue, rowData);
-            if (res.data) {
-              remoteMappingCache[mapKey] = res.data;
-              map = res.data;
+        const valueField = column.pristine.valueField || 'value';
+        const labelField = column.pristine.labelField || 'label';
+
+        if (Array.isArray(map)) {
+          map = map.reduce((res, now) => {
+            if (now == null) {
+              return res;
+            } else if (isObject(now)) {
+              let keys = Object.keys(now);
+              if (
+                keys.length === 1 ||
+                (keys.length == 2 && keys.includes('$$id'))
+              ) {
+                // 针对amis-editor的特殊处理
+                keys = keys.filter(key => key !== '$$id');
+                // 单key 数组对象
+                res[keys[0]] = now[keys[0]];
+              } else if (keys.length > 1) {
+                // 多key 数组对象
+                res[now[valueField]] = now;
+              }
             }
-          }
+            return res;
+          }, {});
         }
 
         if (typeof value !== 'undefined' && map && (map[value] ?? map['*'])) {
@@ -275,7 +546,32 @@ export async function exportExcel(
               : value === false && map['0']
               ? map['0']
               : map['*']); // 兼容平台旧用法：即 value 为 true 时映射 1 ，为 false 时映射 0
-          sheetRow.getCell(columIndex).value = removeHTMLTag(viewValue);
+
+          let label = viewValue;
+          if (isObject(viewValue)) {
+            if (labelField === undefined || labelField === '') {
+              if (!viewValue.hasOwnProperty('type')) {
+                // 映射值是object
+                // 没配置labelField
+                // object 也没有 type，不能作为schema渲染
+                // 默认取 label 字段
+                label = viewValue['label'];
+              }
+            } else {
+              label = viewValue[labelField || 'label'];
+            }
+          }
+
+          let text = removeHTMLTag(label);
+
+          /** map可能会使用比较复杂的html结构，富文本也无法完全支持，直接把里面的变量解析出来即可 */
+          if (isPureVariable(text)) {
+            text = resolveVariableAndFilter(text, rowData, '| raw');
+          } else {
+            text = filter(text, rowData);
+          }
+
+          sheetRow.getCell(columIndex).value = text;
         } else {
           sheetRow.getCell(columIndex).value = removeHTMLTag(value);
         }
@@ -317,9 +613,22 @@ export async function exportExcel(
           sheetRow.getCell(columIndex).value = value;
         }
       }
+
+      // 如果是纯数字，不用科学计数法
+      const cellValue = sheetRow.getCell(columIndex).value;
+      if (Number.isInteger(cellValue)) {
+        sheetRow.getCell(columIndex).numFmt = '0';
+      }
     }
   }
 
+  // 后置总结行
+  renderSummary(worksheet, data, affixRow, rowIndex);
+
+  downloadFile(workbook, filename);
+}
+
+async function downloadFile(workbook: any, filename: string) {
   const buffer = await workbook.xlsx.writeBuffer();
 
   if (buffer) {
@@ -328,4 +637,48 @@ export async function exportExcel(
     });
     saveAs(blob, filename + '.xlsx');
   }
+}
+
+function numberToLetters(num: number) {
+  let letters = '';
+  while (num >= 0) {
+    letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[num % 26] + letters;
+    num = Math.floor(num / 26) - 1;
+  }
+  return letters;
+}
+
+/**
+ * 只导出表头
+ */
+async function exportExcelWithoutData(
+  workbook: any,
+  worksheet: any,
+  filteredColumns: any[],
+  filename: string,
+  env: any,
+  data: any
+) {
+  let index = 0;
+  const rowNumber = 100;
+  const mapCache: any = {};
+  for (const column of filteredColumns) {
+    index += 1;
+    if (column.pristine?.type === 'mapping') {
+      const map = await getMap(mapCache, env, column, data, {});
+      if (map && isObject(map)) {
+        const keys = Object.keys(map);
+        for (let rowIndex = 1; rowIndex < rowNumber; rowIndex++) {
+          worksheet.getCell(numberToLetters(index) + rowIndex).dataValidation =
+            {
+              type: 'list',
+              allowBlank: true,
+              formulae: [`"${keys.join(',')}"`]
+            };
+        }
+      }
+    }
+  }
+
+  downloadFile(workbook, filename);
 }

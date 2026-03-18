@@ -6,17 +6,17 @@
     margin-left: var(--DropDown-caret-marginLeft);
     display: inline-block;
     vertical-align: top;
-    transition: transform var(--animation-duration) ease;
 
     > svg {
       width: px2rem(10px);
       height: px2rem(10px);
-      top: 0.125em;
+      transition: transform var(--animation-duration) ease;
+      transform: rotate(90deg);
     }
   }
 
-  &.is-opened &-caret {
-    transform: rotate(180deg);
+  &.is-opened &-caret svg {
+    transform: rotate(270deg);
   }
 
   &.is-actived > .#{$ns}Button {
@@ -46,6 +46,8 @@
     box-shadow: var(--DropDown-menu-boxShadow);
     min-width: var(--DropDown-menu-minWidth);
     text-align: left;
+    max-height: 500px;
+    overflow: auto;
   }
 
   &--alignRight &-menu {
@@ -55,7 +57,9 @@
 
   &-menuItem,
   &-menu > li {
-    padding: var(--DropDown-menuItem-paddingY) var(--DropDown-menuItem-paddingX);
+    padding: var(--table-togglable-paddingTop)
+      var(--table-togglable-paddingRight) var(--table-togglable-paddingBottom)
+      var(--table-togglable-paddingLeft);
     white-space: nowrap;
     box-sizing: border-box;
     height: var(--DropDown-menu-height);
@@ -63,11 +67,7 @@
     user-select: none;
     color: var(--link-color);
     text-decoration: var(--link-decoration);
-
-    &:hover {
-      background: var(--DropDown-menuItem-onHover-bg);
-      color: var(--DropDown-menuItem-onHover-color);
-    }
+    background: var(--table-togglable-bg-color);
 
     &.is-active {
       color: var(--DropDown-menuItem-onActive-color);
@@ -91,6 +91,17 @@
       overflow: hidden;
       background: var(--DropDown-menu-borderColor);
       padding: 0;
+    }
+
+    > label {
+      margin: 0;
+    }
+  }
+
+  &-menu:not(.is-mobile) > li {
+    &:hover {
+      background: var(--table-togglable-hover-bg-color);
+      color: var(--DropDown-menuItem-onHover-color);
     }
   }
 
@@ -156,41 +167,35 @@
         background: var(--ColumnToggler-item-backgroundColor);
         border-radius: px2rem(2px);
         font-size: var(--fontSizeSm);
-        padding: var(--ColumnToggler-item-paddingY)
-          var(--ColumnToggler-item-paddingX);
+        padding: 0 var(--ColumnToggler-item-paddingX);
+        line-height: var(--ColumnToggler-lineHeight);
         height: var(--ColumnToggler-lineHeight);
         width: calc((100% - var(--ColumnToggler-item-margin) * 6) / 3);
         margin: var(--ColumnToggler-item-margin);
         float: left;
+        display: flex;
 
+        > span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+        }
+        > label {
+          width: 100%;
+        }
+        &-label {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+        }
         &:hover {
           background: var(--ColumnToggler-item-backgroundColor-onHover);
         }
 
         &--dragging {
           border: 1px solid var(--link-color);
-        }
-
-        &-label {
-          display: inline-block;
-          width: calc(100% - var(--Checkbox--sm-size));
-
-          > span {
-            display: inline-block;
-            max-width: 100%;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            overflow: hidden;
-            user-select: none;
-          }
-        }
-
-        label {
-          > i {
-            height: var(--fontSizeLg);
-            width: var(--fontSizeLg);
-            vertical-align: top;
-          }
         }
 
         &-dragBar {
@@ -200,6 +205,12 @@
           vertical-align: super;
           color: var(--ColumnToggler-item-dragBar-color);
           cursor: move;
+        }
+      }
+
+      @for $i from 1 through 10 {
+        &--column-#{$i} > .#{$ns}ColumnToggler-menuItem {
+          width: calc((100% - var(--ColumnToggler-item-margin) * $i * 2) / $i);
         }
       }
     }

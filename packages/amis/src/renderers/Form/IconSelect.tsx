@@ -1,14 +1,22 @@
 import React from 'react';
 import cx from 'classnames';
 import {matchSorter} from 'match-sorter';
-import {FormItem, FormControlProps, autobind} from 'amis-core';
-import {Modal, Button, Spinner, SearchBox, Icon} from 'amis-ui';
+import {FormItem, FormControlProps, autobind, AMISFormItem} from 'amis-core';
+import {
+  Modal,
+  Button,
+  Spinner,
+  SearchBox,
+  Icon,
+  SpinnerExtraProps
+} from 'amis-ui';
 
 import debounce from 'lodash/debounce';
+import find from 'lodash/find';
 import {FormBaseControlSchema} from '../../Schema';
 
 import * as IconSelectStore from './IconSelectStore';
-export interface IconSelectControlSchema extends FormBaseControlSchema {
+export interface AMISIconSelectSchema extends AMISFormItem {
   type: 'icon-select';
 
   placeholder?: string;
@@ -18,17 +26,24 @@ export interface IconSelectControlSchema extends FormBaseControlSchema {
   noDataTip?: string;
 
   clearable?: boolean;
+
+  returnSvg?: boolean;
+
+  noSize?: boolean;
 }
 
-export interface IconSelectProps extends FormControlProps {
+export interface IconSelectProps extends FormControlProps, SpinnerExtraProps {
   placeholder?: string;
   disabled?: boolean;
   noDataTip?: string;
+  returnSvg?: boolean;
+  noSize?: boolean;
 }
 
 export interface IconChecked {
   id: string;
   name?: string;
+  svg?: string;
 }
 
 export interface IconSelectState {
@@ -70,6 +85,41 @@ export default class IconSelectControl extends React.PureComponent<
     );
   }
 
+  getSvgName(value: IconChecked | string) {
+    if (typeof value === 'string') {
+      return /data-name="(.*?)"/.exec(value)?.[1] || '';
+    } else {
+      return value?.name || value?.id || '';
+    }
+  }
+
+  getSvgId(value: IconChecked | string) {
+    if (typeof value === 'string') {
+      return /data-id="(.*?)"/.exec(value)?.[1] || '';
+    } else {
+      return value?.id || '';
+    }
+  }
+
+  getValueBySvg(
+    svg: string | IconSelectStore.SvgIcon
+  ): IconSelectStore.SvgIcon | null {
+    if (!svg) {
+      return null;
+    }
+
+    if (typeof svg !== 'string') {
+      return {
+        ...svg,
+        svg: svg.svg?.replace(/'/g, '')
+      };
+    }
+
+    const svgName = this.getSvgName(svg);
+    const svgId = this.getSvgId(svg);
+    return {name: svgName, id: svgId, svg: svg.replace(/'/g, '')};
+  }
+
   @autobind
   handleClick() {
     if (this.props.disabled) {
@@ -96,24 +146,18 @@ export default class IconSelectControl extends React.PureComponent<
       clearable
     } = this.props;
 
-    const pureValue =
-      (value?.id && String(value.id).replace(/^svg-/, '')) || '';
-    const iconName = value?.name || pureValue;
+    const svg = this.getValueBySvg(value);
 
     return (
       <div className={cx(`${ns}IconSelectControl-input-area`)}>
-        {pureValue && (
-          <div className={cx(`${ns}IconSelectControl-input-icon-show`)}>
-            <svg>
-              <use xlinkHref={`#${pureValue}`}></use>
-            </svg>
-          </div>
-        )}
+        <div className={cx(`${ns}IconSelectControl-input-icon-show`)}>
+          <Icon icon={svg?.svg} className="icon" />
+        </div>
         <span className={cx(`${ns}IconSelectControl-input-icon-id`)}>
-          {iconName}
+          {svg?.name}
         </span>
 
-        {clearable && !disabled && pureValue ? (
+        {clearable && !disabled && svg ? (
           <a
             onClick={this.handleClear}
             className={cx(`${ns}IconSelectControl-clear`)}
@@ -122,7 +166,7 @@ export default class IconSelectControl extends React.PureComponent<
           </a>
         ) : null}
 
-        {(!value && placeholder && (
+        {(!svg && placeholder && (
           <span className={cx(`${ns}IconSelectControl-input-icon-placeholder`)}>
             {placeholder}
           </span>
@@ -168,12 +212,31 @@ export default class IconSelectControl extends React.PureComponent<
   @autobind
   handleConfirm() {
     const checkedIcon = this.state.tmpCheckIconId;
-    this.props.onChange &&
-      this.props.onChange(
-        checkedIcon && checkedIcon.id
-          ? {...checkedIcon, id: 'svg-' + checkedIcon.id}
-          : ''
+    if (this.props.returnSvg) {
+      let svg = (checkedIcon && checkedIcon.svg) || '';
+      svg = svg.replace(
+        /<svg/,
+        `<svg data-name="${checkedIcon?.name}" data-id="${checkedIcon?.id}"`
       );
+      if (this.props.noSize) {
+        svg = svg.replace(/width=".*?"/, '').replace(/height=".*?"/, '');
+      }
+      this.props.onChange && this.props.onChange(svg);
+    } else {
+      this.props.onChange &&
+        this.props.onChange(
+          checkedIcon && checkedIcon.id
+            ? {...checkedIcon, id: 'svg-' + checkedIcon.id}
+            : ''
+        );
+    }
+
+    this.toggleModel(false);
+  }
+
+  @autobind
+  async handleLocalUpload(icon: string) {
+    this.props.onChange && this.props.onChange(icon);
 
     this.toggleModel(false);
   }
@@ -254,14 +317,23 @@ export default class IconSelectControl extends React.PureComponent<
 
   @autobind
   renderModalContent() {
-    const {render, classPrefix: ns} = this.props;
+    const {
+      render,
+      classPrefix: ns,
+      loadingConfig,
+      funcSchema,
+      funcCom: FuncCom
+    } = this.props;
 
     const icons = this.getIconsByType();
 
     const inputValue = this.state.searchValue;
 
     const filteredIcons = inputValue
-      ? matchSorter(icons, inputValue, {keys: ['name']})
+      ? matchSorter(icons, inputValue, {
+          keys: ['name'],
+          threshold: matchSorter.rankings.CONTAINS
+        })
       : icons;
     return (
       <>
@@ -286,9 +358,16 @@ export default class IconSelectControl extends React.PureComponent<
           )) ||
           null}
 
+        {FuncCom ? (
+          <div className={cx(`${ns}IconSelectControl-Modal-func`)}>
+            <FuncCom onUpload={this.handleLocalUpload} />
+          </div>
+        ) : null}
+
         <div className={cx(`${ns}IconSelectControl-Modal-content`)}>
           <Spinner
             size="lg"
+            loadingConfig={loadingConfig}
             overlay
             key="info"
             show={this.state.isRefreshLoading}
@@ -316,7 +395,9 @@ export default class IconSelectControl extends React.PureComponent<
 
   @autobind
   toggleModel(isShow?: boolean) {
-    const {value} = this.props;
+    const {value: valueTemp} = this.props;
+    const value =
+      typeof valueTemp === 'string' ? this.getValueBySvg(valueTemp) : valueTemp;
 
     if (isShow === undefined) {
       this.setState({
@@ -338,7 +419,13 @@ export default class IconSelectControl extends React.PureComponent<
   }
 
   render() {
-    const {className, classPrefix: ns, disabled, translate: __} = this.props;
+    const {
+      className,
+      style,
+      classPrefix: ns,
+      disabled,
+      translate: __
+    } = this.props;
 
     return (
       <div

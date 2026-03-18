@@ -1,19 +1,34 @@
 import React from 'react';
-import {Renderer, RendererProps, filter, IconCheckedSchema} from 'amis-core';
+import {
+  Renderer,
+  RendererProps,
+  filter,
+  autobind,
+  createObject,
+  CustomStyle,
+  setThemeClassName
+} from 'amis-core';
 import {BaseSchema, SchemaTpl} from '../Schema';
-import {BadgeObject, withBadge} from 'amis-ui';
-import {getIcon} from 'amis-ui';
-import {isObject} from 'lodash';
+import {
+  BadgeObject,
+  withBadge,
+  Icon as IconUI,
+  IconCheckedSchema
+} from 'amis-ui';
+import {AMISSchemaBase} from 'amis-core';
 
 /**
- * Icon 图表渲染器
- * 文档：https://baidu.gitee.io/amis/docs/components/icon
+ * Icon 图标渲染器
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/icon
  */
-export interface IconSchema extends BaseSchema {
+/**
+ * 图标组件，用于展示图标或符号。支持字体图标、SVG 与样式控制。
+ */
+export interface AMISIconSchema extends AMISSchemaBase {
   type: 'icon';
 
   /**
-   * 按钮类型
+   * 图标类型
    */
   icon: SchemaTpl | IconCheckedSchema;
 
@@ -27,7 +42,7 @@ export interface IconSchema extends BaseSchema {
 
 export interface IconProps
   extends RendererProps,
-    Omit<IconSchema, 'type' | 'className'> {}
+    Omit<AMISIconSchema, 'type' | 'className'> {}
 
 export class Icon extends React.Component<IconProps, object> {
   static defaultProps: Partial<IconProps> = {
@@ -35,53 +50,73 @@ export class Icon extends React.Component<IconProps, object> {
     vendor: 'fa'
   };
 
+  @autobind
+  handleClick(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
+
+  @autobind
+  handleMouseEnter(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
+
+  @autobind
+  handleMouseLeave(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
+
   render() {
-    const {vendor, classnames: cx, className, data} = this.props;
+    const {
+      classnames: cx,
+      className,
+      data,
+      id,
+      themeCss,
+      env,
+      wrapperCustomStyle
+    } = this.props;
     let icon = this.props.icon;
 
-    icon = filter(icon, data);
-
-    if (typeof icon !== 'string') {
-      if (
-        isObject(icon) &&
-        typeof (icon as IconCheckedSchema).id === 'string' &&
-        (icon as IconCheckedSchema).id.startsWith('svg-')
-      ) {
-        return (
-          <svg className={cx('icon', className)}>
-            <use
-              xlinkHref={`#${(icon as IconCheckedSchema).id.replace(
-                /^svg-/,
-                ''
-              )}`}
-            ></use>
-          </svg>
-        );
-      }
-
-      return;
+    if (typeof icon === 'string') {
+      icon = filter(this.props.icon, data);
     }
 
-    let CustomIcon = getIcon(icon);
-    if (CustomIcon) {
-      return <CustomIcon className={cx(className, `icon-${icon}`)} />;
-    }
-
-    const isURLIcon = icon?.indexOf('.') !== -1;
-    let iconPrefix = '';
-    if (vendor === 'iconfont') {
-      iconPrefix = `iconfont icon-${icon}`;
-    } else if (vendor === 'fa') {
-      //默认是fontawesome v4，兼容之前配置
-      iconPrefix = `${vendor} ${vendor}-${icon}`;
-    } else {
-      // 如果vendor为空，则不设置前缀,这样可以支持fontawesome v5、fontawesome v6或者其他框架
-      iconPrefix = `${icon}`;
-    }
-    return isURLIcon ? (
-      <img className={cx('Icon')} src={icon} />
-    ) : (
-      <i className={cx(iconPrefix, className)} />
+    return (
+      <>
+        <IconUI
+          {...this.props}
+          icon={icon}
+          onClick={this.handleClick}
+          onMouseEnter={this.handleMouseEnter}
+          onMouseLeave={this.handleMouseLeave}
+          className={cx(
+            className,
+            setThemeClassName({...this.props, name: 'className', id, themeCss}),
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            })
+          )}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss,
+            classNames: [
+              {
+                key: 'className'
+              }
+            ],
+            id
+          }}
+          env={env}
+        />
+      </>
     );
   }
 }

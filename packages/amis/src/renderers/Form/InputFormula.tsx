@@ -1,5 +1,10 @@
 import React from 'react';
-import {FormItem, FormBaseControl, FormControlProps} from 'amis-core';
+import {
+  FormItem,
+  FormBaseControl,
+  FormControlProps,
+  AMISFormItem
+} from 'amis-core';
 import {FormulaPicker} from 'amis-ui';
 import {autobind} from 'amis-core';
 
@@ -8,43 +13,36 @@ import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
 import type {
   FuncGroup,
   VariableItem
-} from 'amis-ui/lib/components/formula/Editor';
+} from 'amis-ui/lib/components/formula/CodeEditor';
+import type {FormulaPickerInputSettings} from 'amis-ui/lib/components/formula/Picker';
 
 /**
  * InputFormula 公式编辑器
  * 文档：https://baidu.gitee.io/amis/zh-CN/components/form/input-formula
  */
-export interface InputFormulaControlSchema extends FormBaseControlSchema {
-  type: 'input-formula';
-
+export interface AMISInputFormulaSchemaBase extends AMISFormItem {
   /**
-   * evalMode 即直接就是表达式，否则
-   * 需要 ${这里面才是表达式}
-   * 默认为 true
+   * evalMode 即直接就是表达式，否则需要 ${这里面才是表达式}
    */
   evalMode?: boolean;
 
   /**
-   * 混合模式，意味着这个输入框既可以输入不同文本
-   * 也可以输入公式。
-   * 当输入公式时，值格式为 ${公式内容}
-   * 其他内容当字符串。
+   * 混合模式，意味着这个输入框既可以输入不同文本也可以输入公式
    */
   mixedMode?: boolean;
 
   /**
-   * 用于提示的变量集合，默认为空
+   * 用于提示的变量集合
    */
   variables: Array<VariableItem>;
 
   /**
-   * 变量展现模式，可选值：'tabs' ｜ 'tree'
+   * 变量展现模式
    */
   variableMode?: 'tabs' | 'tree';
 
   /**
-   * 函数集合，默认不需要传，即  amis-formula 里面那个函数
-   * 如果有扩充，则需要传。
+   * 函数集合
    */
   functions: Array<FuncGroup>;
 
@@ -54,7 +52,7 @@ export interface InputFormulaControlSchema extends FormBaseControlSchema {
   title?: string;
 
   /**
-   * 顶部标题，默认为表达式
+   * 顶部标题
    */
   header: string;
 
@@ -64,7 +62,7 @@ export interface InputFormulaControlSchema extends FormBaseControlSchema {
   inputMode?: 'button' | 'input-button' | 'input-group';
 
   /**
-   * 外层input是否允许输入，否需要点击fx在弹窗中输入
+   * 外层input是否允许输入
    */
   allowInput?: boolean;
 
@@ -74,7 +72,7 @@ export interface InputFormulaControlSchema extends FormBaseControlSchema {
   icon?: SchemaIcon;
 
   /**
-   * 按钮Label，inputMode为button时生效
+   * 按钮Label
    */
   btnLabel?: string;
 
@@ -120,12 +118,21 @@ export interface InputFormulaControlSchema extends FormBaseControlSchema {
    * 当前输入项字段 name: 用于避免循环绑定自身导致无限渲染
    */
   selfVariableName?: string;
+
+  /**
+   * 输入框的类型
+   */
+  inputSettings?: FormulaPickerInputSettings;
+}
+
+export interface AMISInputFormulaSchema extends AMISInputFormulaSchemaBase {
+  type: 'input-formula';
 }
 
 export interface InputFormulaProps
   extends FormControlProps,
     Omit<
-      InputFormulaControlSchema,
+      AMISInputFormulaSchema,
       'options' | 'inputClassName' | 'className' | 'descriptionClassName'
     > {}
 
@@ -134,7 +141,7 @@ export interface InputFormulaProps
 })
 export class InputFormulaRenderer extends React.Component<InputFormulaProps> {
   static defaultProps: Pick<
-    InputFormulaControlSchema,
+    AMISInputFormulaSchema,
     'inputMode' | 'borderMode' | 'evalMode'
   > = {
     inputMode: 'input-button',
@@ -180,6 +187,7 @@ export class InputFormulaRenderer extends React.Component<InputFormulaProps> {
       value,
       clearable,
       className,
+      style,
       classPrefix: ns,
       classnames: cx,
       allowInput = true,
@@ -195,7 +203,11 @@ export class InputFormulaRenderer extends React.Component<InputFormulaProps> {
       functionClassName,
       data,
       onPickerOpen,
-      selfVariableName
+      selfVariableName,
+      popOverContainer,
+      env,
+      inputSettings,
+      mobileUI
     } = this.props;
     let {variables, functions} = this.props;
 
@@ -211,11 +223,11 @@ export class InputFormulaRenderer extends React.Component<InputFormulaProps> {
 
     return (
       <FormulaPicker
+        popOverContainer={env.getModalContainer}
         ref={this.formulaRef}
         className={className}
         value={value}
         disabled={disabled}
-        allowInput={allowInput}
         onChange={onChange}
         evalMode={evalMode}
         variables={variables}
@@ -225,6 +237,7 @@ export class InputFormulaRenderer extends React.Component<InputFormulaProps> {
         borderMode={borderMode}
         placeholder={placeholder}
         mode={inputMode}
+        inputSettings={inputSettings}
         btnLabel={btnLabel}
         level={level}
         btnSize={btnSize}
@@ -237,6 +250,7 @@ export class InputFormulaRenderer extends React.Component<InputFormulaProps> {
         onPickerOpen={onPickerOpen}
         selfVariableName={selfVariableName}
         mixedMode={mixedMode}
+        mobileUI={mobileUI}
       />
     );
   }

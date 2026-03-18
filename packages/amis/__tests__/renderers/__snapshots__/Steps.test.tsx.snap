@@ -3,10 +3,10 @@
 exports[`Renderer:steps 1`] = `
 <div>
   <ul
-    class="cxd-Steps cxd-Steps--Placement- cxd-Steps-- cxd-Steps--horizontal"
+    class="cxd-Steps cxd-Steps--Placement- cxd-Steps-- cxd-Steps--horizontal cxd-StepsControl"
   >
     <li
-      class="cxd-StepsItem is-process className cxd-StepsItem-"
+      class="cxd-StepsItem is-process className"
     >
       <div
         class="cxd-StepsItem-container"
@@ -52,7 +52,9 @@ exports[`Renderer:steps 1`] = `
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
               title="this is description"
             >
-              <span>
+              <span
+                class=""
+              >
                 this is description
               </span>
             </div>
@@ -61,7 +63,7 @@ exports[`Renderer:steps 1`] = `
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-wait"
     >
       <div
         class="cxd-StepsItem-container"
@@ -96,16 +98,17 @@ exports[`Renderer:steps 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-wait"
     >
       <div
         class="cxd-StepsItem-container"
@@ -140,9 +143,10 @@ exports[`Renderer:steps 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
@@ -155,10 +159,10 @@ exports[`Renderer:steps 1`] = `
 exports[`Renderer:steps 2`] = `
 <div>
   <ul
-    class="cxd-Steps cxd-Steps--Placement- cxd-Steps-- cxd-Steps--horizontal"
+    class="cxd-Steps cxd-Steps--Placement- cxd-Steps-- cxd-Steps--horizontal cxd-StepsControl"
   >
     <li
-      class="cxd-StepsItem is-process className cxd-StepsItem-"
+      class="cxd-StepsItem is-process className"
     >
       <div
         class="cxd-StepsItem-container"
@@ -204,7 +208,9 @@ exports[`Renderer:steps 2`] = `
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
               title="this is description"
             >
-              <span>
+              <span
+                class=""
+              >
                 this is description
               </span>
             </div>
@@ -213,7 +219,7 @@ exports[`Renderer:steps 2`] = `
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-wait"
     >
       <div
         class="cxd-StepsItem-container"
@@ -248,16 +254,17 @@ exports[`Renderer:steps 2`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-wait"
     >
       <div
         class="cxd-StepsItem-container"
@@ -292,9 +299,10 @@ exports[`Renderer:steps 2`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
@@ -307,10 +315,10 @@ exports[`Renderer:steps 2`] = `
 exports[`Renderer:steps labelPlacement 1`] = `
 <div>
   <ul
-    class="cxd-Steps cxd-Steps--Placement-vertical cxd-Steps-- cxd-Steps--horizontal className"
+    class="cxd-Steps cxd-Steps--Placement-vertical cxd-Steps-- cxd-Steps--horizontal cxd-StepsControl className"
   >
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-process"
     >
       <div
         class="cxd-StepsItem-container"
@@ -345,16 +353,17 @@ exports[`Renderer:steps labelPlacement 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-wait"
     >
       <div
         class="cxd-StepsItem-container"
@@ -397,7 +406,9 @@ exports[`Renderer:steps labelPlacement 1`] = `
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
               title="this is description"
             >
-              <span>
+              <span
+                class=""
+              >
                 this is description
               </span>
             </div>
@@ -406,7 +417,7 @@ exports[`Renderer:steps labelPlacement 1`] = `
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-wait"
     >
       <div
         class="cxd-StepsItem-container"
@@ -441,9 +452,10 @@ exports[`Renderer:steps labelPlacement 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
@@ -456,10 +468,10 @@ exports[`Renderer:steps labelPlacement 1`] = `
 exports[`Renderer:steps progressDot 1`] = `
 <div>
   <ul
-    class="cxd-Steps cxd-Steps--Placement-vertical cxd-Steps--ProgressDot cxd-Steps--horizontal className"
+    class="cxd-Steps cxd-Steps--Placement-vertical cxd-Steps--ProgressDot cxd-Steps--horizontal cxd-StepsControl className"
   >
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-ProgressDot"
+      class="cxd-StepsItem is-process cxd-StepsItem-ProgressDot"
     >
       <div
         class="cxd-StepsItem-container"
@@ -488,9 +500,10 @@ exports[`Renderer:steps progressDot 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
@@ -534,7 +547,9 @@ exports[`Renderer:steps progressDot 1`] = `
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
               title="this is description"
             >
-              <span>
+              <span
+                class=""
+              >
                 this is description
               </span>
             </div>
@@ -572,9 +587,10 @@ exports[`Renderer:steps progressDot 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
@@ -587,10 +603,10 @@ exports[`Renderer:steps progressDot 1`] = `
 exports[`Renderer:steps status 1`] = `
 <div>
   <ul
-    class="cxd-Steps cxd-Steps--Placement- cxd-Steps-- cxd-Steps--horizontal className"
+    class="cxd-Steps cxd-Steps--Placement- cxd-Steps-- cxd-Steps--horizontal cxd-StepsControl className"
   >
     <li
-      class="cxd-StepsItem is-finish cxd-StepsItem-"
+      class="cxd-StepsItem is-finish"
     >
       <div
         class="cxd-StepsItem-container"
@@ -625,16 +641,17 @@ exports[`Renderer:steps status 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-error cxd-StepsItem-"
+      class="cxd-StepsItem is-error"
     >
       <div
         class="cxd-StepsItem-container"
@@ -677,7 +694,9 @@ exports[`Renderer:steps status 1`] = `
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
               title="this is description"
             >
-              <span>
+              <span
+                class=""
+              >
                 this is description
               </span>
             </div>
@@ -686,7 +705,7 @@ exports[`Renderer:steps status 1`] = `
       </div>
     </li>
     <li
-      class="cxd-StepsItem is-wait cxd-StepsItem-"
+      class="cxd-StepsItem is-wait"
     >
       <div
         class="cxd-StepsItem-container"
@@ -721,9 +740,145 @@ exports[`Renderer:steps status 1`] = `
             </div>
             <div
               class="cxd-StepsItem-description cxd-StepsItem-ellText"
-              title="undefined"
             >
-              <span />
+              <span
+                class=""
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
+  </ul>
+</div>
+`;
+
+exports[`Renderer:steps with vertical mode 1`] = `
+<div>
+  <ul
+    class="cxd-Steps cxd-Steps--Placement-vertical cxd-Steps--ProgressDot cxd-Steps--vertical cxd-StepsControl className"
+  >
+    <li
+      class="cxd-StepsItem is-process cxd-StepsItem-ProgressDot"
+    >
+      <div
+        class="cxd-StepsItem-container"
+      >
+        <div
+          class="cxd-StepsItem-containerTail"
+        />
+        <div
+          class="cxd-StepsItem-containerProgressDot"
+        />
+        <div
+          class="cxd-StepsItem-containerWrapper"
+        >
+          <div
+            class="cxd-StepsItem-body"
+          >
+            <div
+              class="cxd-StepsItem-title cxd-StepsItem-vertical-ProgressDot"
+            >
+              <span
+                class="cxd-StepsItem-ellText"
+                title="First"
+              >
+                First
+              </span>
+            </div>
+            <div
+              class="cxd-StepsItem-description cxd-StepsItem-ellText"
+            >
+              <span
+                class=""
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li
+      class="cxd-StepsItem is-wait cxd-StepsItem-ProgressDot"
+    >
+      <div
+        class="cxd-StepsItem-container"
+      >
+        <div
+          class="cxd-StepsItem-containerTail"
+        />
+        <div
+          class="cxd-StepsItem-containerProgressDot"
+        />
+        <div
+          class="cxd-StepsItem-containerWrapper"
+        >
+          <div
+            class="cxd-StepsItem-body"
+          >
+            <div
+              class="cxd-StepsItem-title cxd-StepsItem-vertical-ProgressDot"
+            >
+              <span
+                class="cxd-StepsItem-ellText"
+                title="Second"
+              >
+                Second
+              </span>
+              <span
+                class="cxd-StepsItem-subTitle cxd-StepsItem-ellText"
+                title="this is subTitle"
+              >
+                this is subTitle
+              </span>
+            </div>
+            <div
+              class="cxd-StepsItem-description cxd-StepsItem-ellText"
+              title="this is description"
+            >
+              <span
+                class=""
+              >
+                this is description
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li
+      class="cxd-StepsItem is-wait cxd-StepsItem-ProgressDot"
+    >
+      <div
+        class="cxd-StepsItem-container"
+      >
+        <div
+          class="cxd-StepsItem-containerTail"
+        />
+        <div
+          class="cxd-StepsItem-containerProgressDot"
+        />
+        <div
+          class="cxd-StepsItem-containerWrapper"
+        >
+          <div
+            class="cxd-StepsItem-body"
+          >
+            <div
+              class="cxd-StepsItem-title cxd-StepsItem-vertical-ProgressDot"
+            >
+              <span
+                class="cxd-StepsItem-ellText"
+                title="Third"
+              >
+                Third
+              </span>
+            </div>
+            <div
+              class="cxd-StepsItem-description cxd-StepsItem-ellText"
+            >
+              <span
+                class=""
+              />
             </div>
           </div>
         </div>

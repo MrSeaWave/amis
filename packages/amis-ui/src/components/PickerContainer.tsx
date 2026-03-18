@@ -10,6 +10,7 @@ import {
 import Modal from './Modal';
 import Button from './Button';
 import ConfirmBox, {ConfirmBoxProps} from './ConfirmBox';
+import type {TestIdBuilder} from 'amis-core';
 
 export interface PickerContainerProps
   extends ThemeProps,
@@ -25,13 +26,16 @@ export interface PickerContainerProps
     value: any;
     onChange: (value: any) => void;
     setState: (state: any) => void;
+    loading?: boolean;
     [propName: string]: any;
   }) => JSX.Element | null;
   value?: any;
   onFocus?: () => void;
   onClose?: () => void;
-
+  disabled?: boolean;
   onPickerOpen?: (props: PickerContainerProps) => any;
+  popOverContainer?: any;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export interface PickerContainerState {
@@ -47,7 +51,6 @@ export class PickerContainer extends React.Component<
     isOpened: false,
     value: this.props.value
   };
-  bodyRef = React.createRef<any>();
 
   componentDidUpdate(prevProps: PickerContainerProps) {
     const props = this.props;
@@ -62,6 +65,7 @@ export class PickerContainer extends React.Component<
   @autobind
   async handleClick() {
     const state = {
+      value: this.props.value,
       ...(await this.props.onPickerOpen?.(this.props)),
       isOpened: true
     };
@@ -93,10 +97,13 @@ export class PickerContainer extends React.Component<
   }
 
   @autobind
-  async confirm(): Promise<any> {
+  async beforeConfirm(form?: any): Promise<any> {
     const {onConfirm, beforeConfirm} = this.props;
 
-    const ret = await beforeConfirm?.(this.bodyRef.current);
+    const ret = beforeConfirm
+      ? await beforeConfirm?.(form)
+      : await form?.submit?.();
+
     let state: any = {
       isOpened: false
     };
@@ -107,8 +114,8 @@ export class PickerContainer extends React.Component<
     } else if (isObject(ret)) {
       state.value = ret;
     }
-
-    this.setState(state, () => onConfirm?.(this.state.value));
+    await onConfirm?.(state.value ?? this.state.value);
+    this.setState(state);
   }
 
   @autobind
@@ -128,10 +135,15 @@ export class PickerContainer extends React.Component<
       showTitle,
       headerClassName,
       bodyClassName,
+      className,
       translate: __,
       size,
       showFooter,
-      closeOnEsc
+      closeOnEsc,
+      popOverContainer,
+      mobileUI,
+      disabled,
+      testIdBuilder
     } = this.props;
     return (
       <>
@@ -151,17 +163,24 @@ export class PickerContainer extends React.Component<
           showTitle={showTitle}
           headerClassName={headerClassName}
           bodyClassName={bodyClassName}
+          className={className}
           showFooter={showFooter}
-          beforeConfirm={this.confirm}
+          beforeConfirm={this.beforeConfirm}
+          popOverContainer={popOverContainer}
+          mobileUI={mobileUI}
+          disabled={disabled}
+          testIdBuilder={testIdBuilder?.getChild('confirm-box')}
         >
-          {() =>
-            popOverRender({
+          {({popOverContainer, loading, onConfirm, bodyRef}) =>
+            popOverRender?.({
               ...(this.state as any),
-              ref: this.bodyRef,
+              ref: bodyRef,
               setState: this.updateState,
               onClose: this.close,
               onChange: this.handleChange,
-              onConfirm: this.confirm
+              onConfirm: onConfirm,
+              popOverContainer,
+              loading
             })!
           }
         </ConfirmBox>

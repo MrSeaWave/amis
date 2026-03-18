@@ -20,11 +20,28 @@ import Button from './Button';
 import FormField, {FormFieldProps} from './FormField';
 import {Icon} from './icons';
 
+import type {ButtonProps} from './Button';
+
+export interface tdRenderFunc {
+  (
+    methods: UseFormReturn & {
+      popOverContainer?: any;
+    },
+    colIndex: number,
+    rowIndex: number
+  ): JSX.Element | null;
+}
+
 export interface InputTableColumnProps {
   title?: string;
   className?: string;
   thRender?: () => JSX.Element;
-  tdRender: (methods: UseFormReturn, index: number) => JSX.Element | null;
+  tdRender: tdRenderFunc;
+}
+
+interface InputTableScrollProps {
+  /** 垂直滚动区域的最大高度 */
+  y: number | string;
 }
 
 export interface InputTabbleProps<T = any>
@@ -45,10 +62,24 @@ export interface InputTabbleProps<T = any>
   addable?: boolean;
   addButtonClassName?: string;
   addButtonText?: string;
+  addButtonProps?: Partial<Omit<ButtonProps, 'onClick'>>;
 
   maxLength?: number;
   minLength?: number;
   removable?: boolean;
+  /** 表格CSS类名 */
+  tableClassName?: string;
+  /** 表格头CSS类名 */
+  tableHeadClassName?: string;
+  /** 表格内容区CSS类名 */
+  tableBodyClassName?: string;
+  /** 空状态文字 */
+  placeholder?: React.ReactNode;
+  /** 滚动设置 */
+  scroll?: InputTableScrollProps;
+  /** 底部工具栏 */
+  footer?: () => React.ReactNode;
+  onItemAdd?: (values: Record<string, any>) => void;
 }
 
 export function InputTable({
@@ -69,23 +100,37 @@ export function InputTable({
   addable,
   addButtonText,
   addButtonClassName,
+  addButtonProps,
   scaffold,
   minLength,
   maxLength,
   isRequired,
-  rules
+  rules,
+  tableClassName,
+  tableHeadClassName,
+  tableBodyClassName,
+  placeholder,
+  scroll,
+  footer,
+  onItemAdd
 }: InputTabbleProps) {
+  const enableScroll = scroll?.y != null;
+  const tBodyRef = React.useRef<HTMLTableElement>(null);
+  const tableRef = React.useRef<HTMLTableElement>(null);
   const subForms = React.useRef<Record<any, UseFormReturn>>({});
   const subFormRef = React.useCallback(
-    (subform: UseFormReturn | null, index: number) => {
+    (subform: UseFormReturn | null, id: string) => {
       if (subform) {
-        subForms.current[index] = subform;
+        subForms.current[id] = subform;
       } else {
-        delete subForms.current[index];
+        delete subForms.current[id];
       }
     },
     [subForms]
   );
+  const popOverContainer = React.useCallback(() => {
+    return tBodyRef.current;
+  }, [tBodyRef]);
   let finalRules: any = {...rules};
 
   if (isRequired) {
@@ -143,91 +188,119 @@ export function InputTable({
     control
   });
 
-  const {trigger} = useFormContext();
+  const {trigger, setValue} = useFormContext();
 
   // useFieldArray 的 update 会更新行 id，导致重新渲染
   // 正在编辑中的元素失去焦点，所以自己写一个
   const lightUpdate = React.useCallback(
     (index: number, value: any) => {
-      const arr = control._getFieldArray(name);
-      arr[index] = {...value};
-      control._updateFieldArray(name, arr);
-      trigger(name);
-      control._subjects.watch.next({});
+      // const arr = control._getFieldArray(name);
+      // arr[index] = {...value};
+      // control._updateFieldArray(name, arr);
+      // trigger(name);
+      // control._subjects.watch.next({});
+      setValue(`${name}.${index}`, value);
     },
     [control]
   );
 
   function renderBody() {
+    const handleItemAdd = () => {
+      const values = {...scaffold};
+      append(values);
+
+      /** 开启滚动后新增元素定位到底部 */
+      if (enableScroll && tableRef) {
+        requestAnimationFrame(() => {
+          tableRef?.current?.scrollIntoView?.({
+            behavior: 'smooth',
+            block: 'end',
+            inline: 'nearest'
+          });
+        });
+      }
+
+      onItemAdd?.(values);
+    };
+
     return (
-      <div className={cx(`Table`, className)}>
-        <div className={cx(`Table-contentWrap`)}>
-          <table className={cx(`Table-table`)}>
-            <thead>
-              <tr>
-                {columns.map((item, index) => (
-                  <th key={index} className={item.className}>
-                    {item.thRender ? item.thRender() : item.title}
-                  </th>
-                ))}
-                <th key="operation">{__('Table.operation')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fields.length ? (
-                fields.map((field, index) => (
-                  <tr key={field.id}>
-                    <InputTableRow
-                      key="columns"
-                      control={control}
-                      update={lightUpdate}
-                      index={index}
-                      value={field}
-                      columns={columns}
-                      translate={__}
-                      classnames={cx}
-                      formRef={subFormRef}
-                    />
-                    <td key="operation">
-                      <Button
-                        level="link"
-                        key="delete"
-                        disabled={
-                          removable === false ||
-                          !!(minLength && fields.length <= minLength)
-                        }
-                        className={cx('Table-delBtn')}
-                        onClick={() => remove(index)}
-                      >
-                        {__('delete')}
-                      </Button>
+      <div className={cx(`Table`, `InputTable-UI`, className)}>
+        <div
+          className={cx(`Table-contentWrap`, {'is-fixed': enableScroll})}
+          style={{maxHeight: enableScroll ? scroll.y : 'unset'}}
+          ref={tBodyRef}
+        >
+          <div className={cx('Table-content')}>
+            <table className={cx(`Table-table`, tableClassName)} ref={tableRef}>
+              <thead className={cx(tableHeadClassName)}>
+                <tr>
+                  {columns.map((item, index) => (
+                    <th key={index} className={item.className}>
+                      {item.thRender ? item.thRender() : item.title}
+                    </th>
+                  ))}
+                  <th key="operation">{__('Table.operation')}</th>
+                </tr>
+              </thead>
+              <tbody className={cx(tableBodyClassName)}>
+                {fields.length ? (
+                  fields.map((field, index) => (
+                    <tr key={field.id}>
+                      <InputTableRow
+                        key="columns"
+                        control={control}
+                        update={lightUpdate}
+                        index={index}
+                        value={field}
+                        columns={columns}
+                        translate={__}
+                        classnames={cx}
+                        formRef={subFormRef}
+                        popOverContainer={popOverContainer}
+                      />
+                      <td key="operation">
+                        <Button
+                          level="link"
+                          key="delete"
+                          disabled={
+                            removable === false ||
+                            !!(minLength && fields.length <= minLength)
+                          }
+                          className={cx('Table-delBtn')}
+                          onClick={() => remove(index)}
+                        >
+                          {__('delete')}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={columns.length + 1}>
+                      <Icon
+                        icon="desk-empty"
+                        className={cx('Table-placeholder-empty-icon', 'icon')}
+                      />
+                      {placeholder ?? __('placeholder.noData')}
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length + 1}>
-                    <Icon
-                      icon="desk-empty"
-                      className={cx('Table-placeholder-empty-icon', 'icon')}
-                    />
-                    {__('placeholder.noData')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
         {addable !== false && (!maxLength || fields.length < maxLength) ? (
           <div className={cx(`InputTable-toolbar`)}>
             <Button
               className={cx(addButtonClassName)}
-              onClick={() => append({...scaffold})}
               size="sm"
+              {...addButtonProps}
+              onClick={() => handleItemAdd()}
             >
               <Icon icon="plus" className="icon" />
               <span>{__(addButtonText || 'add')}</span>
             </Button>
+            {footer?.()}
           </div>
         ) : null}
       </div>
@@ -256,42 +329,58 @@ export interface InputTableRowProps {
   value: any;
   control: Control<any>;
   columns: Array<{
-    tdRender: (methods: UseFormReturn, index: number) => JSX.Element | null;
+    tdRender: tdRenderFunc;
     className?: string;
   }>;
   update: (index: number, data: Record<string, any>) => void;
   index: number;
   translate: TranslateFn;
   classnames: ClassNamesFn;
-  formRef: (form: UseFormReturn | null, index: number) => void;
+  formRef: (form: UseFormReturn | null, id: string) => void;
+  popOverContainer?: any;
 }
 
-export function InputTableRow({
+export const InputTableRow = React.memo(function InputTableRow({
   value,
   columns,
   index,
   translate,
   update,
   formRef,
-  classnames: cx
+  classnames: cx,
+  popOverContainer
 }: InputTableRowProps) {
-  const methods = useSubForm(value, translate, data => update(index, data));
+  const indexRef = React.useRef(index);
   React.useEffect(() => {
-    formRef?.(methods, index);
+    indexRef.current = index;
+  }, [index]);
+
+  const methods = useSubForm(value, translate, (data: any) =>
+    update(indexRef.current!, data)
+  );
+  React.useEffect(() => {
+    formRef?.(methods, value.id);
     return () => {
-      formRef?.(null, index);
+      formRef?.(null, value.id);
     };
-  }, [methods]);
+  }, [methods, value.id]);
 
   return (
     <>
-      {columns.map((item, index) => (
-        <td key={index} className={item.className}>
-          {item.tdRender(methods, index)}
+      {columns.map((item, colIndex) => (
+        <td key={colIndex} className={item.className}>
+          {item.tdRender(
+            {
+              ...methods,
+              popOverContainer
+            },
+            colIndex,
+            index
+          )}
         </td>
       ))}
     </>
   );
-}
+});
 
 export default themeable(localeable(InputTable));

@@ -7,13 +7,16 @@
 
 import React from 'react';
 import cx from 'classnames';
+import {AMISFormItem, isMobile} from 'amis-core';
 import {FormItem, FormControlProps, FormBaseControl} from 'amis-core';
 
 /**
  * Repeat
- * 文档：https://baidu.gitee.io/amis/docs/components/form/repeat
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/repeat
+ *
+ * @deprecated 不建议使用，可以直接用组合出来，不需要新建一个组件。
  */
-export interface RepeatControlSchema extends FormBaseControlSchema {
+export interface AMISInputRepeatSchema extends AMISFormItem {
   type: 'input-repeat';
 
   options?: string;
@@ -74,6 +77,9 @@ export default class RepeatControl extends React.Component<RepeatProps, any> {
       placeholder,
       disabled,
       classPrefix: ns,
+      mobileUI,
+      popOverContainer,
+      env,
       translate: __
     } = this.props;
 
@@ -216,6 +222,12 @@ export default class RepeatControl extends React.Component<RepeatProps, any> {
             searchable={false}
             disabled={disabled}
             joinValues={false}
+            mobileUI={mobileUI}
+            popOverContainer={
+              mobileUI
+                ? env?.getModalContainer
+                : popOverContainer || env.getModalContainer
+            }
           />
         </div>
       </div>
@@ -223,7 +235,7 @@ export default class RepeatControl extends React.Component<RepeatProps, any> {
   }
 
   render() {
-    const {className, classPrefix: ns} = this.props;
+    const {className, style, classPrefix: ns} = this.props;
 
     return (
       <div className={cx(`${ns}RepeatControl`, className)}>

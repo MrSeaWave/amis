@@ -6,14 +6,21 @@ import {SchemaNode, Schema, ActionObject, PlainObject} from 'amis-core';
 import {filter, evalExpression} from 'amis-core';
 import {Checkbox} from 'amis-ui';
 import {padArr, isVisible, isDisabled, noop, hashCode} from 'amis-core';
-import {resolveVariable, resolveVariableAndFilter} from 'amis-core';
+import {
+  resolveVariable,
+  resolveVariableAndFilter,
+  filterClassNameObject,
+  AMISSchemaCollection,
+  AMISSchemaBase,
+  AMISSchema
+} from 'amis-core';
 import QuickEdit, {SchemaQuickEdit} from './QuickEdit';
 import PopOver, {SchemaPopOver} from './PopOver';
 import {TableCell} from './Table';
 import Copyable, {SchemaCopyable} from './Copyable';
 import {
   BaseSchema,
-  SchemaClassName,
+  AMISClassName,
   SchemaExpression,
   SchemaObject,
   SchemaTpl,
@@ -21,133 +28,161 @@ import {
 } from '../Schema';
 import {ActionSchema} from './Action';
 import {Card} from 'amis-ui';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {Icon} from 'amis-ui';
-import type {IItem} from 'amis-core/lib/store/list';
+import type {
+  AMISButtonSchema,
+  AMISExpression,
+  AMISFormItem,
+  AMISTemplate,
+  IItem
+} from 'amis-core';
 
-export type CardBodyField = SchemaObject & {
+export type AMISCardFieldBase = {
   /**
-   * 列标题
+   * 字段标签名称
    */
   label: string;
 
   /**
-   * label 类名
+   * 标签CSS类名
    */
-  labelClassName?: SchemaClassName;
+  labelClassName?: AMISClassName;
 
   /**
-   * 绑定字段名
+   * 绑定的字段名
    */
   name?: string;
 
   /**
-   * 配置查看详情功能
+   * 查看详情配置
    */
   popOver?: SchemaPopOver;
 
   /**
-   * 配置快速编辑功能
+   * 快速编辑配置
    */
   quickEdit?: SchemaQuickEdit;
 
   /**
-   * 配置点击复制功能
+   * 点击复制配置
    */
   copyable?: SchemaCopyable;
 };
+export type AMISCardField = AMISSchema & AMISCardFieldBase;
 
-/**
- * Card 卡片渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/card
- */
-export interface CardSchema extends BaseSchema {
-  /**
-   * 指定为 card 类型
-   */
-  type: 'card';
-
-  /**
-   * 头部配置
-   */
+export interface AMISCardSchemaBase extends AMISSchemaBase {
   header?: {
-    className?: SchemaClassName;
+    /**
+     * 头部容器CSS类名
+     */
+    className?: AMISClassName;
 
     /**
-     * 标题
+     * 卡片标题
      */
-    title?: SchemaTpl;
-    titleClassName?: SchemaClassName;
+    title?: AMISTemplate;
 
     /**
-     * 副标题
+     * 标题CSS类名
      */
-    subTitle?: SchemaTpl;
-    subTitleClassName?: SchemaClassName;
+    titleClassName?: AMISClassName;
+
+    /**
+     * 卡片副标题
+     */
+    subTitle?: AMISSchemaCollection;
+
+    /**
+     * 副标题CSS类名
+     */
+    subTitleClassName?: AMISClassName;
+
+    /**
+     * 副标题占位符文本
+     */
     subTitlePlaceholder?: string;
 
     /**
-     * 描述
+     * 卡片描述，支持模板语法
      */
-    description?: SchemaTpl;
+    description?: AMISTemplate;
 
     /**
-     * 描述占位内容
+     * 描述占位符文本
      */
     descriptionPlaceholder?: string;
 
     /**
-     * 描述占位类名
+     * 描述的 CSS 类名
      */
-    descriptionClassName?: SchemaClassName;
+    descriptionClassName?: AMISClassName;
 
     /**
-     * @deprecated 建议用 description
+     * 描述字段（已废弃）
+     * @deprecated 建议使用 description
      */
-    desc?: SchemaTpl;
+    desc?: AMISTemplate;
 
     /**
-     * @deprecated 建议用 descriptionPlaceholder
+     * 描述占位符（已废弃）
+     * @deprecated 建议使用 descriptionPlaceholder
      */
-    descPlaceholder?: SchemaTpl;
+    descPlaceholder?: AMISTemplate;
 
     /**
-     * @deprecated 建议用 descriptionClassName
+     * 描述类名（已废弃）
+     * @deprecated 建议使用 descriptionClassName
      */
-    descClassName?: SchemaClassName;
+    descClassName?: AMISClassName;
 
     /**
-     * 图片地址
+     * 头像图片地址
      */
     avatar?: SchemaUrlPath;
 
-    avatarText?: SchemaTpl;
+    /**
+     * 头像文字，当没有图片时显示
+     */
+    avatarText?: AMISTemplate;
+
+    /**
+     * 头像文字背景色数组
+     */
     avatarTextBackground?: String[];
-    avatarTextClassName?: SchemaClassName;
 
     /**
-     * 图片包括层类名
+     * 头像文字的 CSS 类名
      */
-    avatarClassName?: SchemaClassName;
+    avatarTextClassName?: AMISClassName;
 
     /**
-     * 图片类名。
+     * 头像容器的 CSS 类名
      */
-    imageClassName?: SchemaClassName;
+    avatarClassName?: AMISClassName;
 
     /**
-     * 是否点亮
+     * 图片的 CSS 类名
      */
-    highlight?: SchemaExpression;
-    highlightClassName?: SchemaClassName;
+    imageClassName?: AMISClassName;
 
     /**
-     * 链接地址
+     * 是否高亮显示
      */
-    href?: SchemaTpl;
+    highlight?: AMISExpression;
 
     /**
-     * 是否新窗口打开
+     * 高亮状态的 CSS 类名
+     */
+    highlightClassName?: AMISClassName;
+
+    /**
+     * 链接地址，点击头部时跳转
+     */
+    href?: AMISTemplate;
+
+    /**
+     * 是否在新窗口打开链接
      */
     blank?: boolean;
   };
@@ -155,13 +190,13 @@ export interface CardSchema extends BaseSchema {
   /**
    * 内容区域
    */
-  body?: Array<CardBodyField>;
+  body?: Array<AMISCardField>;
 
   /**
    * 多媒体区域
    */
   media?: {
-    className?: SchemaClassName;
+    className?: AMISClassName;
 
     /**
      * 多媒体类型
@@ -197,26 +232,40 @@ export interface CardSchema extends BaseSchema {
   /**
    * 底部按钮集合。
    */
-  actions?: Array<ActionSchema>;
+  actions?: Array<AMISButtonSchema>;
 
   /**
    * 工具栏按钮
    */
-  toolbar?: Array<ActionSchema>;
+  toolbar?: Array<AMISButtonSchema>;
 
   /**
    * 次要说明
    */
-  secondary?: SchemaTpl;
+  secondary?: AMISTemplate;
 
   /**
    * 卡片内容区的表单项label是否使用Card内部的样式，默认为true
    */
   useCardLabel?: boolean;
 }
+
+/**
+ * Card 卡片渲染器。
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/card
+ */
+/**
+ * 卡片组件，用于展示信息块。支持头部、内容区域、操作按钮等配置。
+ */
+export interface AMISCardSchema extends AMISCardSchemaBase {
+  /**
+   * 指定为 card 组件
+   */
+  type: 'card';
+}
 export interface CardProps
   extends RendererProps,
-    Omit<CardSchema, 'className'> {
+    Omit<AMISCardSchema, 'className'> {
   onCheck: (item: IItem) => void;
   actionsCount: number;
   itemIndex?: number;
@@ -298,15 +347,21 @@ export class CardRenderer extends React.Component<CardProps> {
       itemAction,
       onAction,
       onCheck,
-      selectable
+      onClick,
+      selectable,
+      checkOnItemClick
     } = this.props;
 
     if (href) {
-      env.jumpTo(filter(href, data), {
-        type: 'button',
-        actionType: 'url',
-        blank
-      });
+      env.jumpTo(
+        filter(href, data),
+        {
+          type: 'button',
+          actionType: 'url',
+          blank
+        },
+        data
+      );
       return;
     }
 
@@ -315,7 +370,8 @@ export class CardRenderer extends React.Component<CardProps> {
       return;
     }
 
-    selectable && onCheck?.(item);
+    selectable && checkOnItemClick && onCheck?.(item);
+    onClick && onClick(item);
   }
 
   handleAction(e: React.UIEvent<any>, action: ActionObject, ctx: object) {
@@ -324,7 +380,7 @@ export class CardRenderer extends React.Component<CardProps> {
     onAction && onAction(e, action, ctx || item.data);
   }
 
-  handleCheck(e: React.MouseEvent<any>) {
+  handleCheck() {
     const item = this.props.item;
     this.props.onCheck && this.props.onCheck(item);
   }
@@ -352,7 +408,6 @@ export class CardRenderer extends React.Component<CardProps> {
       selectable,
       checkable,
       selected,
-      checkOnItemClick,
       multiple,
       hideCheckToggler,
       classnames: cx,
@@ -385,10 +440,10 @@ export class CardRenderer extends React.Component<CardProps> {
         <Checkbox
           key="check"
           className={cx('Card-checkbox')}
-          type={multiple ? 'checkbox' : 'radio'}
+          type={multiple !== false ? 'checkbox' : 'radio'}
           disabled={!checkable}
           checked={selected}
-          onChange={checkOnItemClick ? noop : this.handleCheck}
+          onChange={this.handleCheck}
         />
       );
     }
@@ -405,7 +460,8 @@ export class CardRenderer extends React.Component<CardProps> {
               ...(action as any)
             },
             {
-              key: index
+              key: index,
+              onClick: undefined
             }
           )
         )
@@ -451,6 +507,7 @@ export class CardRenderer extends React.Component<CardProps> {
                 level: 'link',
                 type: 'button',
                 ...action,
+                testid: action.testid ? filter(action.testid, data) : index,
                 size
               },
               {
@@ -460,10 +517,17 @@ export class CardRenderer extends React.Component<CardProps> {
                 disabled: dragging || isDisabled(action, data),
                 className: cx(
                   'Card-action',
-                  action.className || `${size ? `Card-action--${size}` : ''}`
+                  filterClassNameObject(
+                    action.className || `${size ? `Card-action--${size}` : ''}`,
+                    data
+                  ),
+                  {
+                    'is-disabled': isDisabled(action, data)
+                  }
                 ),
                 componentClass: 'a',
-                onAction: this.handleAction
+                onAction: this.handleAction,
+                onClick: undefined
               }
             );
           })}
@@ -474,7 +538,7 @@ export class CardRenderer extends React.Component<CardProps> {
   }
 
   renderChild(
-    node: SchemaNode,
+    node: AMISSchemaCollection,
     region: string = 'body',
     key: any = 0
   ): React.ReactNode {
@@ -484,23 +548,23 @@ export class CardRenderer extends React.Component<CardProps> {
       return render(region, node, {key}) as JSX.Element;
     }
 
-    const childNode: Schema = node as Schema;
+    const childNode: AMISSchema = node as AMISSchema;
 
     if (childNode.type === 'hbox' || childNode.type === 'grid') {
       return render(region, node, {
         key,
-        itemRender: this.itemRender
+        itemRender: this.itemRender.bind(this)
       }) as JSX.Element;
     }
 
-    return this.renderFeild(region, childNode, key, this.props);
+    return this.renderField(region, childNode, key, this.props);
   }
 
-  itemRender(field: any, index: number, props: any) {
-    return this.renderFeild(`column/${index}`, field, index, props);
+  itemRender(field: any, index: number, len: number, props: any) {
+    return this.renderField(`column/${index}`, field, index, props);
   }
 
-  renderFeild(region: string, field: Schema, key: any, props: any) {
+  renderField(region: string, field: AMISSchema, key: any, props: any) {
     const {render, classnames: cx, itemIndex} = props;
     const useCardLabel = props?.useCardLabel !== false;
     const data = this.props.data;
@@ -512,9 +576,14 @@ export class CardRenderer extends React.Component<CardProps> {
 
     return (
       <div className={cx('Card-field')} key={key}>
-        {useCardLabel && field.label ? (
-          <label className={cx('Card-fieldLabel', field.labelClassName)}>
-            {field.label}
+        {useCardLabel && (field as AMISFormItem).label ? (
+          <label
+            className={cx(
+              'Card-fieldLabel',
+              (field as AMISFormItem).labelClassName
+            )}
+          >
+            {(field as AMISFormItem).label}
           </label>
         ) : null}
 
@@ -529,10 +598,14 @@ export class CardRenderer extends React.Component<CardProps> {
             },
             {
               useCardLabel,
-              className: cx('Card-fieldValue', field.className),
+              className: cx(
+                'Card-fieldValue',
+                filterClassNameObject(field.className, data)
+              ),
               rowIndex: itemIndex,
               colIndex: key,
-              value: field.name ? resolveVariable(field.name, data) : undefined,
+              // 同 cell 里面逻辑一样，不要下发 value
+              // value: field.name ? resolveVariable(field.name, data) : undefined,
               popOverContainer: this.getPopOverContainer,
               onAction: this.handleAction,
               onQuickChange: this.handleQuickChange
@@ -574,8 +647,12 @@ export class CardRenderer extends React.Component<CardProps> {
     if (header) {
       const {subTitle: subTitleTpl} = header || {};
 
-      const subTitle = filter(subTitleTpl, data);
-      return subTitle ? render('sub-title', subTitleTpl!) : undefined;
+      // const subTitle = filter(subTitleTpl, data);
+      return subTitleTpl
+        ? render('sub-title', subTitleTpl, {
+            data
+          })
+        : undefined;
     }
     return;
   }
@@ -721,16 +798,27 @@ export class CardRenderer extends React.Component<CardProps> {
       media,
       ...rest
     } = this.props;
-
-    const headerCn = header?.className || headerClassName;
-    const titleCn = header?.titleClassName || titleClassName;
-    const subTitleCn = header?.subTitleClassName || subTitleClassName;
-    const descCn = header?.descClassName || descClassName;
+    const ctx = this.props.data;
+    const headerCn =
+      filterClassNameObject(header?.className, ctx) || headerClassName;
+    const titleCn =
+      filterClassNameObject(header?.titleClassName, ctx) || titleClassName;
+    const subTitleCn =
+      filterClassNameObject(header?.subTitleClassName, ctx) ||
+      subTitleClassName;
+    const descCn =
+      filterClassNameObject(header?.descClassName, ctx) || descClassName;
     const descriptionCn =
-      header?.descriptionClassName || descriptionClassName || descCn;
-    const avatarTextCn = header?.avatarTextClassName || avatarTextClassName;
-    const avatarCn = header?.avatarClassName || avatarClassName;
-    const imageCn = header?.imageClassName || imageClassName;
+      filterClassNameObject(header?.descriptionClassName, ctx) ||
+      descriptionClassName ||
+      descCn;
+    const avatarTextCn =
+      filterClassNameObject(header?.avatarTextClassName, ctx) ||
+      avatarTextClassName;
+    const avatarCn =
+      filterClassNameObject(header?.avatarClassName, ctx) || avatarClassName;
+    const imageCn =
+      filterClassNameObject(header?.imageClassName, ctx) || imageClassName;
     const mediaPosition = media?.position;
 
     return (
@@ -761,7 +849,7 @@ export class CardRenderer extends React.Component<CardProps> {
         footerClassName={footerClassName}
         secondaryClassName={secondaryClassName}
         bodyClassName={bodyClassName}
-        onClick={this.isHaveLink() ? this.handleClick : undefined}
+        onClick={this.isHaveLink() ? this.handleClick : this.handleCheck}
       ></Card>
     );
   }
@@ -795,6 +883,7 @@ export class CardItemFieldRenderer extends TableCell {
       render,
       style,
       wrapperComponent: Component,
+      contentsOnly,
       labelClassName,
       value,
       data,
@@ -832,9 +921,10 @@ export class CardItemFieldRenderer extends TableCell {
       );
     }
 
-    if (!Component) {
+    if (contentsOnly) {
       return body as JSX.Element;
     }
+    Component = Component || 'div';
 
     return (
       <Component

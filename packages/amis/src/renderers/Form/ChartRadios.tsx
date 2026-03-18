@@ -7,12 +7,16 @@ import {
 import {autobind} from 'amis-core';
 import {FormOptionsSchema} from '../../Schema';
 import {supportStatic} from './StaticHoc';
+import {AMISFormItemWithOptions} from 'amis-core';
 
 /**
  * 图表 Radio 单选框。
- * 文档：https://baidu.gitee.io/amis/docs/components/form/chart-radios
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/chart-radios
  */
-export interface ChartRadiosControlSchema extends FormOptionsSchema {
+export interface AMISChartRadiosSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 chart-radios 组件
+   */
   type: 'chart-radios';
   config: any;
   showTooltipOnHighlight?: boolean;
@@ -111,10 +115,13 @@ export default class ChartRadiosControl extends React.Component<
     } = this.props;
     if (options.length && selectedOptions.length) {
       const count = options.reduce((all, cur) => {
-        return all + cur[chartValueField || valueField]
+        return all + cur[chartValueField || valueField];
       }, 0);
       if (count > 0) {
-        const percent = (+selectedOptions[0][chartValueField || valueField] / count * 100).toFixed(2);
+        const percent = (
+          (+selectedOptions[0][chartValueField || valueField] / count) *
+          100
+        ).toFixed(2);
         displayValue = `${selectedOptions[0][labelField]}：${percent}%`;
       }
     }

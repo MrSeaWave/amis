@@ -13,10 +13,10 @@ exports[`Renderer:breadcrumb 1`] = `
         href="https://baidu.gitee.com/"
       >
         <i
-          class="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+          class="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
         />
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           首页
         </span>
@@ -34,7 +34,7 @@ exports[`Renderer:breadcrumb 1`] = `
         class="cxd-Breadcrumb-item-default"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           上级页面
         </span>
@@ -52,7 +52,7 @@ exports[`Renderer:breadcrumb 1`] = `
         class="cxd-Breadcrumb-item-default"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           当前页面
         </span>
@@ -75,10 +75,10 @@ exports[`Renderer:breadcrumb className 1`] = `
         href="https://baidu.gitee.com/"
       >
         <i
-          class="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+          class="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
         />
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           首页
         </span>
@@ -96,7 +96,7 @@ exports[`Renderer:breadcrumb className 1`] = `
         class="cxd-Breadcrumb-item-default itemClassName"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           上级页面
         </span>
@@ -118,7 +118,7 @@ exports[`Renderer:breadcrumb className 1`] = `
             href="https://baidu.gitee.com/"
           >
             <span
-              class="cxd-TplField"
+              class="cxd-TplField fr-view"
             >
               选项一
             </span>
@@ -129,7 +129,7 @@ exports[`Renderer:breadcrumb className 1`] = `
             class="cxd-Breadcrumb-item-dropdown dropdownItemClassName"
           >
             <span
-              class="cxd-TplField"
+              class="cxd-TplField fr-view"
             >
               选项二
             </span>
@@ -149,7 +149,7 @@ exports[`Renderer:breadcrumb className 1`] = `
         class="cxd-Breadcrumb-item-default itemClassName"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           当前页面
         </span>
@@ -172,6 +172,7 @@ exports[`Renderer:breadcrumb dropdown 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Breadcrumb"
@@ -184,10 +185,10 @@ exports[`Renderer:breadcrumb dropdown 1`] = `
                 href="https://baidu.gitee.com/"
               >
                 <i
-                  class="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+                  class="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
                 />
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   首页
                 </span>
@@ -205,7 +206,7 @@ exports[`Renderer:breadcrumb dropdown 1`] = `
                 class="cxd-Breadcrumb-item-default"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   上级页面
                 </span>
@@ -231,7 +232,7 @@ exports[`Renderer:breadcrumb dropdown 1`] = `
                 class="cxd-Breadcrumb-item-default"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   当前页面
                 </span>
@@ -258,6 +259,7 @@ exports[`Renderer:breadcrumb separator 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Breadcrumb"
@@ -270,10 +272,10 @@ exports[`Renderer:breadcrumb separator 1`] = `
                 href="https://baidu.gitee.com/"
               >
                 <i
-                  class="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+                  class="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
                 />
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   首页
                 </span>
@@ -291,7 +293,7 @@ exports[`Renderer:breadcrumb separator 1`] = `
                 class="cxd-Breadcrumb-item-default"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   上级页面
                 </span>
@@ -309,7 +311,7 @@ exports[`Renderer:breadcrumb separator 1`] = `
                 class="cxd-Breadcrumb-item-default"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   当前页面
                 </span>
@@ -337,6 +339,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 1`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
@@ -352,10 +355,10 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 1`] = `
                 href="https://baidu.gitee.com/"
               >
                 <i
-                  className="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+                  className="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
                 />
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 />
               </a>
             </span>
@@ -375,7 +378,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 1`] = `
                 onMouseOver={[Function]}
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   上级页面上级页面上级页面上级页面...
                 </span>
@@ -393,7 +396,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 1`] = `
                 className="cxd-Breadcrumb-item-default"
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   当前页面
                 </span>
@@ -424,6 +427,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 2`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
@@ -439,10 +443,10 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 2`] = `
                 href="https://baidu.gitee.com/"
               >
                 <i
-                  className="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+                  className="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
                 />
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 />
               </a>
             </span>
@@ -462,7 +466,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 2`] = `
                 onMouseOver={[Function]}
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   上级页面上级页面上级页面上级页面...
                 </span>
@@ -480,7 +484,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 2`] = `
                 className="cxd-Breadcrumb-item-default"
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   当前页面
                 </span>
@@ -511,6 +515,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 3`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
@@ -526,10 +531,10 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 3`] = `
                 href="https://baidu.gitee.com/"
               >
                 <i
-                  className="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+                  className="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
                 />
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 />
               </a>
             </span>
@@ -549,7 +554,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 3`] = `
                 onMouseOver={[Function]}
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   上级页面上级页面上级页面上级页面...
                 </span>
@@ -567,7 +572,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 3`] = `
                 className="cxd-Breadcrumb-item-default"
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   当前页面
                 </span>
@@ -598,6 +603,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 4`] = `
       >
         <div
           className="cxd-Page-body"
+          role="page-body"
         >
           <span
             className="cxd-Spinner-mark"
@@ -613,10 +619,10 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 4`] = `
                 href="https://baidu.gitee.com/"
               >
                 <i
-                  className="cxd-Icon fa fa-home cxd-Breadcrumb-icon"
+                  className="fa fa-home cxd-Icon cxd-Breadcrumb-icon fa fa-home"
                 />
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 />
               </a>
             </span>
@@ -636,7 +642,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 4`] = `
                 onMouseOver={[Function]}
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   上级页面上级页面上级页面上级页面...
                 </span>
@@ -654,7 +660,7 @@ exports[`Renderer:breadcrumb tooltip labelMaxLength 4`] = `
                 className="cxd-Breadcrumb-item-default"
               >
                 <span
-                  className="cxd-TplField"
+                  className="cxd-TplField fr-view"
                 >
                   当前页面
                 </span>
@@ -684,6 +690,7 @@ exports[`Renderer:breadcrumb var 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Breadcrumb"
@@ -696,7 +703,7 @@ exports[`Renderer:breadcrumb var 1`] = `
                 href="https://baidu.gitee.com/"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   首页
                 </span>
@@ -714,7 +721,7 @@ exports[`Renderer:breadcrumb var 1`] = `
                 class="cxd-Breadcrumb-item-default"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   上级页面
                 </span>
@@ -732,7 +739,7 @@ exports[`Renderer:breadcrumb var 1`] = `
                 class="cxd-Breadcrumb-item-default"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   当前页面
                 </span>

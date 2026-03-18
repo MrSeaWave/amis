@@ -1,8 +1,51 @@
-import React = require('react');
+/**
+ * 组件名称：Select 选择器
+ * 单测内容：
+ * 1. menutpl 选项自定义
+ * 2. 分组模式
+ * 3. 表格模式
+ * 4. 表格模式下自定义 labelField 与 valueField
+ * 5. 树形模式
+ * 6. 级联模式
+ * 7. 级联模式下搜索 searchable
+ * 8. 关联模式
+ * 9. 基础模式下虚拟列表
+ * 10. 分组模式下虚拟列表
+ * 11. 表格模式下虚拟列表
+ * 12. 级联模式下虚拟列表
+ * 13. 关联模式下虚拟列表
+ */
+
 import {render, screen, fireEvent, waitFor} from '@testing-library/react';
 import '../../../src';
 import {render as amisRender} from '../../../src';
-import {makeEnv, wait} from '../../helper';
+import {makeEnv, replaceReactAriaIds, wait} from '../../helper';
+
+const setup = async (items: any = {}, formOptions: any = {}) => {
+  const utils = render(
+    amisRender(
+      {
+        type: 'form',
+        api: '/api/mock2/form/saveForm',
+        body: items,
+        ...formOptions
+      },
+      {},
+      makeEnv()
+    )
+  );
+
+  const select = utils.container.querySelector(
+    '.cxd-SelectControl .cxd-TransferDropDown'
+  );
+
+  expect(select).toBeInTheDocument();
+
+  return {
+    ...utils,
+    select
+  };
+};
 
 test('Renderer:select menutpl', () => {
   const {container} = render(
@@ -41,6 +84,7 @@ test('Renderer:select menutpl', () => {
     )
   );
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -108,6 +152,7 @@ test('Renderer:select group', () => {
     )
   );
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -176,6 +221,7 @@ test('Renderer:select table', () => {
     )
   );
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -259,6 +305,7 @@ test('Renderer:select table with labelField & valueField', async () => {
   await wait(500);
   fireEvent.click(await findByText('李白'));
   await wait(500);
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 
   fireEvent.click(await findByText('Submit'));
@@ -331,6 +378,7 @@ test('Renderer:select tree', () => {
     )
   );
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -398,6 +446,7 @@ test('Renderer:select chained', () => {
     )
   );
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -468,6 +517,7 @@ test('Renderer: chained select', () => {
     )
   );
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -588,6 +638,7 @@ test('Renderer:select associated', () => {
     )
   );
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
 });
 
@@ -620,5 +671,342 @@ test('Renderer:select virtual', async () => {
   const option12 = queryByText('option12');
   expect(option12).toBeNull();
 
+  replaceReactAriaIds(container);
   expect(container).toMatchSnapshot();
+});
+
+test('Renderer:select group mode with virtual', async () => {
+  const options = [...Array(20)].map((_, i) => ({
+    label: `group-${i + 1}`,
+    children: [...Array(10)].map((_, j) => ({
+      label: `option-${i * 10 + j + 1}`,
+      value: `value-${i * 10 + j + 1}`
+    }))
+  }));
+
+  const {container, select, getByText, queryByText} = await setup([
+    {
+      label: '分组',
+      type: 'select',
+      name: 'select',
+      selectMode: 'group',
+      options: options
+    }
+  ]);
+
+  fireEvent.click(select!);
+
+  await wait(300);
+
+  expect(getByText('option-1')).toBeInTheDocument();
+  expect(await queryByText('option-200')).toBeNull();
+
+  replaceReactAriaIds(container);
+  expect(container).toMatchSnapshot();
+});
+
+test('Renderer:select table mode with virtual', async () => {
+  const options = [...Array(200)].map((_, i) => ({
+    label: `label-${i + 1}`,
+    value: i + 1
+  }));
+
+  const {container, getByText, queryByText, select} = await setup([
+    {
+      label: '表格',
+      type: 'select',
+      name: 'select',
+      options: options,
+      selectMode: 'table',
+      columns: [
+        {
+          name: 'label',
+          label: '名称'
+        },
+        {
+          name: 'value',
+          label: '值'
+        }
+      ]
+    }
+  ]);
+
+  fireEvent.click(select!);
+
+  await wait(300);
+
+  expect(getByText('label-1')).toBeInTheDocument();
+  expect(await queryByText('label-200')).toBeNull();
+
+  replaceReactAriaIds(container);
+  expect(container).toMatchSnapshot('');
+});
+
+test('Renderer:select chained mode with virtual', async () => {
+  const options = [...Array(101)].map((_, i) => ({
+    label: `group-${i + 1}`,
+    children: [...Array(101)].map((_, j) => ({
+      label: `group-${i + 1}-option-${j + 1}`,
+      value: `${i + 1}-${j + 1}`
+    }))
+  }));
+
+  const {container, getByText, queryByText, select} = await setup([
+    {
+      label: '级联',
+      type: 'select',
+      name: 'select',
+      options: options,
+      selectMode: 'chained'
+    }
+  ]);
+
+  fireEvent.click(select!);
+  await wait(300);
+  fireEvent.click(getByText('group-1'));
+
+  await wait(300);
+  expect(getByText('group-1')).toBeInTheDocument();
+  expect(await queryByText('group-100')).toBeNull();
+
+  expect(getByText('group-1-option-1')).toBeInTheDocument();
+  expect(await queryByText('group-1-option-100')).toBeNull();
+
+  replaceReactAriaIds(container);
+  expect(container).toMatchSnapshot('');
+});
+
+test('Renderer:select associated mode with virtual', async () => {
+  const leftOptions = [...Array(10)].map((_, i) => ({
+    label: `group-${i + 1}`,
+    children: [...Array(101)].map((_, j) => ({
+      label: `group-${i + 1}-option-${j + 1}`,
+      value: `${i + 1}-${j + 1}`
+    }))
+  }));
+
+  const options = [...Array(101)].map((_, i) => ({
+    label: `label-${i + 1}`,
+    value: `value-${i + 1}`
+  }));
+
+  const {container, getByText, queryByText, select} = await setup([
+    {
+      label: '级联',
+      type: 'select',
+      name: 'select',
+      selectMode: 'associated',
+      leftMode: 'list',
+      rightMode: 'table',
+      columns: [
+        {
+          name: 'label',
+          label: '名称'
+        },
+        {
+          name: 'value',
+          label: '值得'
+        }
+      ],
+      leftOptions: leftOptions,
+      options: [
+        {
+          ref: '1-1',
+          children: options
+        }
+      ]
+    }
+  ]);
+
+  fireEvent.click(select!);
+  await wait(300);
+  fireEvent.click(getByText('group-1-option-1'));
+  await wait(300);
+
+  expect(getByText('group-1-option-1')).toBeInTheDocument();
+  expect(await queryByText('group-10-option-1')).toBeNull();
+
+  expect(getByText('label-1')).toBeInTheDocument();
+  expect(await queryByText('label-100')).toBeNull();
+
+  replaceReactAriaIds(container);
+  expect(container).toMatchSnapshot('');
+});
+
+test('Renderer:select value contains delimiter when single', async () => {
+  const {container} = render(
+    amisRender({
+      type: 'page',
+      body: {
+        type: 'form',
+        body: [
+          {
+            label: '单选不分割',
+            type: 'select',
+            name: 'select',
+            value: 'a,b',
+            options: [
+              {
+                label: 'ALabel',
+                value: 'a,b'
+              },
+              {
+                label: 'BLabel',
+                value: 'b'
+              },
+              {
+                label: 'CLabel',
+                value: 'c'
+              },
+              {
+                label: 'DLabel',
+                value: 'd'
+              }
+            ]
+          }
+        ]
+      }
+    })
+  );
+
+  expect(
+    container.querySelector('.cxd-Select-valueWrap .cxd-Select-value')!
+      .innerHTML
+  ).toEqual('ALabel');
+});
+
+test('should call the user filterOption if it is provided', async () => {
+  const filterOption = jest.fn().mockImplementation(options => options);
+  const options = [
+    {
+      label: 'label1',
+      value: 'value1',
+      comment: 'comment1'
+    },
+    {
+      label: 'label2',
+      value: 'value2',
+      comment: 'comment2'
+    }
+  ];
+
+  const {debug} = render(
+    amisRender(
+      {
+        type: 'select',
+        name: 'select',
+        searchable: true,
+        filterOption,
+        options
+      },
+      {},
+      makeEnv()
+    )
+  );
+
+  const select = screen.getByText('请选择');
+  fireEvent.click(select);
+  fireEvent.change(screen.getByPlaceholderText('搜索'), {
+    target: {value: 'comment'}
+  });
+
+  expect(filterOption).toBeCalled();
+  expect(filterOption).toBeCalledWith(options, 'comment', {
+    keys: ['label', 'value']
+  });
+});
+
+test('should call the string style user filterOption if it is provided', async () => {
+  const options = [
+    {
+      label: 'label1',
+      value: 'value1',
+      comment: 'comment1'
+    },
+    {
+      label: 'label2',
+      value: 'value2',
+      comment: 'comment2'
+    }
+  ];
+
+  const {debug} = render(
+    amisRender(
+      {
+        type: 'select',
+        name: 'select',
+        searchable: true,
+        filterOption: "return [{label: 'label3', value: 'value3'}]",
+        options
+      },
+      {},
+      makeEnv()
+    )
+  );
+
+  const select = screen.getByText('请选择');
+  fireEvent.click(select);
+  fireEvent.change(screen.getByPlaceholderText('搜索'), {
+    target: {value: 'comment'}
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText('label3')).toBeInTheDocument();
+  });
+});
+
+test('Choose default search results should be more relevant', async () => {
+  const options = [
+    {
+      label: 'Display in the top right corner of the list',
+      value: 'list'
+    },
+    {
+      label:
+        'Displayed in the top right corner of the record viewing page and in the drop-down menu for each item in the list view',
+      value: 'record'
+    },
+    {
+      label:
+        'Displayed in the "More" dropdown menu in the upper right corner of the record viewing page, as well as in the dropdown menu for each item in the list view',
+      value: 'record_more'
+    },
+    {
+      label: 'Display in the drop-down menu for each item in the list view',
+      value: 'list_item'
+    },
+    {
+      label: 'Displayed in the upper right corner of the record viewing page',
+      value: 'record_only'
+    },
+    {
+      label:
+        'Displayed in the "More" drop-down menu in the upper right corner of the record viewing page',
+      value: 'record_only_more'
+    }
+  ];
+
+  const {container} = render(
+    amisRender(
+      {
+        type: 'select',
+        name: 'select',
+        searchable: true,
+        options
+      },
+      {},
+      makeEnv()
+    )
+  );
+
+  const select = screen.getByText('请选择');
+  fireEvent.click(select);
+
+  expect(container.querySelectorAll('[role="option"]').length).toBe(6);
+
+  fireEvent.change(screen.getByPlaceholderText('搜索'), {
+    target: {value: 'more'}
+  });
+
+  expect(container.querySelectorAll('[role="option"]').length).toBe(2);
 });

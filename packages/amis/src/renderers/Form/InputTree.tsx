@@ -1,7 +1,12 @@
 import React from 'react';
+import omit from 'lodash/omit';
+import debounce from 'lodash/debounce';
 import cx from 'classnames';
-import {Tree as TreeSelector} from 'amis-ui';
+import {matchSorter} from 'match-sorter';
+import {SpinnerExtraProps, Tree as TreeSelector} from 'amis-ui';
+import {value2array} from 'amis-ui/lib/components/Select';
 import {
+  Option,
   OptionsControl,
   OptionsControlProps,
   autobind,
@@ -9,17 +14,36 @@ import {
   ActionObject,
   isPureVariable,
   resolveVariableAndFilter,
-  resolveEventData
+  resolveEventData,
+  findTreeIndex,
+  hasAbility,
+  findTree,
+  isEffectiveApi,
+  BaseApiObject,
+  getVariable,
+  setThemeClassName,
+  CustomStyle,
+  AMISFormItemWithOptions,
+  AMISSchemaCollection
 } from 'amis-core';
-import {Spinner} from 'amis-ui';
+import {Spinner, SearchBox} from 'amis-ui';
 import {FormOptionsSchema, SchemaApi} from '../../Schema';
 import {supportStatic} from './StaticHoc';
+import type {ItemRenderStates} from 'amis-ui/lib/components/Selection';
+
+type NodeBehaviorType = 'unfold' | 'check';
 
 /**
  * Tree 下拉选择框。
- * 文档：https://baidu.gitee.io/amis/docs/components/form/tree
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/tree
  */
-export interface TreeControlSchema extends FormOptionsSchema {
+/**
+ * Tree 下拉选择框，用于在表单中以树形结构展示和选择数据，支持多选、搜索、级联选择等功能。
+ */
+export interface AMISInputTreeSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 tree 组件
+   */
   type: 'input-tree';
 
   /**
@@ -43,21 +67,27 @@ export interface TreeControlSchema extends FormOptionsSchema {
   showIcon?: boolean;
 
   /**
-   * ui级联关系，true代表级联选中，false代表不级联，默认为true
+   * ui级联关系
    */
   autoCheckChildren?: boolean;
 
   /**
-   * 该属性代表数据级联关系，autoCheckChildren为true时生效，默认为false，具体数据级联关系如下：
-   * 1.casacde为false，ui行为为级联选中子节点，子节点禁用；值只包含父节点的值
-   * 2.cascade为false，withChildren为true，ui行为为级联选中子节点，子节点禁用；值包含父子节点的值
-   * 3.cascade为true，ui行为级联选中子节点，子节点可反选，值包含父子节点的值，此时withChildren属性失效
-   * 4.cascade不论为true还是false，onlyChildren为true，ui行为级联选中子节点，子节点可反选，值只包含子节点的值
+   * 数据级联关系
    */
   cascade?: boolean;
 
   /**
-   * 选父级的时候是否把子节点的值也包含在内。
+   * 节点行为配置
+   */
+  nodeBehavior?: NodeBehaviorType[];
+
+  /**
+   * 子节点取消时自动取消父节点的值
+   */
+  autoCancelParent?: boolean;
+
+  /**
+   * 选父级的时候是否把子节点的值也包含在内
    */
   withChildren?: boolean;
 
@@ -72,7 +102,7 @@ export interface TreeControlSchema extends FormOptionsSchema {
   onlyLeaf?: boolean;
 
   /**
-   * 顶级节点是否可以创建子节点
+   * 顶级节点是否可创建子节点
    */
   rootCreatable?: boolean;
 
@@ -91,31 +121,117 @@ export interface TreeControlSchema extends FormOptionsSchema {
    */
   showOutline?: boolean;
 
+  /**
+   * 懒加载接口
+   */
   deferApi?: SchemaApi;
 
   /**
    * 需要高亮的字符串
    */
   highlightTxt?: string;
+
+  /**
+   * 是否为选项添加默认的Icon，默认值为true
+   */
+  enableDefaultIcon?: boolean;
+
+  /**
+   * 是否开启搜索
+   */
+  searchable?: boolean;
+
+  /**
+   * 搜索 API
+   */
+  searchApi?: SchemaApi;
+
+  /**
+   * 自定义节点操作栏区域
+   */
+  itemActions?: AMISSchemaCollection;
+
+  /**
+   * 搜索框的配置
+   */
+  searchConfig?: {
+    /**
+     * 搜索框外层CSS样式类
+     */
+    className?: string;
+    /**
+     * 占位符
+     */
+    placeholder?: string;
+
+    /**
+     * 是否为 Mini 样式。
+     */
+    mini?: boolean;
+
+    /**
+     * 是否为加强样式
+     */
+    enhance?: boolean;
+
+    /**
+     * 是否可清除
+     */
+    clearable?: boolean;
+
+    /**
+     * 是否立马搜索。
+     */
+    searchImediately?: boolean;
+
+    /**
+     * 搜索框是否吸顶
+     */
+    sticky?: boolean;
+  };
+
+  /**
+   * tree 组件层类名
+   */
+  treeClassName?: string;
+
+  /**
+   * 高度自动增长？
+   */
+  heightAuto?: boolean;
+
+  /**
+   * 设置 icon 字段名
+   */
+  iconField?: string;
 }
 
 export interface TreeProps
   extends OptionsControlProps,
     Omit<
-      TreeControlSchema,
+      AMISInputTreeSchema,
       | 'type'
       | 'options'
       | 'className'
       | 'inputClassName'
       | 'descriptionClassName'
-    > {
+      | 'deferApi'
+    >,
+    SpinnerExtraProps {
   enableNodePath?: boolean;
   pathSeparator?: string;
+  mobileUI?: boolean;
 }
 
-export default class TreeControl extends React.Component<TreeProps> {
+interface TreeState {
+  filteredOptions: Option[];
+  keyword: string;
+  allowSearch: boolean;
+}
+
+export default class TreeControl extends React.Component<TreeProps, TreeState> {
   static defaultProps: Partial<TreeProps> = {
-    placeholder: 'loading',
+    placeholder: 'placeholder.noData',
     multiple: false,
     rootLabel: 'Tree.root',
     rootValue: '',
@@ -125,33 +241,192 @@ export default class TreeControl extends React.Component<TreeProps> {
   };
   treeRef: any;
 
-  reload() {
+  constructor(props: TreeProps) {
+    super(props);
+    this.state = {
+      keyword: '',
+      filteredOptions: this.props.options ?? [],
+      allowSearch: false
+    };
+    this.handleSearch = debounce(this.handleSearch.bind(this), 250, {
+      trailing: true,
+      leading: false
+    });
+  }
+
+  componentDidUpdate(prevProps: TreeProps) {
+    const props = this.props;
+    const keyword = this.state.keyword;
+
+    if (
+      prevProps.options !== props.options ||
+      prevProps.searchable !== props.searchable
+    ) {
+      const {options, searchable} = props;
+
+      this.setState({
+        filteredOptions:
+          searchable && keyword ? this.filterOptions(options, keyword) : options
+      });
+    }
+  }
+
+  reload(subpath?: string, query?: any) {
     const reload = this.props.reloadOptions;
-    reload && reload();
+    reload && reload(subpath, query);
   }
 
   doAction(action: ActionObject, data: any, throwErrors: boolean) {
     const actionType = action?.actionType as string;
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name} = this.props;
 
     if (actionType === 'clear') {
       onChange?.('');
     } else if (actionType === 'reset') {
-      onChange?.(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange?.(pristineVal ?? '');
     } else if (action.actionType === 'expand') {
-      this.treeRef.syncUnFolded(this.props, action.args?.openLevel);
+      this.treeRef.setFoldedOrUnfolded(action.args?.openLevel);
     } else if (action.actionType === 'collapse') {
-      this.treeRef.syncUnFolded(this.props, 1);
+      this.treeRef.setFoldedOrUnfolded(action.args?.closeLevel || 0, true);
+    } else if (action.actionType === 'add') {
+      this.addItemFromAction(action.args?.item, action.args?.parentValue);
+    } else if (action.actionType === 'edit') {
+      this.editItemFromAction(action.args?.item, action.args?.originValue);
+    } else if (action.actionType === 'delete') {
+      this.deleteItemFromAction(action.args?.value);
+    } else if (action.actionType === 'reload') {
+      this.reload();
+    } else if (actionType === 'search') {
+      this.setState({
+        allowSearch: !!action.args?.keyword
+      });
+      this.handleSearch(action.args?.keyword);
     }
+  }
+
+  /**
+   * @deprecated 不推荐使用，没考虑 jointValues false，没考虑多选
+   * @param options
+   * @param value
+   * @returns
+   */
+  resolveOption(options: Array<Option>, value: any) {
+    return findTree(options, item => {
+      const valueAbility = this.props.valueField || 'value';
+      const itemValue = hasAbility(item, valueAbility)
+        ? item[valueAbility]
+        : '';
+      return itemValue === value;
+    });
+  }
+
+  @autobind
+  addItemFromAction(item: Option, parentValue?: any) {
+    const {onAdd, options, valueField} = this.props;
+    const idxes =
+      findTreeIndex(options, item => {
+        const valueAbility = valueField || 'value';
+        const value = hasAbility(item, valueAbility) ? item[valueAbility] : '';
+        return value === parentValue;
+      }) || [];
+    onAdd && onAdd(idxes.concat(0), item, true);
+  }
+
+  @autobind
+  editItemFromAction(item: Option, originValue: any) {
+    const {onEdit, options} = this.props;
+    const editItem = this.resolveOption(options, originValue);
+    onEdit && editItem && onEdit({...item, originValue}, editItem, true);
+  }
+
+  @autobind
+  deleteItemFromAction(value: any) {
+    const {onDelete, options} = this.props;
+    const deleteItem = this.resolveOption(options, value);
+    onDelete && deleteItem && onDelete(deleteItem);
+  }
+
+  filterOptions(options: Array<Option>, keywords: string): Array<Option> {
+    const {labelField, valueField} = this.props;
+
+    return options.map(option => {
+      option = {
+        ...option
+      };
+      option.visible = !!matchSorter([option], keywords, {
+        keys: [labelField || 'label', valueField || 'value'],
+        threshold: matchSorter.rankings.CONTAINS
+      }).length;
+
+      if (!option.visible && option.children) {
+        option.children = this.filterOptions(option.children, keywords);
+        const visibleCount = option.children.filter(
+          item => item.visible
+        ).length;
+        option.visible = !!visibleCount;
+      }
+
+      option.visible && (option.collapsed = false);
+      return option;
+    });
   }
 
   @autobind
   async handleChange(value: any) {
-    const {onChange, dispatchEvent} = this.props;
+    const {
+      onChange,
+      searchable,
+      options,
+      dispatchEvent,
+      multiple,
+      delimiter,
+      valueField,
+      selectedOptions: originSelectedItems,
+      joinValues,
+      extractValue
+    } = this.props;
+    const {filteredOptions, allowSearch} = this.state;
+    const items = searchable || allowSearch ? filteredOptions : options;
+
+    const selectedItems = value2array(value, {
+      multiple,
+      delimiter,
+      valueField,
+      options: filteredOptions
+    });
+    const item = multiple ? null : selectedItems[0];
+
+    // 如果是搜索模式，有可能已经选择的值被过滤掉了，如果值发生了变化
+    // 不应该让原来选中的值丢失
+    // https://github.com/baidu/amis/issues/9946
+    if (multiple && (searchable || allowSearch) && originSelectedItems.length) {
+      originSelectedItems.forEach(origin => {
+        const exists = findTree(
+          filteredOptions,
+          item => item[valueField || 'value'] === origin[valueField || 'value']
+        );
+        if (!exists) {
+          selectedItems.push(origin);
+        }
+      });
+      value = selectedItems.map(item =>
+        extractValue || joinValues ? item[valueField || 'value'] : item
+      );
+      if (joinValues) {
+        value = value.join(delimiter || ',');
+      }
+    }
 
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value}, 'value')
+      resolveEventData(this.props, {
+        value,
+        item,
+        items,
+        selectedItems
+      })
     );
 
     if (rendererEvent?.prevented) {
@@ -159,6 +434,59 @@ export default class TreeControl extends React.Component<TreeProps> {
     }
 
     onChange && onChange(value);
+  }
+
+  @autobind
+  async handleNodeClick(item: any) {
+    const {dispatchEvent, data} = this.props;
+
+    const rendererEvent = await dispatchEvent(
+      'itemClick',
+      createObject(data, {item})
+    );
+
+    if (rendererEvent?.prevented) {
+      return;
+    }
+  }
+
+  async handleSearch(keyword: string) {
+    const {searchApi, options, env, data, translate: __} = this.props;
+
+    let filterOptions: Array<Option> = [];
+
+    if (isEffectiveApi(searchApi)) {
+      try {
+        const payload = await env.fetcher(
+          searchApi,
+          createObject(data, {term: keyword})
+        );
+
+        if (!payload.ok) {
+          throw new Error(__(payload.msg || 'networkError'));
+        }
+
+        const result =
+          payload.data.options || payload.data.items || payload.data;
+        if (!Array.isArray(result)) {
+          throw new Error(__('Tree.invalidArray'));
+        }
+
+        filterOptions = result;
+      } catch (e) {
+        if (!env.isCancel(e)) {
+          !(searchApi as BaseApiObject).silent &&
+            env.notify('error', e.message);
+        }
+      }
+    } else if (keyword) {
+      filterOptions = this.filterOptions(options, keyword);
+    }
+
+    this.setState({
+      keyword,
+      filteredOptions: keyword ? filterOptions : options
+    });
   }
 
   @autobind
@@ -177,6 +505,42 @@ export default class TreeControl extends React.Component<TreeProps> {
     } else if (maxLength && curValue.length > maxLength) {
       return `已选择数量超出设定的最大个数${maxLength}，请取消选择超出的选项。`;
     }
+  }
+
+  @autobind
+  renderOptionItem(option: Option, states: ItemRenderStates) {
+    const {menuTpl, render, data} = this.props;
+
+    return render(`option/${states.index}`, menuTpl, {
+      data: createObject(createObject(data, {...states}), option)
+    });
+  }
+
+  @autobind
+  renderItemActions(option: Option, states: any) {
+    const {itemActions, data, render} = this.props;
+
+    return render(`action/${states.index}`, itemActions || '', {
+      data: createObject(createObject(data, {...states}), option)
+    });
+  }
+
+  @autobind
+  renderSearch() {
+    const {classPrefix: ns, searchConfig, mobileUI, testIdBuilder} = this.props;
+    return (
+      <SearchBox
+        className={cx(`${ns}TreeControl-searchbox`, searchConfig?.className, {
+          'is-sticky': searchConfig?.sticky
+        })}
+        mini={false}
+        clearable={true}
+        {...omit(searchConfig, 'className', 'sticky')}
+        onSearch={this.handleSearch}
+        mobileUI={mobileUI}
+        testIdBuilder={testIdBuilder?.getChild('search')}
+      />
+    );
   }
 
   @supportStatic()
@@ -205,6 +569,7 @@ export default class TreeControl extends React.Component<TreeProps> {
       hideRoot,
       rootLabel,
       autoCheckChildren,
+      autoCancelParent,
       cascade,
       rootValue,
       showIcon,
@@ -212,10 +577,12 @@ export default class TreeControl extends React.Component<TreeProps> {
       showOutline,
       onAdd,
       creatable,
+      createMaxLength,
       createTip,
       addControls,
       onEdit,
       editable,
+      editMaxLength,
       editTip,
       editControls,
       removable,
@@ -225,75 +592,148 @@ export default class TreeControl extends React.Component<TreeProps> {
       rootCreateTip,
       labelField,
       iconField,
+      deferField,
       nodePath,
       deferLoad,
       expandTreeOptions,
       translate: __,
-      data
+      data,
+      virtualThreshold,
+      loadingConfig,
+      menuTpl,
+      enableDefaultIcon,
+      searchable,
+      searchConfig = {},
+      heightAuto,
+      mobileUI,
+      testIdBuilder,
+      nodeBehavior,
+      itemActions,
+      id,
+      wrapperCustomStyle,
+      themeCss,
+      env,
+      treeClassName
     } = this.props;
     let {highlightTxt} = this.props;
+    const {filteredOptions, keyword, allowSearch} = this.state;
 
     if (isPureVariable(highlightTxt)) {
       highlightTxt = resolveVariableAndFilter(highlightTxt, data);
     }
 
-    return (
-      <div
-        className={cx(`${ns}TreeControl`, className, treeContainerClassName)}
-      >
-        <Spinner size="sm" key="info" show={loading} />
-        {loading ? null : (
-          <TreeSelector
-            classPrefix={ns}
-            onRef={this.domRef}
-            labelField={labelField}
-            valueField={valueField}
-            iconField={iconField}
-            disabled={disabled}
-            onChange={this.handleChange}
-            joinValues={joinValues}
-            extractValue={extractValue}
-            delimiter={delimiter}
-            placeholder={__(placeholder)}
-            options={options}
-            highlightTxt={highlightTxt}
-            multiple={multiple}
-            initiallyOpen={initiallyOpen}
-            unfoldedLevel={unfoldedLevel}
-            withChildren={withChildren}
-            onlyChildren={onlyChildren}
-            onlyLeaf={onlyLeaf}
-            hideRoot={hideRoot}
-            rootLabel={__(rootLabel)}
-            rootValue={rootValue}
-            showIcon={showIcon}
-            showRadio={showRadio}
-            showOutline={showOutline}
-            autoCheckChildren={autoCheckChildren}
-            cascade={cascade}
-            foldedField="collapsed"
-            value={value || ''}
-            nodePath={nodePath}
-            enableNodePath={enableNodePath}
-            pathSeparator={pathSeparator}
-            selfDisabledAffectChildren={false}
-            onAdd={onAdd}
-            creatable={creatable}
-            createTip={createTip}
-            rootCreatable={rootCreatable}
-            rootCreateTip={rootCreateTip}
-            onEdit={onEdit}
-            editable={editable}
-            editTip={editTip}
-            removable={removable}
-            removeTip={removeTip}
-            onDelete={onDelete}
-            bultinCUD={!addControls && !editControls}
-            onDeferLoad={deferLoad}
-            onExpandTree={expandTreeOptions}
-          />
+    const TreeCmpt = (
+      <TreeSelector
+        className={treeClassName}
+        classPrefix={ns}
+        onRef={this.domRef}
+        labelField={labelField}
+        valueField={valueField}
+        iconField={iconField}
+        deferField={deferField}
+        disabled={disabled}
+        onChange={this.handleChange}
+        onHandleNodeClick={this.handleNodeClick}
+        joinValues={joinValues}
+        extractValue={extractValue}
+        delimiter={delimiter}
+        placeholder={__(placeholder)}
+        options={searchable || allowSearch ? filteredOptions : options}
+        highlightTxt={searchable || allowSearch ? keyword : highlightTxt}
+        multiple={multiple}
+        initiallyOpen={initiallyOpen}
+        unfoldedLevel={unfoldedLevel}
+        withChildren={withChildren}
+        onlyChildren={onlyChildren}
+        onlyLeaf={onlyLeaf}
+        hideRoot={hideRoot}
+        rootLabel={__(rootLabel)}
+        rootValue={rootValue}
+        showIcon={showIcon}
+        showRadio={showRadio}
+        showOutline={showOutline}
+        autoCheckChildren={autoCheckChildren}
+        autoCancelParent={autoCancelParent}
+        cascade={cascade}
+        foldedField="collapsed"
+        value={value || ''}
+        nodePath={nodePath}
+        enableNodePath={enableNodePath}
+        pathSeparator={pathSeparator}
+        selfDisabledAffectChildren={false}
+        onAdd={onAdd}
+        creatable={creatable}
+        createMaxLength={createMaxLength}
+        createTip={createTip}
+        rootCreatable={rootCreatable}
+        rootCreateTip={rootCreateTip}
+        onEdit={onEdit}
+        editable={editable}
+        editMaxLength={editMaxLength}
+        editTip={editTip}
+        removable={removable}
+        removeTip={removeTip}
+        onDelete={onDelete}
+        bultinCUD={!addControls && !editControls}
+        onDeferLoad={deferLoad}
+        onExpandTree={expandTreeOptions}
+        virtualThreshold={virtualThreshold}
+        itemRender={menuTpl ? this.renderOptionItem : undefined}
+        enableDefaultIcon={enableDefaultIcon}
+        mobileUI={mobileUI}
+        nodeBehavior={nodeBehavior}
+        itemActionsRender={itemActions ? this.renderItemActions : undefined}
+        actionClassName={cx(
+          setThemeClassName({
+            ...this.props,
+            name: 'actionControlClassName',
+            id,
+            themeCss
+          })
         )}
-      </div>
+        testIdBuilder={testIdBuilder?.getChild('tree')}
+      />
+    );
+
+    return (
+      <>
+        <div
+          className={cx(`${ns}TreeControl`, className, treeContainerClassName, {
+            'is-sticky': searchable && searchConfig?.sticky,
+            'h-auto': heightAuto
+          })}
+          {...testIdBuilder?.getChild('control').getTestId()}
+        >
+          {loading ? null : searchable ? (
+            <>
+              {this.renderSearch()}
+              {TreeCmpt}
+            </>
+          ) : (
+            TreeCmpt
+          )}
+          <Spinner
+            size="sm"
+            key="info"
+            show={loading}
+            loadingConfig={loadingConfig}
+          />
+        </div>
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'actionControlClassName'
+              }
+            ]
+          }}
+          env={env}
+        />
+      </>
     );
   }
 }

@@ -5,7 +5,6 @@
 import React from 'react';
 import hoistNonReactStatic from 'hoist-non-react-statics';
 import debounce from 'lodash/debounce';
-import {withStore} from './WithStore';
 
 import {flow, Instance, isAlive, types} from 'mobx-state-tree';
 import {
@@ -17,9 +16,11 @@ import {
 } from 'amis-core';
 import type {RendererEnv} from 'amis-core';
 import {isPureVariable, resolveVariableAndFilter, tokenize} from 'amis-core';
-import {reaction} from 'mobx';
+import {reaction, comparer} from 'mobx';
 import {createObject, findTreeIndex, isObject} from 'amis-core';
 import {Api, ApiObject, Payload} from 'amis-core';
+
+import {withStore} from './WithStore';
 
 export const Store = types
   .model('RemoteConfigStore')
@@ -31,6 +32,7 @@ export const Store = types
   })
   .actions(self => {
     let component: any = undefined;
+    let fetchCancel: Function | null = null;
 
     const load = flow(function* (
       env: RendererEnv,
@@ -39,8 +41,22 @@ export const Store = types
       config: WithRemoteConfigSettings = {}
     ): any {
       try {
+        if (fetchCancel) {
+          fetchCancel?.('remote load request cancelled.');
+          fetchCancel = null;
+          self.fetching = false;
+        }
+
+        if (self.fetching) {
+          return;
+        }
+
         self.fetching = true;
-        const ret: Payload = yield env.fetcher(api, ctx);
+        const ret: Payload = yield env.fetcher(api, ctx, {
+          cancelExecutor: (executor: Function) => (fetchCancel = executor)
+        });
+        fetchCancel = null;
+
         if (!isAlive(self)) {
           return;
         }
@@ -105,6 +121,7 @@ export interface OutterProps {
       | {
           loadConfig: (ctx?: any) => Promise<any> | void;
           setConfig: (value: any) => void;
+          syncConfig: () => void;
         }
       | undefined
   ) => void;
@@ -200,7 +217,6 @@ export function withRemoteConfig<P = any>(
             ComposedComponent as React.ComponentType<T>;
           static contextType = EnvContext;
           toDispose: Array<() => void> = [];
-
           loadOptions = debounce(this.loadAutoComplete.bind(this), 250, {
             trailing: true,
             leading: false
@@ -214,6 +230,7 @@ export function withRemoteConfig<P = any>(
             super(props);
 
             this.setConfig = this.setConfig.bind(this);
+            this.childRef = this.childRef.bind(this);
             props.store.setComponent(this);
             this.deferLoadConfig = this.deferLoadConfig.bind(this);
             props.remoteConfigRef?.(this);
@@ -222,7 +239,8 @@ export function withRemoteConfig<P = any>(
           }
 
           componentDidMount() {
-            const env: RendererEnv = this.props.env || this.context;
+            const env: RendererEnv =
+              this.props.env || (this.context as RendererEnv);
             const {store, data} = this.props;
             const source = (this.props as any)[config.sourceField || 'source'];
 
@@ -235,7 +253,11 @@ export function withRemoteConfig<P = any>(
                       store.data,
                       '| raw'
                     ),
-                  () => this.syncConfig()
+                  () => this.syncConfig(),
+                  // 当nav配置source: "${amisStore.app.portalNavs}"时，切换页面就会触发source更新
+                  // 因此这里增加这个配置 数据源完全不相等情况下再执行loadConfig
+                  // 否则数据源重置 保存不了展开状态 就会始终是手风琴模式了
+                  {equals: comparer.structural}
                 )
               );
             } else if (env && isEffectiveApi(source, data)) {
@@ -274,17 +296,27 @@ export function withRemoteConfig<P = any>(
           }
 
           async loadConfig(ctx = this.props.data) {
-            const env: RendererEnv = this.props.env || this.context;
-            const {store} = this.props;
-            const source = (this.props as any)[config.sourceField || 'source'];
-
+            const env: RendererEnv =
+              this.props.env || (this.context as RendererEnv);
+            const {store, data} = this.props;
+            let source = (this.props as any)[config.sourceField || 'source'];
+            // source: ${nav}、source: ${online ? '/api/v1' : '/api/v2'}
+            // 如果是配置source: ${nav} isEffectiveApi也会认为是api 发出一个无效请求
+            if (isPureVariable(source)) {
+              source = resolveVariableAndFilter(
+                source as string,
+                data,
+                '| raw'
+              );
+            }
             if (env && isEffectiveApi(source, ctx)) {
               await store.load(env, source, ctx, config);
             }
           }
 
           loadAutoComplete(input: string) {
-            const env: RendererEnv = this.props.env || this.context;
+            const env: RendererEnv =
+              this.props.env || (this.context as RendererEnv);
             const {autoComplete, data, store} = this.props;
 
             if (!env || !env.fetcher) {
@@ -312,15 +344,17 @@ export function withRemoteConfig<P = any>(
 
           syncConfig() {
             const {store, data} = this.props;
-            const source = (this.props as any)[config.sourceField || 'source'];
+            let source = (this.props as any)[config.sourceField || 'source'];
 
             if (isPureVariable(source)) {
-              store.setConfig(
-                resolveVariableAndFilter(source as string, data, '| raw') || [],
-                config,
-                'syncConfig'
-              );
-            } else if (isObject(source) && !isEffectiveApi(source, data)) {
+              source =
+                resolveVariableAndFilter(source as string, data, '| raw') || [];
+              if (isEffectiveApi(source, data)) {
+                this.loadConfig();
+              } else {
+                store.setConfig(source, config, 'syncConfig');
+              }
+            } else if (isObject(source) && !source.method) {
               store.setConfig(source, config, 'syncConfig');
             }
           }
@@ -328,7 +362,8 @@ export function withRemoteConfig<P = any>(
           async deferLoadConfig(item: any) {
             const {store, data, deferApi} = this.props;
             const source = (this.props as any)[config.sourceField || 'source'];
-            const env: RendererEnv = this.props.env || this.context;
+            const env: RendererEnv =
+              this.props.env || (this.context as RendererEnv);
             const indexes = findTreeIndex(store.config, a => a === item)!;
 
             const ret = config.beforeDeferLoad?.(
@@ -357,7 +392,7 @@ export function withRemoteConfig<P = any>(
                 data: undefined
               };
             }
-            const ret2 = config.afterDeferLoad?.(
+            const ret2 = await config.afterDeferLoad?.(
               item,
               indexes, // 只能假定还是那个 index 了
               response,
@@ -367,9 +402,24 @@ export function withRemoteConfig<P = any>(
             ret2 && store.setConfig(ret2, config, 'after-defer-load');
           }
 
+          ref: any;
+
+          childRef(ref: any) {
+            while (ref && ref.getWrappedInstance) {
+              ref = ref.getWrappedInstance();
+            }
+
+            this.ref = ref;
+          }
+
+          getWrappedInstance() {
+            return this.ref;
+          }
+
           render() {
             const store = this.props.store;
-            const env: RendererEnv = this.props.env || this.context;
+            const env: RendererEnv =
+              this.props.env || (this.context as RendererEnv);
             const injectedProps: RemoteOptionsProps<P> = {
               config: store.config,
               loading: store.fetching,
@@ -377,6 +427,12 @@ export function withRemoteConfig<P = any>(
               updateConfig: this.setConfig
             };
             const {remoteConfigRef, autoComplete, ...rest} = this.props;
+            const refConfig =
+              ComposedComponent.prototype?.isReactComponent ||
+              (ComposedComponent as any).$$typeof ===
+                Symbol.for('react.forward_ref')
+                ? {ref: this.childRef}
+                : {forwardedRef: this.childRef};
 
             return (
               <ComposedComponent
@@ -390,6 +446,7 @@ export function withRemoteConfig<P = any>(
                 {...(config.injectedPropsFilter
                   ? config.injectedPropsFilter(injectedProps, this.props)
                   : injectedProps)}
+                {...refConfig}
               />
             );
           }

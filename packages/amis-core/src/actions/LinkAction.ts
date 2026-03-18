@@ -34,8 +34,18 @@ export class LinkAction implements RendererAction {
     renderer: ListenerContext,
     event: RendererEvent<any>
   ) {
-    if (!renderer.props.env?.jumpTo) {
+    if (!event.context.env?.jumpTo) {
       throw new Error('env.jumpTo is required!');
+    }
+
+    let apiParams = {
+      ...(action.args?.params ?? {}),
+      ...(action.data ?? {})
+    };
+
+    if (action?.actionType === 'link' && apiParams?.targetType) {
+      // link动作新增打开方式targetType，buildApi不需要该参数
+      delete apiParams.targetType;
     }
 
     // 通过buildApi兼容较复杂的url情况
@@ -44,16 +54,13 @@ export class LinkAction implements RendererAction {
         url: (action.args?.url || action.args?.link) as string,
         method: 'get'
       },
-      {
-        ...(action.args?.params ?? {}),
-        ...(action.data ?? {})
-      },
+      apiParams,
       {
         autoAppend: true
       }
     );
 
-    renderer.props.env.jumpTo(
+    event.context.env?.jumpTo(
       urlObj.url,
       {
         actionType: action.actionType,

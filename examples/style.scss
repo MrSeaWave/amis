@@ -1,3 +1,4 @@
+@use 'sass:color';
 @import 'node_modules/amis-ui/scss/mixins';
 @import 'node_modules/amis-ui/scss/functions';
 @import 'node_modules/amis-ui/scss/variables';
@@ -5,14 +6,14 @@
 body {
   background-color: #fff !important;
   &.dark {
-    background-color: #333538 !important;
-
+    background-color: var(--colors-neutral-fill-11) !important;
     pre {
       color: #fff;
     }
 
     .markdown-body {
-      color: #fff;
+      color: rgb(100 116 139 / 1);
+      background-color: var(--colors-neutral-fill-11) !important;
     }
   }
 }
@@ -55,7 +56,7 @@ body {
   bottom: 0;
   margin-left: -2px;
   width: 4px;
-  background: lighten($dark, 20%);
+  background: color.adjust($dark, $lightness: 20%);
   z-index: 1;
   cursor: col-resize;
 
@@ -140,10 +141,10 @@ body {
         right: 20px;
         top: 15px;
         font-size: 22px;
-        color: #333;
+        color: var(--colors-neutral-text-3);
 
         &:hover {
-          color: #333;
+          color: var(--colors-neutral-text-3);
         }
       }
     }
@@ -210,7 +211,7 @@ body {
         display: inline-block;
         padding: 20px;
         cursor: pointer;
-        color: #666;
+        color: var(--colors-neutral-text-3);
 
         > svg {
           width: 14px;
@@ -282,10 +283,11 @@ body {
 
   > a {
     display: inline-block;
-    color: #333;
+    color: var(--colors-neutral-text-3);
     padding: 0px 5px;
     margin: 0 5px;
     font-weight: 500;
+    line-height: inherit;
     text-decoration: none;
 
     &:hover,
@@ -293,6 +295,8 @@ body {
       color: var(--primary);
       position: relative;
       text-decoration: none;
+      font-weight: 500;
+      line-height: inherit;
 
       &::before {
         content: '';
@@ -331,7 +335,7 @@ body {
 
   a.anchor {
     padding-top: 100px;
-    margin-top: -100px;
+    margin-top: -94px;
   }
 
   &-nav,
@@ -491,9 +495,13 @@ body {
         color: #666;
         cursor: pointer;
         text-decoration: none !important;
+        font-size: 12px;
+        font-weight: 500;
 
         &:hover {
           color: #333;
+          font-size: 12px;
+          font-weight: 500;
         }
       }
 
@@ -816,6 +824,10 @@ body {
   }
 }
 
+.schema-wrapper {
+  display: flex;
+}
+
 @include media-breakpoint-up(lg) {
   .Doc {
     display: flex;
@@ -842,7 +854,7 @@ body {
       position: fixed;
       width: 200px;
       top: 100px;
-      bottom: 0;
+      bottom: 25px;
       overflow-y: auto;
       overflow-x: hidden;
       border-right: 1px solid #e8ebee;
@@ -942,15 +954,22 @@ body {
 
   .search-bar {
     padding: 22px 20px;
-    border: 0;
     border-bottom: 1px solid #e8ebee;
     border-radius: 0;
     font-size: 16px;
     font-weight: 500;
+    display: flex;
 
     > .icon-search {
       margin-right: 10px;
       top: 1px;
+    }
+    > input {
+      flex-basis: 1.875rem;
+      flex-grow: 1;
+      border: none;
+      outline: none;
+      width: 100%;
     }
   }
 

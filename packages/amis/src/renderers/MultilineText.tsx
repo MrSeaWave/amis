@@ -2,19 +2,29 @@
  * @file MultilineText
  */
 import React from 'react';
-import {Renderer, RendererProps, resolveVariableAndFilter} from 'amis-core';
+import {
+  AMISSchemaBase,
+  Renderer,
+  RendererProps,
+  filter,
+  getPropValue,
+  resolveVariableAndFilter
+} from 'amis-core';
 import {BaseSchema} from '../Schema';
 import {MultilineText} from 'amis-ui';
 
 /**
-* MultilineText
-*/
-export interface MultilineTextSchema extends BaseSchema {
+ * MultilineText
+ */
+/**
+ * 多行文本组件，用于展示长文本内容。支持折叠与省略号。
+ */
+export interface AMISMultilineTextSchema extends AMISSchemaBase {
   type: 'multiline-text';
 
   /**
- * 文本
- */
+   * 文本
+   */
   text?: string;
 
   /**
@@ -22,25 +32,29 @@ export interface MultilineTextSchema extends BaseSchema {
    */
   maxRows?: number;
 
-    /**
+  /**
    * 展开按钮文本
    */
   expendButtonText?: string;
 
   /**
-  * 收起按钮文本
-  */
+   * 收起按钮文本
+   */
   collapseButtonText?: string;
 }
 
 export interface MultilineTextProps
   extends RendererProps,
-    Omit<MultilineTextSchema, 'type' | 'className'> {}
+    Omit<AMISMultilineTextSchema, 'type' | 'className'> {}
 
-export class MultilineTextField extends React.Component<MultilineTextProps, object> {
+export class MultilineTextField extends React.Component<
+  MultilineTextProps,
+  object
+> {
   render() {
-    const {data, text: originText} = this.props;
-    const text = resolveVariableAndFilter(originText, data, '| raw');
+    const text = getPropValue(this.props, props =>
+      props.text ? filter(props.text, props.data, '| raw') : undefined
+    );
     return <MultilineText {...this.props} text={text} />;
   }
 }

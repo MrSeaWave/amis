@@ -16,7 +16,7 @@
 
   &-selectBtn {
     display: inline-flex;
-    margin-right: 10px;
+    margin-right: var(--inputFile-base-des-margin);
 
     > svg {
       margin-right: 4px !important;
@@ -47,8 +47,11 @@
   // }
 
   &-description {
-    color: #999;
-    font-size: 12px;
+    margin-top: var(--inputFile-base-des-margin);
+    line-height: 20px;
+    color: var(--inputFile-base-des-color);
+    font-size: var(--inputFile-base-des-fontSize);
+    font-weight: var(--inputFile-base-des-fontWeight);
   }
 
   &-sizeTip {
@@ -60,7 +63,8 @@
 
   &-list {
     list-style: none;
-    margin: 8px 0;
+    margin: var(--inputFile-list-marginTop) var(--inputFile-list-marginRight)
+      var(--inputFile-list-marginBottom) var(--inputFile-list-marginLeft);
     padding: 0;
     max-height: 144px;
     overflow-x: hidden;
@@ -69,6 +73,7 @@
     > li {
       margin-bottom: 4px;
       font-size: 12px;
+      background: var(--inputFile-list-bg-color);
 
       &:hover {
         border-radius: 2px;
@@ -76,14 +81,21 @@
       }
     }
 
-    &-tooltip span {
-      font-size: var(--fontSizeSm);
-      color: var(--FileControl-danger-color);
+    &-tooltip {
+      span {
+        font-size: var(--fontSizeSm);
+      }
+      &.is-invalid {
+        span {
+          color: var(--FileControl-danger-color);
+        }
+      }
     }
   }
 
   &-itemInfo {
-    padding: 2px 4px;
+    padding: var(--inputFile-list-paddingTop) var(--inputFile-list-paddingRight)
+      var(--inputFile-list-paddingBottom) var(--inputFile-list-paddingLeft);
     display: flex;
     line-height: 24px;
     height: auto;
@@ -94,6 +106,11 @@
 
     &.is-invalid {
       color: var(--FileControl-danger-color);
+
+      .#{$ns}FileControl-itemInfoIcon,
+      .#{$ns}FileControl-itemInfoText {
+        color: var(--FileControl-danger-color);
+      }
     }
 
     > svg:not(:first-child) {
@@ -105,7 +122,9 @@
   }
 
   &-itemInfoIcon {
-    margin-right: 4px;
+    margin-right: var(--inputFile-list-icon-margin);
+    font-size: var(--inputFile-list-icon-size);
+    color: var(--inputFile-list-icon-color);
   }
 
   &-itemInfoText {
@@ -114,6 +133,17 @@
     text-overflow: ellipsis;
 
     vertical-align: middle;
+    color: var(--inputFile-list-color);
+    font-size: var(--inputFile-list-fontSize);
+    font-weight: var(--inputFile-list-fontWeight);
+    line-height: px2rem(24px);
+
+    &:hover {
+      color: var(--inputFile-list-color);
+      font-size: var(--inputFile-list-fontSize);
+      font-weight: var(--inputFile-list-fontWeight);
+      line-height: px2rem(24px);
+    }
   }
 
   &-clear {
@@ -122,7 +152,11 @@
     cursor: pointer;
     margin-left: auto;
     margin-right: var(--gap-xs);
+    font-size: var(--inputFile-list-delete-icon-size);
+    line-height: px2rem(24px);
     &:hover {
+      font-size: var(--inputFile-list-delete-icon-size);
+      line-height: px2rem(24px);
       color: var(--FileControl-icon-onHover-color);
     }
   }
@@ -162,6 +196,8 @@
 
   &-progress {
     height: 5px;
+    min-width: 0;
+    min-height: 0;
     flex: 1;
     background: #ebebeb;
 
@@ -199,9 +235,20 @@
     flex-flow: column;
     height: 180px;
     text-align: center;
-    border: 1px dashed var(--FileControl-border-color);
-    border-radius: var(--borderRadius);
-    background: var(--white);
+    border-style: var(--inputFile-drag-top-border-style)
+      var(--inputFile-drag-right-border-style)
+      var(--inputFile-drag-bottom-border-style)
+      var(--inputFile-drag-left-border-style);
+    border-color: var(--FileControl-border-color);
+    border-width: var(--inputFile-drag-top-border-width)
+      var(--inputFile-drag-right-border-width)
+      var(--inputFile-drag-bottom-border-width)
+      var(--inputFile-drag-left-border-width);
+    border-radius: var(--inputFile-drag-top-left-border-radius)
+      var(--inputFile-drag-top-right-border-radius)
+      var(--inputFile-drag-bottom-right-border-radius)
+      var(--inputFile-drag-bottom-left-border-radius);
+    background: var(--inputFile-drag-bg-color);
     cursor: pointer;
 
     &-click {
@@ -216,20 +263,33 @@
     }
 
     &:hover {
-      border-color: var(--info);
+      border-style: var(--inputFile-drag-hover-top-border-style)
+        var(--inputFile-drag-hover-right-border-style)
+        var(--inputFile-drag-hover-bottom-border-style)
+        var(--inputFile-drag-hover-left-border-style);
+      border-color: var(--inputFile-drag-hover-top-border-color)
+        var(--inputFile-drag-hover-right-border-color)
+        var(--inputFile-drag-hover-bottom-border-color)
+        var(--inputFile-drag-hover-left-border-color);
+      border-width: var(--inputFile-drag-hover-top-border-width)
+        var(--inputFile-drag-hover-right-border-width)
+        var(--inputFile-drag-hover-bottom-border-width)
+        var(--inputFile-drag-hover-left-border-width);
+      background: var(--inputFile-drag-bg-color-hover);
     }
 
     > span {
-      margin-top: 8px;
+      margin-top: var(--inputFile-drag-icon-margin);
       line-height: 20px;
-      font-size: var(--fontSizeSm);
+      font-size: var(--inputFile-drag-fontSize);
+      font-weight: var(--inputFile-drag-fontWeight);
       color: var(--FileControl-drag-color);
     }
 
     > svg {
-      width: 48px;
-      height: 48px;
       top: 0;
+      font-size: var(--inputFile-drag-icon-size);
+      color: var(--inputFile-drag-icon-color);
     }
   }
 
@@ -242,6 +302,7 @@
 
     > a {
       cursor: pointer;
+      font-size: var(--fontSizeSm);
     }
   }
 }

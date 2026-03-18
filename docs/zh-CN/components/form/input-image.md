@@ -8,7 +8,7 @@ icon:
 order: 27
 ---
 
-图片格式输入，需要实现接收器，提交时将以 url 的方式提交，如果需要以表单方式提交请使用 [InputFile](input-file#手动上传)。
+图片格式输入，需要实现接收器，提交时将以 url 的方式提交，如果需要以表单方式提交请使用 [InputFile](input-file#作为表单项上传)。
 
 ## 基本用法
 
@@ -95,7 +95,7 @@ app.listen(8080, function () {});
 
 想要限制多个类型，则用逗号分隔，例如：`.jpg,.png`
 
-## 限制文件大小
+## 限制文件宽度
 
 配置 `limit`，更多属性请参考后面的属性说明。
 
@@ -112,6 +112,27 @@ app.listen(8080, function () {});
             "limit": {
               "minWidth": 1000
             },
+            "receiver": "/api/upload/file"
+        }
+    ]
+}
+```
+
+## 限制文件大小
+
+配置 `maxSize`，限制文件大小，单位为 `B`。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "api": "/api/mock2/form/saveForm",
+    "body": [
+        {
+            "type": "input-image",
+            "name": "image",
+            "label": "上传文件不能大于 1K",
+            "accept": ".jpg",
+            "maxSize": 1024,
             "receiver": "/api/upload/file"
         }
     ]
@@ -178,6 +199,194 @@ app.listen(8080, function () {});
 }
 ```
 
+## 手动上传
+
+默认`"autoUpload": true`，即添加文件后自动上传。可以设置`"autoUpload": false`关闭自动上传，此时通过点击底部上传按钮上传。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "api": "/api/mock2/form/saveForm",
+    "data": {
+      "file": {
+        "id":"2ba48d02d348",
+        "value":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395693148/1314a2a3d3f6.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+        "url":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395693148/1314a2a3d3f6.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+        "filename":"file(single).md",
+        "name":"file(single).md",
+        "state":"uploaded"
+      },
+      "files": [
+        {
+          "id":"2ba48d02d349",
+          "value":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692722/4f3cb4202335.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "url":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692722/4f3cb4202335.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "preview": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692722/4f3cb4202335.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "filename":"file1.md",
+          "name":"file1.md",
+          "state":"uploaded"
+        },
+        {
+          "id": "14723e0bc640",
+          "value": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692942/d8e4992057f9.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "url": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692942/d8e4992057f9.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "preview": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692942/d8e4992057f9.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "filename":"file2.md",
+          "name":"file2.md",
+          "state":"uploaded"
+        }
+      ]
+    },
+    "body": [
+      {
+        "type": "input-image",
+        "name": "files",
+        "label": "File(多选)",
+        "mode": "horizontal",
+        "labelAlign": "left",
+        "accept": "image/jpeg, image/jpg, image/png, image/gif",
+        "receiver": "/api/upload/file",
+        "multiple": true,
+        "autoUpload": false,
+        "joinValues": false,
+        "onEvent": {
+          "success": {
+            "actions": [
+              {
+                "actionType": "toast",
+                "args": {
+                  "msgType": "info",
+                  "msg": "「${event.data.path}」上传成功"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "input-image",
+        "name": "file",
+        "label": "File(单选)",
+        "mode": "horizontal",
+        "labelAlign": "left",
+        "accept": "image/jpeg, image/jpg, image/png, image/gif",
+        "receiver": "/api/upload/file",
+        "multiple": false,
+        "autoUpload": false,
+        "joinValues": false,
+        "onEvent": {
+          "success": {
+            "actions": [
+              {
+                "actionType": "toast",
+                "args": {
+                  "msgType": "info",
+                  "msg": "「${event.data.path}」上传成功"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+}
+```
+
+### 隐藏上传按钮
+
+设置 `"hideUploadButton": true` 隐藏手动上传的按钮。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "api": "/api/mock2/form/saveForm",
+    "data": {
+      "file": {
+        "id":"2ba48d02d348",
+        "value":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395693148/1314a2a3d3f6.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+        "url":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395693148/1314a2a3d3f6.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+        "filename":"file(single).md",
+        "name":"file(single).md",
+        "state":"uploaded"
+      },
+      "files": [
+        {
+          "id":"2ba48d02d349",
+          "value":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692722/4f3cb4202335.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "url":"https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692722/4f3cb4202335.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "preview": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692722/4f3cb4202335.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "filename":"file1.md",
+          "name":"file1.md",
+          "state":"uploaded"
+        },
+        {
+          "id": "14723e0bc640",
+          "value": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692942/d8e4992057f9.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "url": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692942/d8e4992057f9.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "preview": "https://internal-amis-res.cdn.bcebos.com/images/2020-1/1578395692942/d8e4992057f9.jpeg@s_0,w_216,l_1,f_jpg,q_80",
+          "filename":"file2.md",
+          "name":"file2.md",
+          "state":"uploaded"
+        }
+      ]
+    },
+    "body": [
+      {
+        "type": "input-image",
+        "name": "files",
+        "label": "File(多选)",
+        "mode": "horizontal",
+        "labelAlign": "left",
+        "accept": "image/jpeg, image/jpg, image/png, image/gif",
+        "receiver": "/api/upload/file",
+        "multiple": true,
+        "autoUpload": false,
+        "joinValues": false,
+        "hideUploadButton": true,
+        "onEvent": {
+          "success": {
+            "actions": [
+              {
+                "actionType": "toast",
+                "args": {
+                  "msgType": "info",
+                  "msg": "「${event.data.path}」上传成功"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "input-image",
+        "name": "file",
+        "label": "File(单选)",
+        "mode": "horizontal",
+        "labelAlign": "left",
+        "accept": "image/jpeg, image/jpg, image/png, image/gif",
+        "receiver": "/api/upload/file",
+        "multiple": false,
+        "autoUpload": false,
+        "joinValues": false,
+        "hideUploadButton": true,
+        "onEvent": {
+          "success": {
+            "actions": [
+              {
+                "actionType": "toast",
+                "args": {
+                  "msgType": "info",
+                  "msg": "「${event.data.path}」上传成功"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+}
+```
+
 如果浏览器支持，还能设置为 `image/webp`
 
 ## 自动填充
@@ -207,7 +416,7 @@ app.listen(8080, function () {});
 }
 ```
 
-上例中，image 组件上传后，接口返回格式例如如下：
+上例中，image 组件上传后，接口返回格式如下：
 
 ```json
 {
@@ -270,7 +479,7 @@ app.listen(8080, function () {});
       "className": "mb-1",
       "items": {
         "type": "tpl",
-        "tpl": "<span class='label label-info m-l-sm inline-block mb-1'><%= data.item %></span>"
+        "tpl": "<span class='label label-info m-l-sm inline-block mb-1'>${item}</span>"
       }
     },
     {
@@ -420,37 +629,71 @@ app.listen(8080, function () {});
 }
 ```
 
+## 拖拽排序
+
+可配置 `draggable` 为 `true` 启动拖拽排序。
+
+```schema: scope="body"
+{
+  "type": "form",
+  "title": "表单",
+  data: {
+    image: [
+      'http://www.sortablejs.com/assets/img/npm.png',
+      'http://www.sortablejs.com/assets/img/bower.png',
+      'http://www.sortablejs.com/assets/img/js.png'
+    ]
+  },
+  "body": [
+    'Images: <br />${image|split|join:"<br />"}',
+    {
+      type: 'input-image',
+      name: 'image',
+      multiple: true,
+      draggable: true
+    }
+  ]
+}
+```
+
 ## 属性表
 
 除了支持 [普通表单项属性表](./formitem#%E5%B1%9E%E6%80%A7%E8%A1%A8) 中的配置以外，还支持下面一些配置
 
-| 属性名             | 类型                            | 默认值                 | 说明                                                                                                                                             |
-| ------------------ | ------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| receiver           | [API](../../../docs/types/api)  |                        | 上传文件接口                                                                                                                                     |
-| accept             | `string`                        | `.jpeg,.jpg,.png,.gif` | 支持的图片类型格式，请配置此属性为图片后缀，例如`.jpg,.png`                                                                                      |
-| maxSize            | `number`                        |                        | 默认没有限制，当设置后，文件大小大于此值将不允许上传。单位为`B`                                                                                  |
-| maxLength          | `number`                        |                        | 默认没有限制，当设置后，一次只允许上传指定数量文件。                                                                                             |
-| multiple           | `boolean`                       | `false`                | 是否多选。                                                                                                                                       |
-| joinValues         | `boolean`                       | `true`                 | [拼接值](./options#%E6%8B%BC%E6%8E%A5%E5%80%BC-joinvalues)                                                                                       |
-| extractValue       | `boolean`                       | `false`                | [提取值](./options#%E6%8F%90%E5%8F%96%E5%A4%9A%E9%80%89%E5%80%BC-extractvalue)                                                                   |
-| delimiter          | `string`                        | `,`                    | [拼接符](./options#%E6%8B%BC%E6%8E%A5%E7%AC%A6-delimiter)                                                                                        |
-| autoUpload         | `boolean`                       | `true`                 | 否选择完就自动开始上传                                                                                                                           |
-| hideUploadButton   | `boolean`                       | `false`                | 隐藏上传按钮                                                                                                                                     |
-| fileField          | `string`                        | `file`                 | 如果你不想自己存储，则可以忽略此属性。                                                                                                           |
-| crop               | `boolean`或`{"aspectRatio":""}` |                        | 用来设置是否支持裁剪。                                                                                                                           |
-| crop.aspectRatio   | `number`                        |                        | 裁剪比例。浮点型，默认 `1` 即 `1:1`，如果要设置 `16:9` 请设置 `1.7777777777777777` 即 `16 / 9`。。                                               |
-| crop.rotatable     | `boolean`                       | `false`                | 裁剪时是否可旋转                                                                                                                                 |
-| crop.scalable      | `boolean`                       | `false`                | 裁剪时是否可缩放                                                                                                                                 |
-| crop.viewMode      | `number`                        | `1`                    | 裁剪时的查看模式，0 是无限制                                                                                                                     |
-| cropFormat         | `string`                        | `image/png`            | 裁剪文件格式                                                                                                                                     |
-| cropQuality        | `number`                        | `1`                    | 裁剪文件格式的质量，用于 jpeg/webp，取值在 0 和 1 之间                                                                                           |
-| limit              | Limit                           |                        | 限制图片大小，超出不让上传。                                                                                                                     |
-| frameImage         | `string`                        |                        | 默认占位图地址                                                                                                                                   |
-| fixedSize          | `boolean`                       |                        | 是否开启固定尺寸,若开启，需同时设置 fixedSizeClassName                                                                                           |
-| fixedSizeClassName | `string`                        |                        | 开启固定尺寸时，根据此值控制展示尺寸。例如`h-30`,即图片框高为 h-30,AMIS 将自动缩放比率设置默认图所占位置的宽度，最终上传图片根据此尺寸对应缩放。 |
-| initAutoFill       | `boolean`                       | `false`                | 表单反显时是否执行 autoFill                                                                                                                      |
-| dropCrop           | `boolean`                       | `true`                 | 图片上传后是否进入裁剪模式                                                                                                                       |
-| initCrop           | `boolean`                       | `false`                | 图片选择器初始化后是否立即进入裁剪模式                                                                                                           |
+| 属性名             | 类型                                                  | 默认值                 | 说明                                                                                                                                             |
+| ------------------ | ----------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --- |
+| receiver           | [API](../../../docs/types/api)                        |                        | 上传文件接口                                                                                                                                     |
+| accept             | `string`                                              | `.jpeg,.jpg,.png,.gif` | 支持的图片类型格式，请配置此属性为图片后缀，例如`.jpg,.png`                                                                                      |
+| capture            | `string`                                              | `undefined`            | 用于控制 input[type=file] 标签的 capture 属性，在移动端可控制输入来源                                                                            |
+| maxSize            | `number`                                              |                        | 默认没有限制，当设置后，文件大小大于此值将不允许上传。单位为`B`                                                                                  |
+| maxLength          | `number`                                              |                        | 默认没有限制，当设置后，一次只允许上传指定数量文件。                                                                                             |
+| multiple           | `boolean`                                             | `false`                | 是否多选。                                                                                                                                       |
+| joinValues         | `boolean`                                             | `true`                 | [拼接值](./options#%E6%8B%BC%E6%8E%A5%E5%80%BC-joinvalues)                                                                                       |
+| extractValue       | `boolean`                                             | `false`                | [提取值](./options#%E6%8F%90%E5%8F%96%E5%A4%9A%E9%80%89%E5%80%BC-extractvalue)                                                                   |
+| delimiter          | `string`                                              | `,`                    | [拼接符](./options#%E6%8B%BC%E6%8E%A5%E7%AC%A6-delimiter)                                                                                        |
+| autoUpload         | `boolean`                                             | `true`                 | 否选择完就自动开始上传                                                                                                                           |
+| hideUploadButton   | `boolean`                                             | `false`                | 隐藏上传按钮                                                                                                                                     |
+| fileField          | `string`                                              | `file`                 | 如果你不想自己存储，则可以忽略此属性。                                                                                                           |
+| crop               | `boolean`或`{"aspectRatio":""}`                       |                        | 用来设置是否支持裁剪。                                                                                                                           |
+| crop.aspectRatio   | `number`                                              |                        | 裁剪比例。浮点型，默认 `1` 即 `1:1`，如果要设置 `16:9` 请设置 `1.7777777777777777` 即 `16 / 9`。。                                               |
+| crop.rotatable     | `boolean`                                             | `false`                | 裁剪时是否可旋转                                                                                                                                 |
+| crop.scalable      | `boolean`                                             | `false`                | 裁剪时是否可缩放                                                                                                                                 |
+| crop.viewMode      | `number`                                              | `1`                    | 裁剪时的查看模式，0 是无限制                                                                                                                     |
+| cropFormat         | `string`                                              | `image/png`            | 裁剪文件格式                                                                                                                                     |
+| cropQuality        | `number`                                              | `1`                    | 裁剪文件格式的质量，用于 jpeg/webp，取值在 0 和 1 之间                                                                                           |
+| limit              | Limit                                                 |                        | 限制图片大小，超出不让上传。                                                                                                                     |
+| frameImage         | `string`                                              |                        | 默认占位图地址                                                                                                                                   |
+| fixedSize          | `boolean`                                             |                        | 是否开启固定尺寸,若开启，需同时设置 fixedSizeClassName                                                                                           |
+| fixedSizeClassName | `string`                                              |                        | 开启固定尺寸时，根据此值控制展示尺寸。例如`h-30`,即图片框高为 h-30,AMIS 将自动缩放比率设置默认图所占位置的宽度，最终上传图片根据此尺寸对应缩放。 |
+| initAutoFill       | `boolean`                                             | `false`                | 表单反显时是否执行 autoFill                                                                                                                      |
+| uploadBtnText      | `string` \| [SchemaNode](../../docs/types/schemanode) |                        | 上传按钮文案。支持 tpl、schema 形式配置。                                                                                                        |
+| dropCrop           | `boolean`                                             | `true`                 | 图片上传后是否进入裁剪模式                                                                                                                       |
+| initCrop           | `boolean`                                             | `false`                | 图片选择器初始化后是否立即进入裁剪模式                                                                                                           |
+| draggable          | `boolean`                                             | false                  | 开启后支持拖拽排序改变图片值顺序                                                                                                                 |
+| draggableTip       | `string`                                              | '拖拽排序'             | 拖拽提示文案                                                                                                                                     |
+| showErrorModal     | `boolean`                                             | `true`                 | 校验失败后是否弹窗提醒                                                                                                                           |
+| invalidTypeMessage | `string`                                              | '文件格式不正确'       | 校验格式失败后的提示信息                                                                                                                         |     |
+| invalidSizeMessage | `string`                                              | '文件大小超出限制'     | 校验文件大小失败时显示的文字信息                                                                                                                 |     |
 
 ### Limit 属性表
 
@@ -466,7 +709,7 @@ app.listen(8080, function () {});
 
 ## 事件表
 
-当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`来获取事件产生的数据（`< 2.3.2 及以下版本 为 ${event.data.[事件参数名]}`），详细请查看[事件动作](../../docs/concepts/event-action)。
+当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`或`${event.data.[事件参数名]}`来获取事件产生的数据，详细请查看[事件动作](../../docs/concepts/event-action)。
 
 > `[name]`表示当前组件绑定的名称，即`name`属性，如果没有配置`name`属性，则通过`file`取值。
 
@@ -474,7 +717,7 @@ app.listen(8080, function () {});
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | change   | `[name]: FileValue` \| `Array<FileValue>` 组件的值                                                                                          | 上传文件值变化时触发(上传失败同样会触发) |
 | remove   | `item: FileValue` 被移除的文件<br/>`[name]: FileValue` \| `Array<FileValue>` 组件的值                                                       | 移除文件时触发                           |
-| success  | `item: FileValue` 远程上传请求成功后返回的结果数据<br />`id: string` id<br />`[name]: FileValue` 组件的值                                   | 上传成功时触发                           |
+| success  | `item: FileValue` 上传的文件<br/>`result: any` 远程上传请求成功后接口返回的结果数据<br/>`id: string` id<br />`[name]: FileValue` 组件的值   | 上传成功时触发                           |
 | fail     | `item: FileValue` 上传的文件 <br /> `error: object` 远程上传请求失败后返回的错误信息<br/>`[name]: FileValue` \| `Array<FileValue>` 组件的值 | 上传文件失败时触发                       |
 
 ### FileValue 属性表
@@ -493,3 +736,35 @@ app.listen(8080, function () {});
 | 动作名称 | 动作配置 | 说明 |
 | -------- | -------- | ---- |
 | clear    | -        | 清空 |
+
+### clear
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+            "type": "input-image",
+            "name": "image",
+            "label": "Image",
+            "receiver": "/api/upload/file",
+            "id": "clear_text"
+        },
+        {
+            "type": "button",
+            "label": "清空",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "clear",
+                            "componentId": "clear_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```

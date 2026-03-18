@@ -1,6 +1,6 @@
 import isPlainObject from 'lodash/isPlainObject';
 import {ActionObject} from '../types';
-import {promisify} from '../utils';
+import {promisify, str2AsyncFunction} from '../utils';
 import {RendererEvent} from '../utils/renderer-event';
 import {
   RendererAction,
@@ -9,15 +9,16 @@ import {
   registerAction,
   runActions
 } from './Action';
+import {AMISFunction} from '../schema';
 
-type ScriptType =
-  | string
-  | ((
-      renderer: any,
-      doAction: (action: ActionObject, data: Record<string, any>) => void,
-      event: RendererEvent<any>,
-      action: ListenerAction
-    ) => void); // 自定义JS，actionType: custom
+type ScriptType = AMISFunction<
+  (
+    renderer: any,
+    doAction: (action: ActionObject, data: Record<string, any>) => void,
+    event: RendererEvent<any>,
+    action: ListenerAction
+  ) => void
+>;
 
 export interface ICustomAction extends ListenerAction {
   actionType: 'custom';
@@ -44,15 +45,27 @@ export class CustomAction implements RendererAction {
     let scriptFunc = action.args?.script ?? action.script;
 
     if (typeof scriptFunc === 'string') {
-      scriptFunc = promisify(
-        new Function('context', 'doAction', 'event', scriptFunc) as any
-      );
+      scriptFunc = str2AsyncFunction(
+        scriptFunc,
+        'context',
+        'doAction',
+        'event'
+      ) as any;
     }
-
+    const proxy = new Proxy(
+      {},
+      {
+        get(target: {}, p: string | symbol, receiver: any): any {
+          if (typeof p === 'string') {
+            return event.context.scoped?.getComponentByName?.(p);
+          }
+        }
+      }
+    );
     // 外部可以直接调用doAction来完成动作调用
     // 可以通过上下文直接编排动作调用，通过event来进行动作干预
     let result = await (scriptFunc as any)?.call(
-      null,
+      proxy,
       renderer,
       (action: ListenerAction) => runActions(action, renderer, event),
       event,

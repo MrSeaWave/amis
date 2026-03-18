@@ -3,26 +3,32 @@ import {
   OptionsControl,
   OptionsControlProps,
   Option,
-  FormOptionsControl
+  FormOptionsControl,
+  getVariable,
+  filter,
+  AMISFormItemWithOptions,
+  AMISSchemaCollection
 } from 'amis-core';
 import {ActionObject, Schema} from 'amis-core';
 import {createObject, isEmpty} from 'amis-core';
-import {
-  FormOptionsSchema,
-  SchemaClassName,
-  SchemaCollection
-} from '../../Schema';
+import {FormOptionsSchema, AMISClassName} from '../../Schema';
 import {supportStatic} from './StaticHoc';
 
 /**
  * List 复选框
- * 文档：https://baidu.gitee.io/amis/docs/components/form/list
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/list-select
  */
-export interface ListControlSchema extends FormOptionsSchema {
+/**
+ * ListSelect 组件用于多选列表展示和选择，支持图片、模板自定义和双击提交等功能。
+ */
+export interface AMISListSelectSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 list-select 组件
+   */
   type: 'list-select';
 
   /**
-   * 开启双击点选并提交。
+   * 开启双击点选并提交
    */
   submitOnDBClick?: boolean;
 
@@ -32,21 +38,25 @@ export interface ListControlSchema extends FormOptionsSchema {
   imageClassName?: string;
 
   /**
-   * 可以自定义展示模板。
+   * 可以自定义展示模板
    */
-  itemSchema?: SchemaCollection;
+  itemSchema?: AMISSchemaCollection;
 
   /**
-   * 支持配置 list div 的 css 类名。
-   * 比如：flex justify-between
+   * 激活态自定义展示模板
    */
-  listClassName?: SchemaClassName;
+  activeItemSchema?: AMISSchemaCollection;
+
+  /**
+   * 支持配置 list div 的 CSS 类名
+   */
+  listClassName?: AMISClassName;
 }
 
 export interface ListProps
   extends OptionsControlProps,
     Omit<
-      ListControlSchema,
+      AMISListSelectSchema,
       | 'type'
       | 'options'
       | 'className'
@@ -63,13 +73,15 @@ export default class ListControl extends React.Component<ListProps, any> {
   };
 
   doAction(action: ActionObject, data: object, throwErrors: boolean) {
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name} = this.props;
     const actionType = action?.actionType as string;
 
     if (actionType === 'clear') {
       onChange?.('');
     } else if (actionType === 'reset') {
-      onChange?.(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange?.(pristineVal ?? '');
     }
   }
 
@@ -90,9 +102,9 @@ export default class ListControl extends React.Component<ListProps, any> {
     onToggle(option);
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     const reload = this.props.reloadOptions;
-    reload && reload();
+    reload && reload(subpath, query);
   }
 
   renderStatic(displayValue = '-') {
@@ -119,51 +131,41 @@ export default class ListControl extends React.Component<ListProps, any> {
         return (
           <div
             key={key}
-            className={cx(
-              'ListControl-static-item',
-              itemClassName
-            )}
+            className={cx('ListControl-static-item', itemClassName)}
           >
             {itemSchema
               ? render(`${key}/body`, itemSchema, {
-                data: createObject(data, option)
-              })
+                  data: createObject(data, option)
+                })
               : option.body
-                ? render(`${key}/body`, option.body)
-                : [(option.image
-                      ? <div key="image"
-                          className={cx('ListControl-itemImage', imageClassName)}
-                        >
-                          <img src={option.image} alt={label} />
-                        </div>
-                      : null
-                    ),
-                    (
-                      <div key="label"
-                        className={cx('ListControl-itemLabel')}
-                      >
-                        {label}
-                      </div>
-                    )
-                  ]
-            }
+              ? render(`${key}/body`, option.body)
+              : [
+                  option.image ? (
+                    <div
+                      key="image"
+                      className={cx('ListControl-itemImage', imageClassName)}
+                    >
+                      <img src={option.image} alt={label} />
+                    </div>
+                  ) : null,
+                  <div key="label" className={cx('ListControl-itemLabel')}>
+                    {label}
+                  </div>
+                ]}
           </div>
         );
       }
 
       return (
-        <div
-          key={key}
-          className={cx(`ListControl-static-item`)}
-        >
+        <div key={key} className={cx(`ListControl-static-item`)}>
           {label}
         </div>
       );
-    }
+    };
 
-    return <div className={cx('StaticList')}>
-      {selectedOptions.map(itemRender)}
-    </div>
+    return (
+      <div className={cx('StaticList')}>{selectedOptions.map(itemRender)}</div>
+    );
   }
 
   @supportStatic()
@@ -173,6 +175,7 @@ export default class ListControl extends React.Component<ListProps, any> {
       itemClassName,
       classnames: cx,
       className,
+      style,
       disabled,
       options,
       placeholder,
@@ -180,10 +183,12 @@ export default class ListControl extends React.Component<ListProps, any> {
       imageClassName,
       submitOnDBClick,
       itemSchema,
+      activeItemSchema,
       data,
       labelField,
       listClassName,
-      translate: __
+      translate: __,
+      testIdBuilder
     } = this.props;
 
     let body: JSX.Element | null = null;
@@ -196,7 +201,8 @@ export default class ListControl extends React.Component<ListProps, any> {
               key={key}
               className={cx(`ListControl-item`, itemClassName, {
                 'is-active': ~selectedOptions.indexOf(option),
-                'is-disabled': option.disabled || disabled
+                'is-disabled': option.disabled || disabled,
+                'is-custom': !!itemSchema
               })}
               onClick={this.handleClick.bind(this, option)}
               onDoubleClick={
@@ -204,11 +210,20 @@ export default class ListControl extends React.Component<ListProps, any> {
                   ? this.handleDBClick.bind(this, option)
                   : undefined
               }
+              {...testIdBuilder
+                ?.getChild(`options-${option.value || key}`)
+                .getTestId()}
             >
               {itemSchema
-                ? render(`${key}/body`, itemSchema, {
-                    data: createObject(data, option)
-                  })
+                ? render(
+                    `${key}/body`,
+                    ~selectedOptions.indexOf(option)
+                      ? activeItemSchema ?? itemSchema
+                      : itemSchema,
+                    {
+                      data: createObject(data, option)
+                    }
+                  )
                 : option.body
                 ? render(`${key}/body`, option.body)
                 : [
@@ -225,7 +240,7 @@ export default class ListControl extends React.Component<ListProps, any> {
                     ) : null,
                     option[labelField || 'label'] ? (
                       <div key="label" className={cx('ListControl-itemLabel')}>
-                        {String(option[labelField || 'label'])}
+                        {filter(String(option[labelField || 'label']), data)}
                       </div>
                     ) : null
                     // {/* {option.tip ? (<div className={`${ns}ListControl-tip`}>{option.tip}</div>) : null} */}

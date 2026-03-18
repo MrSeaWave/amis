@@ -15,6 +15,14 @@
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #f9f9f9;
+
+  &.is-mobile-year {
+    width: px2rem(184px);
+  }
+
+  &.is-mobile-embed {
+    width: px2rem(240px);
+  }
 }
 
 .rdtPickerNotDays {
@@ -38,6 +46,7 @@
   margin: 0;
   padding: 0 12px;
   border-spacing: 0 8px;
+  border-collapse: inherit;
 }
 
 .rdtMonths,
@@ -47,7 +56,7 @@
   }
   .headerTable {
     border-spacing: 0;
-    border-bottom: 1px solid #E8E9EB;
+    border-bottom: 1px solid var(--colors-neutral-line-8);
   }
 }
 .rdtPicker td,
@@ -61,7 +70,10 @@
   cursor: pointer;
   > span {
     display: inline-block;
-    border-radius: 2px;
+    border-radius: var(--inputDate-default-option-top-left-border-radius)
+      var(--inputDate-default-option-top-right-border-radius)
+      var(--inputDate-default-option-bottom-right-border-radius)
+      var(--inputDate-default-option-bottom-left-border-radius);
     height: 24px;
     width: 24px;
   }
@@ -76,12 +88,15 @@
 }
 .rdtPicker td.rdtOld,
 .rdtPicker td.rdtNew {
-  color: #B8BABF;
+  color: var(--inputDate-disabled-option-color);
+  span {
+    background: var(--inputDate-disabled-option-bg-color);
+  }
 }
 .rdtPicker td.rdtToday {
   position: relative;
   > span {
-    border: 1px solid #2468F2;
+    border: 1px solid #2468f2;
   }
 }
 .rdtPicker td.rdtActive,
@@ -96,20 +111,20 @@
 .rdtPicker td.rdtDisabled,
 .rdtPicker td.rdtDisabled:hover {
   background: none;
-  color: #B8BABF;
+  color: #b8babf;
   cursor: not-allowed;
 }
 
 .rdtPicker td span.rdtOld {
-  color: #B8BABF;
+  color: #b8babf;
 }
 .rdtPicker td span.rdtDisabled,
 .rdtPicker td span.rdtDisabled:hover {
   background: none;
-  color: #B8BABF;
+  color: #b8babf;
   cursor: not-allowed;
   > span {
-    border-color: #E8E9EB;
+    border-color: #e8e9eb;
   }
 }
 .rdtPicker th {
@@ -147,7 +162,7 @@
 .rdtPicker th.rdtDisabled,
 .rdtPicker th.rdtDisabled:hover {
   background: none;
-  color: #B8BABF;
+  color: #b8babf;
   cursor: not-allowed;
 }
 .rdtPicker thead tr:first-of-type th {

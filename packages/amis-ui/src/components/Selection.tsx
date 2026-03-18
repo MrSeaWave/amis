@@ -14,10 +14,16 @@ import {
   themeable,
   ThemeProps,
   autobind,
-  findTree
+  findTree,
+  flattenTree,
+  getOptionValue,
+  getOptionValueBindField,
+  ClassNamesFn
 } from 'amis-core';
 import Checkbox from './Checkbox';
 import {Option, Options} from './Select';
+
+import type {TestIdBuilder} from 'amis-core';
 
 export interface BaseSelectionProps extends ThemeProps, LocaleProps {
   options: Options;
@@ -27,6 +33,8 @@ export interface BaseSelectionProps extends ThemeProps, LocaleProps {
   multiple?: boolean;
   clearable?: boolean;
   labelField?: string;
+  valueField?: string;
+  deferField?: string;
   onChange?: (value: Array<any> | any) => void;
   onDeferLoad?: (option: Option) => void;
   onLeftDeferLoad?: (option: Option, leftOptions: Option) => void;
@@ -34,10 +42,16 @@ export interface BaseSelectionProps extends ThemeProps, LocaleProps {
   labelClassName?: string;
   option2value?: (option: Option) => any;
   itemClassName?: string;
+  itemHeight?: number; // 每个选项的高度，主要用于虚拟渲染
+  virtualThreshold?: number; // 数据量多大的时候开启虚拟渲染
+  virtualListHeight?: number; // 虚拟渲染时，列表高度
   itemRender: (option: Option, states: ItemRenderStates) => JSX.Element;
   disabled?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   placeholderRender?: (props: any) => JSX.Element | null;
+  checkAll?: boolean;
+  checkAllLabel?: string;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export interface ItemRenderStates {
@@ -47,6 +61,8 @@ export interface ItemRenderStates {
   checked: boolean;
   onChange: () => void;
   disabled?: boolean;
+  classnames: ClassNamesFn;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export class BaseSelection<
@@ -54,10 +70,26 @@ export class BaseSelection<
   S = any
 > extends React.Component<T, S> {
   static itemRender(option: Option, states: ItemRenderStates) {
+    const label = option[states?.labelField || 'label'];
+    const tip = option.tip || '';
+    const classnames = states.classnames;
+    const testIdBuilder = states.testIdBuilder;
+
+    const canlabelTitle =
+      typeof label === 'string' || typeof label === 'number';
+    const canTipTitle = typeof tip === 'string' || typeof label === 'number';
+    const title = canlabelTitle && canTipTitle ? `${label} ${tip}` : '';
+
     return (
-      <span className={cx({'is-invalid': option?.__unmatched})}>
-        {option[states?.labelField || 'label']}
-        {option.tip || ''}
+      <span
+        title={title}
+        className={`${cx({'is-invalid': option?.__unmatched})} ${classnames(
+          'Selection-ellipsis-line'
+        )}`}
+        {...testIdBuilder?.getChild('span').getTestId()}
+      >
+        {label}
+        {tip}
       </span>
     );
   }
@@ -66,13 +98,16 @@ export class BaseSelection<
     placeholder: 'placeholder.noOption',
     itemRender: this.itemRender,
     multiple: true,
-    clearable: false
+    clearable: false,
+    virtualThreshold: 1000,
+    itemHeight: 32
   };
 
   static value2array(
     value: any,
     options: Options,
-    option2value: (option: Option) => any = (option: Option) => option
+    option2value: (option: Option) => any = (option: Option) => option,
+    valueField?: string
   ): Options {
     if (value === void 0) {
       return [];
@@ -83,8 +118,15 @@ export class BaseSelection<
     }
 
     return value.map((value: any) => {
-      const option = findTree(options, option =>
-        isEqual(option2value(option), value)
+      const option = findTree(
+        options,
+        option => isEqual(option2value(option), value),
+        valueField
+          ? {
+              value: getOptionValue(value, valueField),
+              resolve: getOptionValueBindField(valueField)
+            }
+          : undefined
       );
       return option || value;
     });
@@ -123,14 +165,20 @@ export class BaseSelection<
       options,
       disabled,
       multiple,
-      clearable
+      clearable,
+      valueField
     } = this.props;
 
     if (disabled || option.disabled) {
       return;
     }
 
-    let valueArray = BaseSelection.value2array(value, options, option2value);
+    let valueArray = BaseSelection.value2array(
+      value,
+      options,
+      option2value,
+      valueField
+    );
     let idx = valueArray.indexOf(option);
 
     if (~idx && (multiple || clearable)) {
@@ -148,13 +196,22 @@ export class BaseSelection<
     onChange && onChange(multiple ? newValue : newValue[0]);
   }
 
+  getAvailableOptions() {
+    const {options} = this.props;
+    const flattendOptions = flattenTree(options, item =>
+      item.children ? null : item
+    ).filter(a => a && !a.disabled);
+
+    return flattendOptions as Option[];
+  }
+
   @autobind
   toggleAll() {
     const {value, onChange, option2value, options} = this.props;
 
     let valueArray: Array<Option> = [];
 
-    const availableOptions = options.filter(option => !option.disabled);
+    const availableOptions = this.getAvailableOptions();
     const intersectOptions = this.intersectArray(value, availableOptions);
 
     if (!Array.isArray(value)) {
@@ -189,12 +246,19 @@ export class BaseSelection<
       itemRender,
       multiple,
       labelField,
-      onClick
+      valueField,
+      onClick,
+      testIdBuilder
     } = this.props;
 
     const __ = this.props.translate;
 
-    let valueArray = BaseSelection.value2array(value, options, option2value);
+    let valueArray = BaseSelection.value2array(
+      value,
+      options,
+      option2value,
+      valueField
+    );
     let body: Array<React.ReactNode> = [];
 
     if (Array.isArray(options) && options.length) {
@@ -215,7 +279,9 @@ export class BaseSelection<
             checked: !!~valueArray.indexOf(option),
             onChange: () => this.toggleOption(option),
             labelField,
-            disabled: disabled || option.disabled
+            classnames: cx,
+            disabled: disabled || option.disabled,
+            testIdBuilder: testIdBuilder?.getChild(key)
           })}
         </Checkbox>
       ));

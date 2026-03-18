@@ -1,11 +1,6 @@
 import * as React from 'react';
-import {
-  ClassNamesFn,
-  themeable,
-  ThemeProps,
-  generateIcon,
-  IconCheckedSchema
-} from 'amis-core';
+import {ClassNamesFn, themeable, ThemeProps} from 'amis-core';
+import {Icon, IconCheckedSchema} from './icons';
 
 /**
  * Avatar 属性
@@ -75,7 +70,25 @@ interface AvatarCmptProps extends ThemeProps {
   /**
    *
    */
-  children?: JSX.Element | ((props?: any) => JSX.Element);
+  children?:
+    | React.ReactNode
+    | Array<React.ReactNode>
+    | ((props?: any) => React.ReactNode | Array<React.ReactNode>);
+
+  /**
+   * 点击事件
+   */
+  onClick?: (e: React.MouseEvent) => void;
+
+  /**
+   * 鼠标移入事件
+   */
+  onMouseEnter?: (e: React.MouseEvent) => void;
+
+  /**
+   * 鼠标移出事件
+   */
+  onMouseLeave?: (e: React.MouseEvent) => void;
 }
 
 const prefix = 'Avatar--';
@@ -171,7 +184,10 @@ export class Avatar extends React.Component<AvatarCmptProps, AvatarState> {
       fit,
       text,
       children,
-      classnames: cx
+      classnames: cx,
+      onClick,
+      onMouseEnter,
+      onMouseLeave
     } = this.props;
 
     const {scale, hasImg} = this.state;
@@ -179,7 +195,7 @@ export class Avatar extends React.Component<AvatarCmptProps, AvatarState> {
     const isImgRender = React.isValidElement(src);
     const isIconRender = React.isValidElement(icon);
 
-    let childrenRender;
+    let childrenRender: React.ReactNode | Array<React.ReactNode>;
 
     let sizeStyle = {};
     let sizeClass = '';
@@ -231,9 +247,9 @@ export class Avatar extends React.Component<AvatarCmptProps, AvatarState> {
         </span>
       );
     } else if (['string', 'object'].includes(typeof icon)) {
-      childrenRender = generateIcon(cx, icon as any);
+      childrenRender = <Icon cx={cx} icon={icon} />;
     } else if (isIconRender) {
-      childrenRender = icon;
+      childrenRender = icon as any;
     } else {
       childrenRender = (
         <span
@@ -241,7 +257,7 @@ export class Avatar extends React.Component<AvatarCmptProps, AvatarState> {
           ref={this.avatarChildrenRef}
           style={scaleStyle}
         >
-          {children}
+          {typeof children === 'function' ? children() : children}
         </span>
       );
     }
@@ -250,6 +266,9 @@ export class Avatar extends React.Component<AvatarCmptProps, AvatarState> {
       <span
         className={cx(`Avatar`, className, prefix + shape, sizeClass)}
         style={{...sizeStyle, ...style}}
+        onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         ref={this.avatarRef}
       >
         {childrenRender}

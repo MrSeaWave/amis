@@ -1,5 +1,13 @@
 import React from 'react';
-import {ScopedContext, IScopedContext} from 'amis-core';
+import {
+  ScopedContext,
+  IScopedContext,
+  filterTarget,
+  AMISFormBase,
+  AMISExpression,
+  AMISApi,
+  ApiObject
+} from 'amis-core';
 import {Renderer, RendererProps} from 'amis-core';
 import {ServiceStore, IServiceStore} from 'amis-core';
 import {Api, ActionObject} from 'amis-core';
@@ -9,21 +17,17 @@ import {
   createObject,
   until,
   isVisible,
-  getScrollParent,
   autobind,
   SkipOperation
 } from 'amis-core';
 import {isApiOutdated, isEffectiveApi} from 'amis-core';
 import {IFormStore} from 'amis-core';
-import {Spinner} from 'amis-ui';
-import {Icon} from 'amis-ui';
-import {findDOMNode} from 'react-dom';
-import {resizeSensor} from 'amis-core';
+import {Spinner, SpinnerExtraProps} from 'amis-ui';
+import {Steps} from 'amis-ui';
 import {
   BaseSchema,
-  FormSchema,
   SchemaApi,
-  SchemaClassName,
+  AMISClassName,
   SchemaExpression,
   SchemaName,
   SchemaReload
@@ -31,30 +35,33 @@ import {
 
 import {ActionSchema} from './Action';
 
-import {tokenize} from 'amis-core';
+import {tokenize, evalExpressionWithConditionBuilderAsync} from 'amis-core';
+import {StepSchema} from './Steps';
+import isEqual from 'lodash/isEqual';
+import {AMISButtonSchema} from 'amis-core';
 
-export type WizardStepSchema = Omit<FormSchema, 'type'> & {
+export interface WizardStepSchema extends AMISFormBase, StepSchema {
   /**
-   * 当前步骤用来保存数据的 api。
+   * 当前步骤用来保存数据的 api
    */
-  api?: SchemaApi;
+  api?: AMISApi;
 
-  asyncApi?: SchemaApi;
+  asyncApi?: AMISApi;
 
   /**
    * 当前步骤用来获取初始数据的 api
    */
-  initApi?: SchemaApi;
+  initApi?: AMISApi;
 
   /**
-   * 是否可直接跳转到该步骤，一般编辑模式需要可直接跳转查看。
+   * 是否可直接跳转到该步骤，一般编辑模式需要可直接跳转查看
    */
   jumpable?: boolean;
 
   /**
-   * 通过 JS 表达式来配置当前步骤可否被直接跳转到。
+   * 通过 JS 表达式来配置当前步骤可否被直接跳转到
    */
-  jumpableOn?: SchemaExpression;
+  jumpableOn?: AMISExpression;
 
   /**
    * Step 标题
@@ -63,28 +70,27 @@ export type WizardStepSchema = Omit<FormSchema, 'type'> & {
   label?: string;
 
   /**
-   * 每一步可以单独配置按钮。如果不配置wizard会自动生成。
+   * 每一步可以单独配置按钮。如果不配置wizard会自动生成
    */
-  actions?: Array<ActionSchema>;
+  actions?: Array<AMISButtonSchema>;
 
   /**
-   * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时可以通过 $xxx 使用变量
+   * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时通过 $xxx 使用变量
    */
   redirect?: string;
 
   reload?: SchemaReload;
 
   /**
-   * 默认表单提交自己会通过发送 api 保存数据，但是也可以设定另外一个 form 的 name 值，或者另外一个 `CRUD` 模型的 name 值。 如果 target 目标是一个 `Form` ，则目标 `Form` 会重新触发 `initApi` 和 `schemaApi`，api 可以拿到当前 form 数据。如果目标是一个 `CRUD` 模型，则目标模型会重新触发搜索，参数为当前 Form 数据。
+   * 默认表单提交自己会通过发送 api 保存数据，但是也可以设定另外一个 form 的 name 值，或者另外一个 `CRUD` 模型的 name 值。 如果 target 目标是一个 `Form` ，则目标 `Form` 会重新触发 `initApi` 和 `schemaApi`，api 可以拿到当前 form 数据。如果目标是一个 `CRUD` 模型，则目标模型会重新触发搜索，参数为当前 Form 数据
    */
   target?: string;
-};
+}
 
 /**
- * 表单向导
- * 文档：https://baidu.gitee.io/amis/docs/components/wizard
+ * 表单向导组件，用于分步表单流程。支持步骤切换、校验与提交控制。
  */
-export interface WizardSchema extends BaseSchema {
+export interface AMISWizardSchema extends BaseSchema, SpinnerExtraProps {
   /**
    * 指定为表单向导
    */
@@ -93,7 +99,7 @@ export interface WizardSchema extends BaseSchema {
   /**
    * 配置按钮 className
    */
-  actionClassName?: SchemaClassName;
+  actionClassName?: AMISClassName;
 
   /**
    * 完成按钮的文字描述
@@ -119,7 +125,9 @@ export interface WizardSchema extends BaseSchema {
    * Wizard 用来保存数据的 api。
    * [详情](https://baidu.github.io/amis/docs/api#wizard)
    */
-  api?: SchemaApi;
+  api?: AMISApi;
+
+  asyncApi?: AMISApi;
 
   /**
    * 是否合并后再提交
@@ -129,7 +137,7 @@ export interface WizardSchema extends BaseSchema {
   /**
    * Wizard 用来获取初始数据的 api。
    */
-  initApi?: SchemaApi;
+  initApi?: AMISApi;
 
   /**
    * 展示模式
@@ -146,7 +154,7 @@ export interface WizardSchema extends BaseSchema {
   readOnly?: boolean;
 
   /**
-   * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时可以通过 $xxx 使用变量
+   * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时通过 $xxx 使用变量
    */
   redirect?: string;
 
@@ -165,11 +173,36 @@ export interface WizardSchema extends BaseSchema {
   steps: Array<WizardStepSchema>;
 
   startStep?: string;
+
+  /**
+   * 步骤条区域css类
+   */
+  stepsClassName?: string;
+
+  /**
+   * 表单区域css类
+   */
+  bodyClassName?: string;
+
+  /**
+   * step + body区域css类
+   */
+  stepClassName?: string;
+
+  /**
+   * 底部操作栏的css类
+   */
+  footerClassName?: string;
+
+  /**
+   * 是否用panel包裹
+   */
+  wrapWithPanel?: boolean;
 }
 
 export interface WizardProps
   extends RendererProps,
-    Omit<WizardSchema, 'className'> {
+    Omit<AMISWizardSchema, 'className'> {
   store: IServiceStore;
   onFinished: (values: object, action: any) => any;
 }
@@ -177,6 +210,7 @@ export interface WizardProps
 export interface WizardState {
   currentStep: number;
   completeStep: number;
+  rawSteps: WizardStepSchema[];
 }
 
 export default class Wizard extends React.Component<WizardProps, WizardState> {
@@ -189,7 +223,8 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     actionNextLabel: 'Wizard.next',
     actionNextSaveLabel: 'Wizard.saveAndNext',
     actionFinishLabel: 'Wizard.finish',
-    startStep: '1'
+    startStep: '1',
+    wrapWithPanel: true
   };
 
   static propsList: Array<string> = [
@@ -210,17 +245,14 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
   form: any;
   asyncCancel: () => void;
 
-  parentNode?: any;
-  unSensor: Function;
-  affixDom: React.RefObject<HTMLDivElement> = React.createRef();
-  footerDom: React.RefObject<HTMLDivElement> = React.createRef();
   initalValues: {
     [propName: string]: any;
   } = {};
 
-  state = {
+  state: WizardState = {
     currentStep: -1, // init 完后会设置成 1
-    completeStep: -1
+    completeStep: -1,
+    rawSteps: []
   };
 
   componentDidMount() {
@@ -254,68 +286,67 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
             );
           }
         })
-        .then(value => {
-          this.handleInitEvent(store.data);
+        .then(result => {
+          this.handleFetchInitEvent(result);
 
           const state = {
             currentStep:
               typeof this.props.startStep === 'string'
-                ? toNumber(tokenize(this.props.startStep, this.props.data), 1)
+                ? toNumber(
+                    tokenize(
+                      this.props.startStep,
+                      createObject(this.props.data, result?.data || {})
+                    ),
+                    1
+                  )
                 : 1
           };
 
           if (
-            value &&
-            value.data &&
-            (typeof value.data.step === 'number' ||
-              (typeof value.data.step === 'string' &&
-                /^\d+$/.test(value.data.step)))
+            result &&
+            result.data &&
+            (typeof result.data.step === 'number' ||
+              (typeof result.data.step === 'string' &&
+                /^\d+$/.test(result.data.step)))
           ) {
-            state.currentStep = toNumber(value.data.step, 1);
+            state.currentStep = toNumber(result.data.step, 1);
           }
 
           this.setState(state, () => {
             // 如果 initApi 返回的状态是正在提交，则进入轮顺状态。
             if (
-              value &&
-              value.data &&
-              (value.data.submiting || value.data.submited)
+              result &&
+              result.data &&
+              (result.data.submiting || result.data.submited)
             ) {
               this.checkSubmit();
             }
           });
-          return value;
+          return result;
         });
     } else {
-      this.setState(
-        {
-          currentStep:
-            typeof this.props.startStep === 'string'
-              ? toNumber(tokenize(this.props.startStep, this.props.data), 1)
-              : 1
-        },
-        () => this.handleInitEvent(store.data)
-      );
+      this.setState({
+        currentStep:
+          typeof this.props.startStep === 'string'
+            ? toNumber(tokenize(this.props.startStep, this.props.data), 1)
+            : 1
+      });
     }
 
-    const dom = findDOMNode(this) as HTMLElement;
-    if (!(dom instanceof Element)) {
-      return;
-    }
-
-    let parent: HTMLElement | Window | null = dom ? getScrollParent(dom) : null;
-    if (!parent || parent === document.body) {
-      parent = window;
-    }
-    this.parentNode = parent;
-    parent.addEventListener('scroll', this.affixDetect);
-    this.unSensor = resizeSensor(dom as HTMLElement, this.affixDetect);
-    this.affixDetect();
+    this.normalizeSteps(store.data);
   }
 
   componentDidUpdate(prevProps: WizardProps) {
     const props = this.props;
     const {store, fetchSuccess, fetchFailed} = props;
+
+    // 步骤steps、上下文数据data改变时需要执行normalizeSteps
+    if (
+      !isEqual(prevProps.steps, props.steps) ||
+      !isEqual(prevProps.data, props.data)
+    ) {
+      this.normalizeSteps(props.data);
+    }
 
     if (
       isApiOutdated(
@@ -334,9 +365,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
 
   componentWillUnmount() {
     this.asyncCancel && this.asyncCancel();
-    const parent = this.parentNode;
-    parent && parent.removeEventListener('scroll', this.affixDetect);
-    this.unSensor && this.unSensor();
   }
 
   async dispatchEvent(action: string, value?: object) {
@@ -350,41 +378,47 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     return rendererEvent?.prevented ?? false;
   }
 
-  async handleInitEvent(data: any) {
-    const {onInit} = this.props;
-    (await this.dispatchEvent('inited', data)) && onInit && onInit(data);
+  async handleFetchInitEvent(result: any) {
+    const {onInit, store} = this.props;
+    (await this.dispatchEvent('inited', {
+      ...store.data, // 保留，兼容历史
+      responseData: result.ok ? store.data ?? {} : result,
+      responseStatus:
+        result?.status === undefined ? (store.error ? 1 : 0) : result?.status,
+      responseMsg: store.msg
+    })) &&
+      onInit &&
+      onInit(store.data);
   }
 
-  @autobind
-  affixDetect() {
-    if (
-      !this.props.affixFooter ||
-      !this.affixDom.current ||
-      !this.footerDom.current
-    ) {
-      return;
+  async normalizeSteps(values: any) {
+    const {steps, translate: __} = this.props;
+    const rawSteps: WizardStepSchema[] = [];
+    const stepsLength = steps.length;
+    // 这里有个bug，如果把第一个step隐藏，表单就不会渲染
+    for (let i = 0; i < stepsLength; i++) {
+      const hiddenFlag = await evalExpressionWithConditionBuilderAsync(
+        steps[i].hiddenOn,
+        values
+      );
+      !hiddenFlag && rawSteps.push(steps[i]);
     }
-
-    const affixDom = this.affixDom.current;
-    const footerDom = this.footerDom.current;
-    let affixed = false;
-    footerDom.offsetWidth &&
-      (affixDom.style.cssText = `width: ${footerDom.offsetWidth}px;`);
-
-    if (this.props.affixFooter === 'always') {
-      affixed = true;
-      footerDom.classList.add('invisible2');
-    } else {
-      const clip = footerDom.getBoundingClientRect();
-      const clientHeight = window.innerHeight;
-      affixed = clip.top + clip.height / 2 > clientHeight;
-    }
-
-    affixed ? affixDom.classList.add('in') : affixDom.classList.remove('in');
+    this.setState({
+      rawSteps: rawSteps.map((step, index) => ({
+        ...step,
+        hiddenOn: '',
+        title:
+          step.title ||
+          step.label ||
+          __('Steps.step', {
+            index: index + 1
+          })
+      }))
+    });
   }
 
   async gotoStep(index: number) {
-    const steps = this.props.steps || [];
+    const steps = this.state.rawSteps;
     index = Math.max(Math.min(steps.length, index), 1);
 
     if (index != this.state.currentStep) {
@@ -423,7 +457,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     throw new Error('Please implements this!');
   }
 
-  reload(
+  async reload(
     subPath?: string,
     query?: any,
     ctx?: any,
@@ -443,60 +477,58 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     } = this.props;
 
     if (isEffectiveApi(initApi, store.data) && this.state.currentStep === 1) {
-      store
-        .fetchInitData(initApi, store.data, {
-          successMessage: fetchSuccess,
-          errorMessage: fetchFailed,
-          onSuccess: () => {
-            if (
-              !isEffectiveApi(initAsyncApi, store.data) ||
-              store.data[initFinishedField || 'finished']
-            ) {
-              return;
-            }
-
-            return until(
-              () => store.checkRemote(initAsyncApi, store.data),
-              (ret: any) => ret && ret[initFinishedField || 'finished'],
-              cancel => (this.asyncCancel = cancel)
-            );
-          }
-        })
-        .then(value => {
-          const state = {
-            currentStep: 1
-          };
-
+      const value = await store.fetchInitData(initApi, store.data, {
+        successMessage: fetchSuccess,
+        errorMessage: fetchFailed,
+        onSuccess: () => {
           if (
-            value &&
-            value.data &&
-            (typeof value.data.step === 'number' ||
-              (typeof value.data.step === 'string' &&
-                /^\d+$/.test(value.data.step)))
+            !isEffectiveApi(initAsyncApi, store.data) ||
+            store.data[initFinishedField || 'finished']
           ) {
-            state.currentStep = toNumber(value.data.step, 1);
+            return;
           }
 
-          this.setState(state, () => {
-            // 如果 initApi 返回的状态是正在提交，则进入轮顺状态。
-            if (
-              value &&
-              value.data &&
-              (value.data.submiting || value.data.submited)
-            ) {
-              this.checkSubmit();
-            }
-          });
-          return value;
-        });
+          return until(
+            () => store.checkRemote(initAsyncApi, store.data),
+            (ret: any) => ret && ret[initFinishedField || 'finished'],
+            cancel => (this.asyncCancel = cancel)
+          );
+        }
+      });
+      const state = {
+        currentStep: 1
+      };
+
+      if (
+        value &&
+        value.data &&
+        (typeof value.data.step === 'number' ||
+          (typeof value.data.step === 'string' &&
+            /^\d+$/.test(value.data.step)))
+      ) {
+        state.currentStep = toNumber(value.data.step, 1);
+      }
+
+      this.setState(state, () => {
+        // 如果 initApi 返回的状态是正在提交，则进入轮顺状态。
+        if (
+          value &&
+          value.data &&
+          (value.data.submiting || value.data.submited)
+        ) {
+          this.checkSubmit();
+        }
+      });
     }
+
+    return store.data;
   }
 
-  receive(values: object, subPath?: string, replace?: boolean) {
+  receive(values: object, subPath?: string, replace?: boolean): Promise<any> {
     const {store} = this.props;
 
     store.updateData(values, undefined, replace);
-    this.reload();
+    return this.reload();
   }
 
   @autobind
@@ -511,7 +543,8 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
 
   // 用来还原异步提交状态。
   checkSubmit() {
-    const {store, steps, asyncApi, finishedField, env} = this.props;
+    const {store, asyncApi, finishedField, env} = this.props;
+    const steps = this.state.rawSteps;
 
     const step = steps[this.state.currentStep - 1];
     let finnalAsyncApi =
@@ -528,7 +561,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     });
 
     until(
-      () => store.checkRemote(finnalAsyncApi as Api, store.data),
+      () => store.checkRemote(finnalAsyncApi, store.data),
       (ret: any) => ret && ret[finishedField || 'finished'],
       cancel => (this.asyncCancel = cancel)
     )
@@ -537,7 +570,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         this.gotoStep(this.state.currentStep + 1);
       })
       .catch(e => {
-        env.notify('error', e.message);
+        !(finnalAsyncApi as ApiObject).silent && env.notify('error', e.message);
         store.markSaving(false);
       });
   }
@@ -550,7 +583,8 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     throwErrors: boolean = false,
     delegate?: IScopedContext
   ) {
-    const {onAction, store, env, steps} = this.props;
+    const {onAction, store, env} = this.props;
+    const steps = this.state.rawSteps;
 
     if (
       action.actionType === 'next' ||
@@ -569,8 +603,21 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     } else if (action.type === 'reset') {
       this.form.reset();
     } else if (action.actionType === 'dialog') {
-      store.setCurrentAction(action);
-      store.openDialog(data);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDialog(
+          data,
+          undefined,
+          (confirmed: any, value: any) => {
+            action.callback?.(confirmed, value);
+            resolve({
+              confirmed,
+              value
+            });
+          },
+          delegate || (this.context as any)
+        );
+      });
     } else if (action.actionType === 'ajax') {
       if (!action.api) {
         return env.alert(`当 actionType 为 ajax 时，请设置 api 属性`);
@@ -598,17 +645,18 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
 
           const reidrect =
             action.redirect && filter(action.redirect, store.data);
-          reidrect && env.jumpTo(reidrect, action);
+          reidrect && env.jumpTo(reidrect, action, store.data);
 
-          action.reload && this.reloadTarget(action.reload, store.data);
+          action.reload &&
+            this.reloadTarget(
+              filterTarget(action.reload, store.data),
+              store.data
+            );
         })
-        .catch(reason => {
-          if (reason instanceof SkipOperation) {
-            return;
-          }
-        });
+        .catch(reason => {});
     } else if (action.actionType === 'reload') {
-      action.target && this.reloadTarget(action.target, data);
+      action.target &&
+        this.reloadTarget(filterTarget(action.target, data), data);
     } else if (action.actionType === 'goto-step') {
       const targetStep = (data as any).step;
 
@@ -617,35 +665,62 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         targetStep <= steps.length &&
         targetStep >= 0
       ) {
-        this.gotoStep((data as any).step);
+        return this.gotoStep((data as any).step);
       }
     } else if (action.actionType === 'submit') {
-      this.finalSubmit();
+      return this.finalSubmit();
     } else if (onAction) {
-      onAction(e, action, data, throwErrors, delegate || this.context);
+      return onAction(e, action, data, throwErrors, delegate || this.context);
     }
   }
 
   @autobind
   handleQuery(query: any) {
     if (this.props.initApi) {
+      // 如果是分页动作，则看接口里面有没有用，没用则  return false
+      // 让组件自己去排序
+      if (
+        query?.hasOwnProperty('orderBy') &&
+        !isApiOutdated(
+          this.props.initApi,
+          this.props.initApi,
+          this.props.store.data,
+          createObject(this.props.store.data, query)
+        )
+      ) {
+        return false;
+      }
+
       this.receive(query);
+      return;
+    }
+
+    if (this.props.onQuery) {
+      return this.props.onQuery(query);
     } else {
-      this.props.onQuery?.(query);
+      return false;
     }
   }
 
   openFeedback(dialog: any, ctx: any) {
     return new Promise(resolve => {
       const {store} = this.props;
-      store.setCurrentAction({
-        type: 'button',
-        actionType: 'dialog',
-        dialog: dialog
-      });
-      store.openDialog(ctx, undefined, confirmed => {
-        resolve(confirmed);
-      });
+      store.setCurrentAction(
+        {
+          type: 'button',
+          actionType: 'dialog',
+          dialog: dialog
+        },
+        this.props.resolveDefinitions
+      );
+      store.openDialog(
+        ctx,
+        undefined,
+        confirmed => {
+          resolve(confirmed);
+        },
+        this.context as any
+      );
     });
   }
 
@@ -692,7 +767,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
   ) {
     const {
       store,
-      steps,
       api,
       asyncApi,
       finishedField,
@@ -702,6 +776,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
       env,
       onFinished
     } = this.props;
+    const steps = this.state.rawSteps;
 
     if (await this.dispatchEvent('finished', store.data)) {
       return;
@@ -712,7 +787,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
 
     // 最后一步
     if (target) {
-      this.submitToTarget(target, store.data);
+      this.submitToTarget(filterTarget(target, store.data), store.data);
       this.setState({completeStep: steps.length});
     } else if (action.api || step.api || api) {
       let finnalAsyncApi = action.asyncApi || step.asyncApi || asyncApi;
@@ -798,10 +873,10 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
             filter(action.redirect || step.redirect || redirect, store.data);
 
           if (finalRedirect) {
-            env.jumpTo(finalRedirect, action);
+            env.jumpTo(finalRedirect, action, store.data);
           } else if (action.reload || step.reload || reload) {
             this.reloadTarget(
-              action.reload || step.reload || reload!,
+              filterTarget(action.reload || step.reload || reload!, store.data),
               store.data
             );
           }
@@ -810,15 +885,32 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         })
         .catch(error => {});
     } else {
-      onFinished && onFinished(store.data, action);
       this.setState({completeStep: steps.length});
+
+      if (onFinished && onFinished(store.data, action) === false) {
+        return;
+      }
+
+      const finalRedirect =
+        (action.redirect || step.redirect || redirect) &&
+        filter(action.redirect || step.redirect || redirect, store.data);
+
+      if (finalRedirect) {
+        env.jumpTo(finalRedirect, action, store.data);
+      } else if (action.reload || step.reload || reload) {
+        this.reloadTarget(
+          filterTarget(action.reload || step.reload || reload!, store.data),
+          store.data
+        );
+      }
     }
   }
 
   // 接管里面 form 的提交，不能直接让 form 提交，因为 wizard 自己需要知道进度。
   @autobind
   handleSubmit(values: object, action: ActionObject) {
-    const {store, steps, finishedField} = this.props;
+    const {store, finishedField} = this.props;
+    const steps = this.state.rawSteps;
 
     if (this.state.currentStep < steps.length) {
       const step = steps[this.state.currentStep - 1];
@@ -878,9 +970,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
           })
           .catch(reason => {
             this.dispatchEvent('stepSubmitFail', {error: reason});
-            if (reason instanceof SkipOperation) {
-              return;
-            }
             // do nothing
           });
       } else {
@@ -910,7 +999,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
       store.updateData(values[0]);
     }
 
-    store.closeDialog(true);
+    store.closeDialog(true, values);
   }
 
   @autobind
@@ -919,47 +1008,35 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     store.closeDialog(confirmed);
   }
 
+  @autobind
+  handleJumpStep(index: number, step: any) {
+    const {store} = this.props;
+    const {currentStep} = this.state;
+
+    const canJump = isJumpable(step, index, currentStep, store.data);
+
+    if (!canJump) {
+      return;
+    }
+    this.gotoStep(index + 1);
+  }
+
   renderSteps() {
-    const {steps, store, mode, classPrefix: ns, classnames: cx} = this.props;
-    const {currentStep, completeStep} = this.state;
+    const {mode, classPrefix: ns, classnames: cx, stepsClassName} = this.props;
+    const {currentStep, rawSteps: steps} = this.state;
 
     return (
-      <div className={`${ns}Wizard-steps`} id="form-wizard">
+      <div
+        className={cx(`${ns}-Wizard-steps`, stepsClassName)}
+        id="form-wizard"
+      >
         {Array.isArray(steps) && steps.length ? (
-          <ul>
-            {steps.map((step, key) => {
-              const canJump = isJumpable(step, key, currentStep, store.data);
-              const isComplete = canJump || key < completeStep;
-              const isActive = currentStep === key + 1;
-
-              return (
-                <li
-                  key={key}
-                  className={cx({
-                    'is-complete': isComplete,
-                    'is-active': isActive
-                  })}
-                  onClick={() => (canJump ? this.gotoStep(key + 1) : null)}
-                >
-                  <span
-                    className={cx('Badge', {
-                      // 'Badge--success': canJump && currentStep != key + 1,
-                      'is-complete': isComplete,
-                      'is-active':
-                        isActive || (canJump && currentStep != key + 1)
-                    })}
-                  >
-                    {isComplete && !isActive ? (
-                      <Icon icon="check" className="icon" />
-                    ) : (
-                      key + 1
-                    )}
-                  </span>
-                  {step.title || step.label || `第 ${key + 1} 步`}
-                </li>
-              );
-            })}
-          </ul>
+          <Steps
+            steps={steps as any}
+            mode={mode}
+            current={currentStep - 1}
+            onClickStep={this.handleJumpStep}
+          />
         ) : null}
       </div>
     );
@@ -967,7 +1044,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
 
   renderActions() {
     const {
-      steps,
       store,
       readOnly,
       disabled,
@@ -977,8 +1053,11 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
       actionNextSaveLabel,
       actionFinishLabel,
       render,
-      translate: __
+      translate: __,
+      classnames: cx,
+      testIdBuilder
     } = this.props;
+    const steps = this.state.rawSteps;
 
     if (!Array.isArray(steps)) {
       return null;
@@ -1003,7 +1082,10 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         <>
           {step.actions.map((action, index) =>
             render(`action/${index}`, action, {
-              key: index,
+              key: `${currentStepIndex}-${index}`,
+              data: createObject(this.props.data, {
+                currentStep: currentStepIndex
+              }),
               onAction: this.handleAction,
               disabled:
                 action.disabled ||
@@ -1027,11 +1109,14 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
             type: 'button',
             label: __(actionPrevLabel),
             actionType: 'prev',
-            className: actionClassName
+            className: actionClassName,
+            hiddenOn: '${currentStep === 1}',
+            id: testIdBuilder?.getChild('button-prev').getTestIdValue()
           },
           {
             disabled: waiting || !prevCanJump || disabled,
-            onAction: this.handleAction
+            onAction: this.handleAction,
+            data: createObject(this.props.data, {currentStep: currentStepIndex})
           }
         )}
 
@@ -1046,7 +1131,9 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
               : __(actionNextSaveLabel),
             actionType: 'next',
             primary: !nextStep || !!step.api,
-            className: actionClassName
+            className: actionClassName,
+            level: 'primary',
+            id: testIdBuilder?.getChild('button-next').getTestIdValue()
           },
           {
             disabled:
@@ -1064,59 +1151,76 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     if (!actions) {
       return actions;
     }
-    const {classnames: cx, affixFooter} = this.props;
+
+    const {
+      classnames: cx,
+      affixFooter,
+      footerClassName,
+      wrapWithPanel
+    } = this.props;
 
     return (
-      <>
-        <div
-          role="wizard-footer"
-          ref={this.footerDom}
-          className={cx('Panel-footer Wizard-footer')}
-        >
-          {actions}
-        </div>
-
-        {affixFooter ? (
-          <div
-            ref={this.affixDom}
-            className={cx('Panel-fixedBottom Wizard-footer')}
-          >
-            <div className={cx('Panel-footer')}>{actions}</div>
-          </div>
-        ) : null}
-      </>
+      <div
+        role="wizard-footer"
+        className={cx(
+          'Wizard-footer',
+          wrapWithPanel ? 'Panel-footer' : '',
+          affixFooter && wrapWithPanel ? 'Panel-fixedBottom' : '',
+          footerClassName
+        )}
+      >
+        {actions}
+      </div>
     );
   }
 
   renderWizard() {
     const {
       className,
-      steps,
+      steps: propsSteps,
+      style,
       render,
       store,
       classPrefix: ns,
       classnames: cx,
       popOverContainer,
       mode,
-      translate: __
+      translate: __,
+      loadingConfig,
+      stepClassName,
+      bodyClassName,
+      wrapWithPanel
     } = this.props;
+    const {rawSteps: stateSteps, currentStep} = this.state;
 
-    const currentStep = this.state.currentStep;
+    // 这里初次渲染时，需要取props的steps
+    const steps =
+      Array.isArray(stateSteps) && stateSteps.length > 0
+        ? stateSteps
+        : Array.isArray(propsSteps)
+        ? [...propsSteps].map(step => {
+            delete step.hiddenOn;
+            return step;
+          })
+        : null;
+
     const step = Array.isArray(steps) ? steps[currentStep - 1] : null;
 
     return (
       <div
         ref={this.domRef}
         className={cx(
-          `${ns}Panel ${ns}Panel--default ${ns}Wizard ${ns}Wizard--${mode}`,
+          wrapWithPanel ? `${ns}Panel ${ns}Panel--default` : '',
+          `${ns}Wizard ${ns}Wizard--${mode}`,
           className
         )}
+        style={style}
       >
-        <div className={`${ns}Wizard-step`}>
+        <div className={cx(`${ns}Wizard-step`, stepClassName)}>
           {this.renderSteps()}
           <div
             role="wizard-body"
-            className={`${ns}Wizard-stepContent clearfix`}
+            className={cx(`${ns}Wizard-stepContent clearfix`, bodyClassName)}
           >
             {step ? (
               render(
@@ -1127,7 +1231,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
                   wrapWithPanel: false,
 
                   // 接口相关需要外部来接管
-                  api: null
+                  api: undefined
                 },
                 {
                   key: this.state.currentStep,
@@ -1156,8 +1260,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         {render(
           'dialog',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).dialog as object)),
+            ...store.dialogSchema,
             type: 'dialog'
           },
           {
@@ -1168,7 +1271,13 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
             show: store.dialogOpen
           }
         )}
-        <Spinner size="lg" overlay key="info" show={store.loading} />
+        <Spinner
+          loadingConfig={loadingConfig}
+          size="lg"
+          overlay
+          key="info"
+          show={store.loading}
+        />
       </div>
     );
   }
@@ -1251,5 +1360,10 @@ export class WizardRenderer extends Wizard {
 
   setData(values: object, replace?: boolean) {
     return this.props.store.updateData(values, undefined, replace);
+  }
+
+  getData() {
+    const {store} = this.props;
+    return store.data;
   }
 }

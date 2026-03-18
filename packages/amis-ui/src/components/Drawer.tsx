@@ -17,6 +17,7 @@ import cx from 'classnames';
 import {current, addModal, removeModal} from './ModalManager';
 import {ClassNamesFn, themeable} from 'amis-core';
 import {noop, autobind, getScrollbarWidth} from 'amis-core';
+import {getContainerWithFullscreen} from './Modal';
 
 type DrawerPosition = 'top' | 'right' | 'bottom' | 'left';
 
@@ -38,16 +39,24 @@ export interface DrawerProps {
   classPrefix: string;
   resizable?: boolean;
   classnames: ClassNamesFn;
+  children?: React.ReactNode | Array<React.ReactNode>;
   onExited?: () => void;
   onEntered?: () => void;
+  drawerClassName?: string;
+  drawerMaskClassName?: string;
+  mobileUI?: boolean;
+  onDragging?: (value: boolean) => void;
 }
+
 export interface DrawerState {}
+
 const fadeStyles: {
   [propName: string]: string;
 } = {
   [ENTERING]: 'in',
   [ENTERED]: 'in'
 };
+
 export class Drawer extends React.Component<DrawerProps, DrawerState> {
   static defaultProps: Pick<
     DrawerProps,
@@ -70,9 +79,6 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
     if (this.props.show) {
       this.handleEntered();
     }
-
-    document.body.addEventListener('click', this.handleRootClickCapture, true);
-    document.body.addEventListener('click', this.handleRootClick);
   }
 
   componentDidUpdate(prevProps: DrawerProps) {
@@ -93,13 +99,6 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
     if (this.props.show) {
       this.handleExited();
     }
-
-    document.body.removeEventListener('click', this.handleRootClick);
-    document.body.removeEventListener(
-      'click',
-      this.handleRootClickCapture,
-      true
-    );
   }
 
   contentRef = (ref: any) => (this.contentDom = ref);
@@ -119,11 +118,37 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
 
   handleEntered = () => {
     const onEntered = this.props.onEntered;
+
+    document.body.addEventListener(
+      'mousedown',
+      this.handleRootMouseDownCapture,
+      true
+    );
+    document.body.addEventListener(
+      'mouseup',
+      this.handleRootMouseUpCapture,
+      true
+    );
+    document.body.addEventListener('mouseup', this.handleRootMouseUp);
+
     onEntered && onEntered();
   };
   handleExited = () => {
     const onExited = this.props.onExited;
     document.activeElement && (document.activeElement as HTMLElement)?.blur?.();
+
+    document.body.removeEventListener('mouseup', this.handleRootMouseUp);
+    document.body.removeEventListener(
+      'mouseup',
+      this.handleRootMouseUpCapture,
+      true
+    );
+    document.body.removeEventListener(
+      'mousedown',
+      this.handleRootMouseDownCapture,
+      true
+    );
+
     onExited && onExited();
     setTimeout(() => {
       if (!document.querySelector('.amis-dialog-widget')) {
@@ -146,9 +171,9 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
   };
 
   @autobind
-  handleRootClickCapture(e: MouseEvent) {
+  handleRootMouseDownCapture(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    const {closeOnOutside, classPrefix: ns} = this.props;
+    const {closeOnOutside, classPrefix: ns, mobileUI} = this.props;
     const isLeftButton =
       (e.button === 1 && window.event !== null) || e.button === 0;
 
@@ -157,14 +182,27 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
       closeOnOutside &&
       target &&
       this.modalDom &&
-      ((!this.modalDom.contains(target) && !target.closest('[role=dialog]')) ||
+      ((!mobileUI &&
+        !this.modalDom.contains(target) &&
+        !target.closest('[role=dialog]')) ||
         (target.matches(`.${ns}Drawer-overlay`) &&
           target.parentElement === this.modalDom))
     ); // 干脆过滤掉来自弹框里面的点击
   }
 
   @autobind
-  handleRootClick(e: MouseEvent) {
+  handleRootMouseUpCapture(e: MouseEvent) {
+    // mousedown 的时候不在弹窗里面，则不需要判断了
+    if (!this.isRootClosed) {
+      return;
+    }
+
+    // 再判断 mouseup 的时候是不是在弹窗里面
+    this.handleRootMouseDownCapture(e);
+  }
+
+  @autobind
+  handleRootMouseUp(e: MouseEvent) {
     const {onHide} = this.props;
 
     this.isRootClosed && !e.defaultPrevented && onHide(e);
@@ -189,7 +227,8 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
 
   @autobind
   resizeMouseDown(e: React.MouseEvent<any>) {
-    const {position, classPrefix: ns} = this.props;
+    const {position, classPrefix: ns, onDragging} = this.props;
+    onDragging && onDragging(true);
     const drawer = this.contentDom;
     const resizer = this.resizer.current!;
 
@@ -248,6 +287,8 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
 
   @autobind
   removeResize() {
+    const {onDragging} = this.props;
+    onDragging && onDragging(false);
     document.body.removeEventListener('mousemove', this.bindResize);
     document.body.removeEventListener('mouseup', this.removeResize);
   }
@@ -280,13 +321,15 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
       disabled,
       overlay,
       bodyClassName,
-      resizable
+      resizable,
+      drawerClassName,
+      drawerMaskClassName
     } = this.props;
 
     const bodyStyle = this.getDrawerStyle();
 
     return (
-      <Portal container={container}>
+      <Portal container={getContainerWithFullscreen(container)}>
         <Transition
           mountOnEnter
           unmountOnExit
@@ -322,7 +365,11 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
               >
                 {overlay ? (
                   <div
-                    className={cx(`${ns}Drawer-overlay`, fadeStyles[status])}
+                    className={cx(
+                      `${ns}Drawer-overlay`,
+                      fadeStyles[status],
+                      drawerMaskClassName
+                    )}
                   />
                 ) : null}
                 <div
@@ -331,7 +378,8 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
                   className={cx(
                     `${ns}Drawer-content`,
                     bodyClassName,
-                    fadeStyles[status]
+                    fadeStyles[status],
+                    drawerClassName
                   )}
                 >
                   {show && showCloseButton ? (
@@ -339,7 +387,11 @@ export class Drawer extends React.Component<DrawerProps, DrawerState> {
                       onClick={disabled ? undefined : onHide}
                       className={`${ns}Drawer-close`}
                     >
-                      <Icon icon="close" className="icon" />
+                      <Icon
+                        icon="close"
+                        className="icon"
+                        iconContent="Drawer-close"
+                      />
                     </a>
                   ) : null}
                   {status === EXITED ? null : children}

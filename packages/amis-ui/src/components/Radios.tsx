@@ -22,11 +22,14 @@ import {value2array, OptionProps, Option} from './Select';
 import chunk from 'lodash/chunk';
 import {ClassNamesFn, themeable} from 'amis-core';
 import {columnsSplit} from 'amis-core';
+import {TestIdBuilder} from 'amis-core';
+import TooltipWrapper from './TooltipWrapper';
+import Icon from './icons';
 
 interface RadioProps extends OptionProps {
   id?: string;
   type: string;
-  optionType?: string;
+  optionType?: 'default' | 'button';
   value?: string;
   className?: string;
   style?: React.CSSProperties;
@@ -41,12 +44,16 @@ interface RadioProps extends OptionProps {
   labelClassName?: string;
   classPrefix: string;
   classnames: ClassNamesFn;
+  renderLabel?: (item: Option, props: RadioProps) => JSX.Element;
+  testIdBuilder?: TestIdBuilder;
 }
 
+const defaultLabelRender = (item: Option, props: RadioProps) => (
+  <>{`${item[props.labelField || 'label']}`}</>
+);
 export class Radios extends React.Component<RadioProps, any> {
   static defaultProps = {
     type: 'radio',
-    optionType: 'default',
     btnActiveLevel: 'primary',
     resetValue: '',
     inline: true,
@@ -79,14 +86,19 @@ export class Radios extends React.Component<RadioProps, any> {
   }
 
   renderGroup(option: Option, index: number, valueArray: Array<Option>) {
-    const {classnames: cx, optionType, classPrefix: ns} = this.props;
+    const {
+      classnames: cx,
+      optionType,
+      classPrefix: ns,
+      renderLabel = defaultLabelRender
+    } = this.props;
 
     return (
       <div key={index} className={cx('RadiosControl-group', option.className)}>
         <label
           className={cx('RadiosControl-groupLabel', option.labelClassName)}
         >
-          {option.label}
+          {renderLabel(option, this.props)}
         </label>
 
         {option.children && option.children.length
@@ -99,7 +111,7 @@ export class Radios extends React.Component<RadioProps, any> {
   }
 
   renderItem(option: Option, index: number, valueArray: Array<Option>) {
-    if (option.children) {
+    if (option.children?.length) {
       return this.renderGroup(option, index, valueArray);
     }
 
@@ -113,24 +125,29 @@ export class Radios extends React.Component<RadioProps, any> {
       optionType,
       level,
       btnActiveLevel,
-      classPrefix: ns
+      classPrefix: ns,
+      testIdBuilder,
+      renderLabel = defaultLabelRender
     } = this.props;
+    const itemTestIdBuilder = testIdBuilder?.getChild(option.value || index);
 
-    if (optionType === 'button') {
-      const active = !!~valueArray.indexOf(option);
-      return (
-        <Button
-          key={index}
-          active={active}
-          onClick={() => this.toggleOption(option)}
-          className={cx(itemClassName, option.className)}
-          disabled={disabled || option.disabled}
-          level={(active ? btnActiveLevel : '') || level}
-        >
-          <span>{`${option[labelField || 'label']}`}</span>
-        </Button>
-      );
-    }
+    // if (optionType === 'button') {
+    //   const active = !!~valueArray.indexOf(option);
+    //   return (
+    //     <Button
+    //       key={index}
+    //       active={active}
+    //       onClick={() => this.toggleOption(option)}
+    //       className={cx(itemClassName, option.className)}
+    //       disabled={disabled || option.disabled}
+    //       level={(active ? btnActiveLevel : '') || level}
+    //     >
+    //       <span>{renderLabel(option, this.props)}</span>
+    //     </Button>
+    //   );
+    // }
+
+    const finalDisabled = disabled || option.disabled;
 
     return (
       <Checkbox
@@ -139,12 +156,25 @@ export class Radios extends React.Component<RadioProps, any> {
         onChange={() => this.toggleOption(option)}
         checked={!!~valueArray.indexOf(option)}
         className={cx(itemClassName, option.className)}
-        disabled={disabled || option.disabled}
+        disabled={finalDisabled}
         description={option.description}
         inline={inline}
         labelClassName={labelClassName}
+        testIdBuilder={itemTestIdBuilder}
+        optionType={optionType}
       >
-        {`${option[labelField || 'label']}`}
+        {renderLabel(option, this.props)}
+        {option.disabledTip && finalDisabled ? (
+          <TooltipWrapper
+            placement="right"
+            tooltip={option.disabledTip}
+            trigger="hover"
+          >
+            <a className={cx('Select-option-disabledTip')}>
+              <Icon className="icon" icon="question2" />
+            </a>
+          </TooltipWrapper>
+        ) : null}
       </Checkbox>
     );
   }
@@ -154,6 +184,7 @@ export class Radios extends React.Component<RadioProps, any> {
       value,
       options,
       className,
+      style,
       classnames: cx,
       placeholder,
       columnsCount,
@@ -184,7 +215,7 @@ export class Radios extends React.Component<RadioProps, any> {
     }
 
     return (
-      <div className={className}>
+      <div className={className} style={style}>
         {body && body.length ? body : placeholder}
       </div>
     );

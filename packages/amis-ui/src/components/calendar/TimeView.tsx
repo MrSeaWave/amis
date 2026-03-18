@@ -5,14 +5,16 @@ import {
   LocaleProps,
   localeable,
   ClassNamesFn,
-  utils,
   getRange,
-  isMobile
+  isObject
 } from 'amis-core';
 import {Icon} from '../icons';
 import Picker from '../Picker';
 import {PickerColumnItem} from '../PickerColumn';
 import Downshift from 'downshift';
+
+import type {Moment} from 'moment';
+import type {TestIdBuilder} from 'amis-core';
 
 interface CustomTimeViewProps extends LocaleProps {
   viewDate: moment.Moment;
@@ -46,11 +48,12 @@ interface CustomTimeViewProps extends LocaleProps {
   onClose?: () => void;
   onConfirm?: (value: number[], types: string[]) => void;
   setDateTimeState: (state: any, callback?: () => void) => void;
-  useMobileUI: boolean;
+  mobileUI: boolean;
   showToolbar?: boolean;
   onChange: (value: moment.Moment) => void;
   timeConstraints?: any;
   timeRangeHeader?: string;
+  testIdBuilder?: TestIdBuilder;
 }
 
 interface CustomTimeViewState {
@@ -102,6 +105,8 @@ export class CustomTimeView extends React.Component<
 
   timer?: any;
   increaseTimer?: any;
+  /** 基于 timeConstraints 计算出的时间列表 */
+  timeList: string[] = [];
 
   constructor(props: any) {
     super(props);
@@ -143,7 +148,58 @@ export class CustomTimeView extends React.Component<
         );
       }
     });
+
+    /** 如果设置了step或者min、max限制，则计算出时间列表提供给后续使用 */
+    if (this.shoudExtractTimeConstraintsList()) {
+      const hours = this.computedTimeOptions('hours').map(item => item.value);
+      const minutes = timeFormat.split(':').some(f => /^(mm|m)$/.test(f))
+        ? this.computedTimeOptions('minutes').map(item => item.value)
+        : ['00'];
+      const seconds = timeFormat.split(':').some(f => /^(ss|s)$/.test(f))
+        ? this.computedTimeOptions('seconds').map(item => item.value)
+        : ['00'];
+      const result = [];
+
+      for (let h of hours) {
+        for (let m of minutes) {
+          for (let s of seconds) {
+            result.push(`${h}:${m}:${s}`);
+          }
+        }
+      }
+
+      this.timeList = result;
+    }
   }
+
+  shoudExtractTimeConstraintsList = (): boolean => {
+    const timeConstraints = this.timeConstraints;
+    let result = false;
+
+    if (!timeConstraints || !isObject(timeConstraints)) {
+      return result;
+    }
+
+    ['hours', 'minutes', 'seconds'].forEach(
+      (timeScale: 'hours' | 'minutes' | 'seconds') => {
+        const {min, max, step} = timeConstraints[timeScale];
+
+        if (result !== false) {
+          return;
+        }
+
+        if (timeScale === 'hours') {
+          result = min > 0 || max < 23 || step > 1;
+        } else if (timeScale === 'minutes') {
+          result = min > 0 || max < 59 || step > 1;
+        } else if (timeScale === 'seconds') {
+          result = min > 0 || max < 59 || step > 1;
+        }
+      }
+    );
+
+    return result;
+  };
 
   updateSelectedDate = (event: React.MouseEvent<any>) => {
     // need confirm
@@ -561,16 +617,39 @@ export class CustomTimeView extends React.Component<
     });
   };
 
+  /**
+   * 选择当前时间，如果设置了timeConstraints，则选择最接近的时间
+   */
   selectNowTime = () => {
-    this.props.setDateTimeState(
-      {
-        viewDate: moment().clone(),
-        selectedDate: moment().clone()
-      },
-      () => {
-        this.confirm();
-      }
-    );
+    const {setDateTimeState, timeFormat} = this.props;
+    const useClosetDate = this.shoudExtractTimeConstraintsList();
+
+    if (useClosetDate) {
+      const timeList = this.timeList;
+      const now: Moment = moment().clone();
+      let closetDate: Moment = now.clone();
+      let minDiff = Infinity;
+
+      /** 遍历时间列表，找出最接近此刻的时间 */
+      timeList.forEach((item, index) => {
+        const date = moment(item, timeFormat);
+        const diff = Math.abs(now.diff(date));
+
+        if (diff < minDiff) {
+          minDiff = diff;
+          closetDate = date;
+        }
+      });
+
+      setDateTimeState({viewDate: closetDate, selectedDate: closetDate}, () =>
+        this.confirm()
+      );
+    } else {
+      setDateTimeState(
+        {viewDate: moment().clone(), selectedDate: moment().clone()},
+        () => this.confirm()
+      );
+    }
   };
 
   confirm = () => {
@@ -611,7 +690,9 @@ export class CustomTimeView extends React.Component<
       viewDate,
       isEndDate,
       classnames: cx,
-      timeRangeHeader
+      timeRangeHeader,
+      mobileUI,
+      testIdBuilder
     } = this.props;
 
     const __ = this.props.translate;
@@ -620,7 +701,7 @@ export class CustomTimeView extends React.Component<
     const inputs: Array<React.ReactNode> = [];
     const timeConstraints = this.timeConstraints;
 
-    if (isMobile() && this.props.useMobileUI) {
+    if (mobileUI) {
       return (
         <div className={cx('CalendarTime')}>{this.renderTimeViewPicker()}</div>
       );
@@ -667,6 +748,7 @@ export class CustomTimeView extends React.Component<
                     )
                   )
               });
+              const itemTIB = testIdBuilder?.getChild(type);
               return (
                 <div className={cx('CalendarInputWrapper')}>
                   <div
@@ -683,10 +765,13 @@ export class CustomTimeView extends React.Component<
                         <div
                           key={option.value}
                           className={cx('CalendarInput-sugsItem', {
+                            'is-mobile': mobileUI,
                             'is-highlight': selectedDate
                               ? option.value === date.format(formatMap[type])
-                              : option.value === options?.[0]?.value
+                              : option.value === options?.[0]?.value &&
+                                !mobileUI
                           })}
+                          {...itemTIB?.getChild(option.value).getTestId()}
                           onClick={() => {
                             this.setTime(type, parseInt(option.value, 10));
                             this.scrollToTop(
@@ -713,7 +798,11 @@ export class CustomTimeView extends React.Component<
     inputs.length && inputs.pop();
 
     const quickLists = [
-      <a key="select-now" onClick={this.selectNowTime}>
+      <a
+        key="select-now"
+        onClick={this.selectNowTime}
+        {...testIdBuilder?.getChild('select-now').getTestId()}
+      >
         {__('TimeNow')}
       </a>
     ];
@@ -729,6 +818,7 @@ export class CustomTimeView extends React.Component<
             <a
               className={cx('Button', 'Button--primary', 'Button--size-sm')}
               onClick={this.confirm}
+              {...testIdBuilder?.getChild('confirm').getTestId()}
             >
               {__('confirm')}
             </a>

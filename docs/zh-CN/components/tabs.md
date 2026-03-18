@@ -15,6 +15,7 @@ order: 68
 ```schema: scope="body"
 {
     "type": "tabs",
+    "swipeable": true,
     "tabs": [
         {
             "title": "Tab 1",
@@ -529,6 +530,46 @@ order: 68
 }
 ```
 
+内容来源于 source
+
+```schema: scope="body"
+{
+    "type": "page",
+    "data": {
+        "arr": [
+            {
+                "a": "收入",
+                "b": 199,
+                "key": "a"
+            },
+
+            {
+                "a": "支出",
+                "b": 299,
+                "key": "b"
+            }
+        ]
+    },
+    "body": [
+        {
+            "type": "tabs",
+            "activeKey": "b",
+            "source": "${arr}",
+            "tabs": [
+                {
+                    "title": "${a}",
+                    "hash": "${key}",
+                    "body": {
+                        "type": "tpl",
+                        "tpl": "金额：${b|number}元"
+                    }
+                }
+            ]
+        }
+    ]
+}
+```
+
 #### 配置索引值
 
 单个`tab`上不要配置`hash`属性，配置需要展示的`tab`索引值，`0`代表第一个。支持变量，如`"${id}"`
@@ -555,31 +596,109 @@ order: 68
 
 ```schema
 {
-    "type": "page",
+  "type": "page",
     "data": {
-        "key": "tab2"
-    },
-    "body": [
+    "key": 2
+  },
+  "body": [
+    {
+      "type": "radios",
+      "name": "key",
+      "mode": "inline",
+      "label": "激活的选项卡",
+      "options": [
         {
-            "type": "tabs",
-            "activeKey": "${key}",
-            "tabs": [
-                {
-                    "title": "Tab 1",
-                    "hash": "tab1",
-                    "tab": "Content 1"
-                },
-
-                {
-                    "title": "Tab 2",
-                    "hash": "tab2",
-                    "tab": "Content 2"
-                }
-            ]
+          "label": "Tab 1",
+          "value": 0
+        },
+        {
+          "label": "Tab 2",
+          "value": 1
+        },
+        {
+          "label": "Tab 3",
+          "value": 2
         }
-    ]
+      ]
+    },
+    {
+      "type": "tabs",
+      "activeKey": "${key|toInt}",
+      "tabs": [
+        {
+          "title": "Tab 1",
+          "tab": "Content 1"
+        },
+        {
+          "title": "Tab 2",
+          "tab": "Content 2"
+        },
+        {
+          "title": "Tab 3",
+          "tab": "Content 3"
+        }
+      ]
+    }
+  ]
 }
 ```
+
+### 初始化设置默认选项卡
+
+> 2.7.1 以上版本
+
+```schema
+{
+  "type": "page",
+  "data": {
+    "defaultKey": 1,
+    "key": 2
+  },
+  "body": [
+    {
+      "type": "radios",
+      "name": "key",
+      "mode": "inline",
+      "label": "激活的选项卡",
+      "options": [
+        {
+          "label": "Tab 1",
+          "value": 0
+        },
+        {
+          "label": "Tab 2",
+          "value": 1
+        },
+        {
+          "label": "Tab 3",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "type": "tabs",
+      "activeKey": "${activeKey|toInt}",
+      "defaultKey": "${defaultKey|toInt}",
+      "tabs": [
+        {
+          "title": "Tab 1",
+          "tab": "Content 1"
+        },
+        {
+          "title": "Tab 2",
+          "tab": "Content 2"
+        },
+        {
+          "title": "Tab 3",
+          "tab": "Content 3"
+        }
+      ]
+    }
+  ]
+}
+```
+
+> 初始化组件时 `defaultKey` 优先级高于 `activeKey`，但 `defaultKey` 仅作用于组件初始化时，不会响应上下文数据变化。
 
 ## 图标
 
@@ -595,6 +714,44 @@ order: 68
             "icon": "https://suda.cdn.bcebos.com/images%2F2021-01%2Fdiamond.svg"
         },
 
+        {
+            "title": "Tab 2",
+            "tab": "Content 2"
+        }
+    ]
+}
+```
+
+## title 自定义
+
+> 3.2.0 及以上版本
+
+通过配置 tabs 数组中 title 为 schema，就能自定义 title 的显示。
+
+```schema: scope="body"
+{
+    "type": "tabs",
+    "addBtnText": "新增Tab",
+    "showTip": true,
+    "tabs": [
+        {
+            "title": {
+                "type": "container",
+                "body": [
+                    {
+                        "type": "tpl",
+                        "tpl": "这里是容器内容区"
+                    },
+                    {
+                        "type": "icon",
+                        "icon": "cloud"
+                    }
+                ]
+            },
+            "closable": true,
+            "tab": "Content 1",
+            "tip": "容器内容区提示"
+        },
         {
             "title": "Tab 2",
             "tab": "Content 2"
@@ -676,49 +833,128 @@ order: 68
 
 ## 属性表
 
-| 属性名                | 类型                              | 默认值                              | 说明                                                                                                       |
-| --------------------- | --------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| type                  | `string`                          | `"tabs"`                            | 指定为 Tabs 渲染器                                                                                         |
-| className             | `string`                          |                                     | 外层 Dom 的类名                                                                                            |
-| tabsMode              | `string`                          |                                     | 展示模式，取值可以是 `line`、`card`、`radio`、`vertical`、`chrome`、`simple`、`strong`、`tiled`、`sidebar` |
-| tabsClassName         | `string`                          |                                     | Tabs Dom 的类名                                                                                            |
-| tabs                  | `Array`                           |                                     | tabs 内容                                                                                                  |
-| source                | `string`                          |                                     | tabs 关联数据，关联后可以重复生成选项卡                                                                    |
-| toolbar               | [SchemaNode](../types/schemanode) |                                     | tabs 中的工具栏                                                                                            |
-| toolbarClassName      | `string`                          |                                     | tabs 中工具栏的类名                                                                                        |
-| tabs[x].title         | `string`                          |                                     | Tab 标题                                                                                                   |
-| tabs[x].icon          | `icon`                            |                                     | Tab 的图标                                                                                                 |
-| tabs[x].iconPosition  | `left` / `right`                  | `left`                              | Tab 的图标位置                                                                                             |
-| tabs[x].tab           | [SchemaNode](../types/schemanode) |                                     | 内容区                                                                                                     |
-| tabs[x].hash          | `string`                          |                                     | 设置以后将跟 url 的 hash 对应                                                                              |
-| tabs[x].reload        | `boolean`                         |                                     | 设置以后内容每次都会重新渲染，对于 crud 的重新拉取很有用                                                   |
-| tabs[x].unmountOnExit | `boolean`                         |                                     | 每次退出都会销毁当前 tab 栏内容                                                                            |
-| tabs[x].className     | `string`                          | `"bg-white b-l b-r b-b wrapper-md"` | Tab 区域样式                                                                                               |
-| tabs[x].closable      | `boolean`                         | false                               | 是否支持删除，优先级高于组件的 `closable`                                                                  |
-| tabs[x].disabled      | `boolean`                         | false                               | 是否禁用                                                                                                   |
-| mountOnEnter          | `boolean`                         | false                               | 只有在点中 tab 的时候才渲染                                                                                |
-| unmountOnExit         | `boolean`                         | false                               | 切换 tab 的时候销毁                                                                                        |
-| addable               | `boolean`                         | false                               | 是否支持新增                                                                                               |
-| addBtnText            | `string`                          | 增加                                | 新增按钮文案                                                                                               |
-| closable              | `boolean`                         | false                               | 是否支持删除                                                                                               |
-| draggable             | `boolean`                         | false                               | 是否支持拖拽                                                                                               |
-| showTip               | `boolean`                         | false                               | 是否支持提示                                                                                               |
-| showTipClassName      | `string`                          | `'' `                               | 提示的类                                                                                                   |
-| editable              | `boolean`                         | false                               | 收否可编辑标签名                                                                                           |
-| scrollable            | `boolean`                         | true                                | 是否导航支持内容溢出滚动。（属性废弃）                                                                     |
-| sidePosition          | `left` / `right`                  | `left`                              | `sidebar` 模式下，标签栏位置                                                                               |
-| collapseOnExceed      | `number`                          |                                     | 当 tabs 超出多少个时开始折叠                                                                               |
-| collapseBtnLabel      | `string`                          | `more`                              | 用来设置折叠按钮的文字                                                                                     |
+| 属性名                | 类型                                          | 默认值                              | 说明                                                                                                                                      |
+| --------------------- | --------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| type                  | `string`                                      | `"tabs"`                            | 指定为 Tabs 渲染器                                                                                                                        |
+| defaultKey            | `string` / `number`                           |                                     | 组件初始化时激活的选项卡，hash 值或索引值，支持使用表达式 `2.7.1 以上版本`                                                                |
+| activeKey             | `string` / `number`                           |                                     | 激活的选项卡，hash 值或索引值，支持使用表达式，可响应上下文数据变化                                                                       |
+| className             | `string`                                      |                                     | 外层 Dom 的类名                                                                                                                           |
+| linksClassName        | `string`                                      |                                     | Tabs 标题区的类名                                                                                                                         |
+| contentClassName      | `string`                                      |                                     | Tabs 内容区的类名                                                                                                                         |
+| tabsMode              | `string`                                      |                                     | 展示模式，取值可以是 `line`、`card`、`radio`、`vertical`、`chrome`、`simple`、`strong`、`tiled`、`sidebar`                                |
+| tabs                  | `Array`                                       |                                     | tabs 内容                                                                                                                                 |
+| source                | `string`                                      |                                     | tabs 关联数据，关联后可以重复生成选项卡                                                                                                   |
+| toolbar               | [SchemaNode](../types/schemanode)             |                                     | tabs 中的工具栏                                                                                                                           |
+| toolbarClassName      | `string`                                      |                                     | tabs 中工具栏的类名                                                                                                                       |
+| tabs[x].title         | `string` \| [SchemaNode](../types/schemanode) |                                     | Tab 标题，当是 [SchemaNode](../types/schemanode) 时，该 title 不支持 editable 为 true 的双击编辑                                          |
+| tabs[x].icon          | `icon`                                        |                                     | Tab 的图标                                                                                                                                |
+| tabs[x].iconPosition  | `left` / `right`                              | `left`                              | Tab 的图标位置                                                                                                                            |
+| tabs[x].tab           | [SchemaNode](../types/schemanode)             |                                     | 内容区                                                                                                                                    |
+| tabs[x].hash          | `string`                                      |                                     | 设置以后将跟 url 的 hash 对应                                                                                                             |
+| tabs[x].reload        | `boolean`                                     |                                     | 设置以后内容每次都会重新渲染，对于 crud 的重新拉取很有用                                                                                  |
+| tabs[x].unmountOnExit | `boolean`                                     |                                     | 每次退出都会销毁当前 tab 栏内容                                                                                                           |
+| tabs[x].className     | `string`                                      | `"bg-white b-l b-r b-b wrapper-md"` | Tab 区域样式                                                                                                                              |
+| tabs[x].tip           | `string`                                      |                                     | `3.2.0及以上版本支持` Tab 提示，当开启 `showTip` 时生效，作为 Tab 在 hover 时的提示显示，可不配置，如不设置，`tabs[x].title` 作为提示显示 |
+| tabs[x].closable      | `boolean`                                     | false                               | 是否支持删除，优先级高于组件的 `closable`                                                                                                 |
+| tabs[x].disabled      | `boolean`                                     | false                               | 是否禁用                                                                                                                                  |
+| mountOnEnter          | `boolean`                                     | true                                | 只有在点中 tab 的时候才渲染                                                                                                               |
+| unmountOnExit         | `boolean`                                     | false                               | 切换 tab 的时候销毁                                                                                                                       |
+| addable               | `boolean`                                     | false                               | 是否支持新增                                                                                                                              |
+| addBtnText            | `string`                                      | 增加                                | 新增按钮文案                                                                                                                              |
+| closable              | `boolean`                                     | false                               | 是否支持删除                                                                                                                              |
+| draggable             | `boolean`                                     | false                               | 是否支持拖拽                                                                                                                              |
+| showTip               | `boolean`                                     | false                               | 是否支持提示                                                                                                                              |
+| showTipClassName      | `string`                                      | `'' `                               | 提示的类                                                                                                                                  |
+| editable              | `boolean`                                     | false                               | 是否可编辑标签名。当 `tabs[x].title` 为 [SchemaNode](../types/schemanode) 时，双击编辑 Tab 的 title 显示空的内容                          |
+| scrollable            | `boolean`                                     | true                                | 是否导航支持内容溢出滚动。（属性废弃）                                                                                                    |
+| sidePosition          | `left` / `right`                              | `left`                              | `sidebar` 模式下，标签栏位置                                                                                                              |
+| collapseOnExceed      | `number`                                      |                                     | 当 tabs 超出多少个时开始折叠                                                                                                              |
+| collapseBtnLabel      | `string`                                      | `more`                              | 用来设置折叠按钮的文字                                                                                                                    |
+| swipeable             | `boolean`                                     | false                               | 是否开启手势滑动切换（移动端生效）                                                                                                        |
 
 ## 事件表
 
-当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`来获取事件产生的数据（`< 2.3.2 及以下版本 为 ${event.data.[事件参数名]}`），详细请查看[事件动作](../../docs/concepts/event-action)。
+当前组件会对外派发以下事件，可以通过`onEvent`来监听这些事件，并通过`actions`来配置执行的动作，在`actions`中可以通过`${事件参数名}`或`${event.data.[事件参数名]}`来获取事件产生的数据，详细请查看[事件动作](../../docs/concepts/event-action)。
 
 > `[name]`表示当前组件绑定的名称，即`name`属性，如果没有配置`name`属性，则通过`value`取值。
 
-| 事件名称 | 事件参数                              | 说明             |
-| -------- | ------------------------------------- | ---------------- |
-| change   | `[name]: number \| string` 选项卡索引 | 切换选项卡时触发 |
+| 事件名称 | 事件参数                             | 说明             |
+| -------- | ------------------------------------ | ---------------- |
+| change   | `value: number \| string` 选项卡索引 | 切换选项卡时触发 |
+| delete   | `value: number \| string` 选项卡索引 | 删除选项卡时触发 |
+
+### change
+
+```schema: scope="body"
+{
+    "type": "tabs",
+    "mode": "line",
+    "tabs": [
+    {
+        "title": "选项卡1",
+        "body": "选项卡内容1"
+    },
+    {
+        "title": "选项卡2",
+        "body": "选项卡内容2"
+    },
+    {
+        "title": "选项卡3",
+        "body": "选项卡内容3"
+    }
+    ],
+    "onEvent": {
+        "change": {
+            "actions": [
+                {
+                    "actionType": "toast",
+                    "args": {
+                    "msgType": "info",
+                    "msg": "切换至选项卡${event.data.value}"
+                    }
+                }
+            ]
+        }
+    }
+}
+```
+
+### delete
+
+```schema: scope="body"
+{
+    "type": "tabs",
+    "closable": true,
+    "mode": "line",
+    "tabs": [
+    {
+        "title": "选项卡1",
+        "body": "选项卡内容1"
+    },
+    {
+        "title": "选项卡2",
+        "body": "选项卡内容2"
+    },
+    {
+        "title": "选项卡3",
+        "body": "选项卡内容3"
+    }
+    ],
+    "onEvent": {
+        "delete": {
+            "actions": [
+                {
+                    "actionType": "toast",
+                    "args": {
+                        "msgType": "info",
+                        "msg": "删除选项卡${event.data.value}"
+                    }
+                }
+            ]
+        }
+    }
+}
+```
 
 ## 动作表
 
@@ -727,3 +963,171 @@ order: 68
 | 动作名称        | 动作配置                                 | 说明             |
 | --------------- | ---------------------------------------- | ---------------- |
 | changeActiveKey | `activeKey: number \| string` 选项卡索引 | 激活指定的选项卡 |
+| deleteTab       | `deleteHash: string` 选项卡 hash         | 删除指定的选项卡 |
+
+### changeActiveKey
+
+可以尝试点击下方按钮，实现选项卡激活。
+
+```schema: scope="body"
+[
+    {
+      "type": "action",
+      "label": "激活选项卡1",
+      "className": "mr-3 mb-3",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "actionType": "changeActiveKey",
+              "componentId": "tabs-change-receiver",
+              "args": {
+                "activeKey": 1
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "action",
+      "label": "激活选项卡2",
+      "className": "mr-3 mb-3",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "actionType": "changeActiveKey",
+              "componentId": "tabs-change-receiver",
+              "args": {
+                "activeKey": 2
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "action",
+      "label": "激活选项卡3",
+      "className": "mr-3 mb-3",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "actionType": "changeActiveKey",
+              "componentId": "tabs-change-receiver",
+              "args": {
+                "activeKey": 3
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tabs-change-receiver",
+      "type": "tabs",
+      "mode": "line",
+      "tabs": [
+        {
+          "title": "选项卡1",
+          "body": "选项卡内容1"
+        },
+        {
+          "title": "选项卡2",
+          "body": "选项卡内容2"
+        },
+        {
+          "title": "选项卡3",
+          "body": "选项卡内容3"
+        }
+      ]
+    }
+]
+```
+
+### deleteTab
+
+可以尝试点击下方按钮，实现选项卡删除。
+
+```schema: scope="body"
+[
+    {
+      "type": "action",
+      "label": "删除选项卡1",
+      "className": "mr-3 mb-3",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "actionType": "deleteTab",
+              "componentId": "tabs-change-receiver",
+              "args": {
+                "deleteHash": "tab1"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "action",
+      "label": "删除选项卡2",
+      "className": "mr-3 mb-3",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "actionType": "deleteTab",
+              "componentId": "tabs-change-receiver",
+              "args": {
+                "deleteHash": "tab2"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "action",
+      "label": "删除选项卡3",
+      "className": "mr-3 mb-3",
+      "onEvent": {
+        "click": {
+          "actions": [
+            {
+              "actionType": "deleteTab",
+              "componentId": "tabs-change-receiver",
+              "args": {
+                "deleteHash": "tab3"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tabs-change-receiver",
+      "type": "tabs",
+      "mode": "line",
+      "tabs": [
+        {
+          "title": "选项卡1",
+          "hash": "tab1",
+          "body": "选项卡内容1"
+        },
+        {
+          "title": "选项卡2",
+          "hash": "tab2",
+          "body": "选项卡内容2"
+        },
+        {
+          "title": "选项卡3",
+          "hash": "tab3",
+          "body": "选项卡内容3"
+        }
+      ]
+    }
+]
+```

@@ -1,3 +1,4 @@
+import {getFilters} from './filter';
 import {LexerOptions, Token, TokenTypeName} from './types';
 
 export const enum TokenEnum {
@@ -81,6 +82,7 @@ const punctuatorList = [
   '===',
   '!==',
   '>>>',
+  '...',
   '==',
   '!=',
   '<>',
@@ -123,6 +125,35 @@ const punctuatorList = [
   '$'
 ];
 
+// Fast dispatch of punctuators by first character, keeping longest-first order
+const punctuatorByFirstChar: {[ch: string]: string[]} = {
+  '.': ['...', '.'],
+  '=': ['===', '==', '='],
+  '!': ['!==', '!=', '!'],
+  '>': ['>>>', '>=', '>>', '>'],
+  '<': ['<=', '<<', '<>', '<'],
+  '|': ['||', '|'],
+  '&': ['&&', '&'],
+  '+': ['++', '+=', '+'],
+  '-': ['--', '-'],
+  '*': ['**', '*=', '*'],
+  '/': ['/=', '/'],
+  '%': ['%'],
+  '^': ['^'],
+  '~': ['~'],
+  '(': ['('],
+  ')': [')'],
+  '[': ['['],
+  ']': [']'],
+  '{': ['{'],
+  '}': ['}'],
+  '?': ['?'],
+  ':': [':'],
+  ';': [';'],
+  ',': [','],
+  '$': ['$']
+};
+
 const escapes = {
   '"': 0, // Quotation mask
   '\\': 1, // Reverse solidus
@@ -161,6 +192,10 @@ function escapeString(text: string, allowedLetter: Array<string> = []) {
       ? '\t'
       : text === 'v'
       ? '\v'
+      : text === '\\'
+      ? '\\'
+      : text === '/'
+      ? '/'
       : ~allowedLetter.indexOf(text)
       ? text
       : _;
@@ -171,16 +206,25 @@ function formatNumber(value: string) {
   return Number(value);
 }
 
-export function lexer(input: string, options?: LexerOptions) {
+export function lexer(input: string, options: LexerOptions = {}) {
   let line = 1;
   let column = 1;
   let index = 0;
   let mainState = mainStates.START;
   const states: Array<any> = [mainState];
   let tokenCache: Array<Token> = [];
-  const allowFilter = options?.allowFilter !== false;
+  options = {...options};
+  const allowFilter = options.allowFilter !== false;
 
-  if (options?.evalMode || options?.variableMode) {
+  if (!options.isFilter) {
+    const filterKeys = Object.keys(getFilters());
+    if ((options as any).filters) {
+      filterKeys.push(...Object.keys((options as any).filters));
+    }
+    options.isFilter = (name: string) => filterKeys.includes(name);
+  }
+
+  if (options.evalMode || options.variableMode) {
     pushState(mainStates.EXPRESSION);
   }
 
@@ -336,9 +380,9 @@ export function lexer(input: string, options?: LexerOptions) {
       punctuator() ||
       char();
 
-    if (token?.value === '{') {
+    if (token?.value === '{' && token.type == 'Punctuator') {
       pushState(mainStates.BLOCK);
-    } else if (token?.value === '}') {
+    } else if (token?.value === '}' && token.type == 'Punctuator') {
       if (mainState === mainStates.Filter) {
         popState();
       }
@@ -366,9 +410,20 @@ export function lexer(input: string, options?: LexerOptions) {
     // filter 过滤器部分需要特殊处理
     if (
       mainState === mainStates.SCRIPT &&
-      token?.value === '|' &&
+      token?.type == 'Punctuator' &&
+      token.value === '|' &&
       allowFilter
     ) {
+      // 怎么区分是过滤还是位运算呢？
+      // 靠外面反馈吧
+      if (options?.isFilter) {
+        const restInput = input.substring(token.start.index + 1).trim();
+        const m = /^[A-Za-z0-9_$@][A-Za-z0-9_\-$@]*/.exec(restInput);
+        if (!m || !options.isFilter(m[0])) {
+          return token;
+        }
+      }
+
       pushState(mainStates.Filter);
       return {
         type: TokenName[TokenEnum.OpenFilter],
@@ -376,7 +431,11 @@ export function lexer(input: string, options?: LexerOptions) {
         start: position(),
         end: position('|')
       };
-    } else if (mainState === mainStates.Filter && token?.value === '|') {
+    } else if (
+      mainState === mainStates.Filter &&
+      token?.value === '|' &&
+      token.type == 'Punctuator'
+    ) {
       return {
         type: TokenName[TokenEnum.OpenFilter],
         value: '|',
@@ -532,17 +591,29 @@ export function lexer(input: string, options?: LexerOptions) {
   }
 
   function punctuator() {
-    const find = punctuatorList.find(
-      punctuator =>
-        input.substring(index, index + punctuator.length) === punctuator
-    );
-    if (find) {
-      return {
-        type: TokenName[TokenEnum.Punctuator],
-        value: find,
-        start: position(),
-        end: position(find)
-      };
+    const ch = input[index];
+    const candidates = punctuatorByFirstChar[ch];
+    if (!candidates) {
+      return null;
+    }
+    for (let i = 0; i < candidates.length; i++) {
+      const p = candidates[i];
+      // Avoid substring allocation: compare sequential characters
+      let matched = true;
+      for (let k = 0; k < p.length; k++) {
+        if (input[index + k] !== p[k]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) {
+        return {
+          type: TokenName[TokenEnum.Punctuator],
+          value: p,
+          start: position(),
+          end: position(p)
+        };
+      }
     }
     return null;
   }
@@ -588,89 +659,20 @@ export function lexer(input: string, options?: LexerOptions) {
   }
 
   function numberLiteral() {
-    let i = index;
-
-    let passedValueIndex = i;
-    let state = numberStates.START;
-
-    iterator: while (i < input.length) {
-      const char = input.charAt(i);
-
-      switch (state) {
-        case numberStates.START: {
-          if (char === '0') {
-            passedValueIndex = i + 1;
-            state = numberStates.ZERO;
-          } else if (isDigit1to9(char)) {
-            passedValueIndex = i + 1;
-            state = numberStates.DIGIT;
-          } else {
-            return null;
-          }
-          break;
-        }
-
-        case numberStates.ZERO: {
-          if (char === '.') {
-            state = numberStates.POINT;
-          } else if (isExp(char)) {
-            state = numberStates.EXP;
-          } else {
-            break iterator;
-          }
-          break;
-        }
-
-        case numberStates.DIGIT: {
-          if (isDigit(char)) {
-            passedValueIndex = i + 1;
-          } else if (char === '.') {
-            state = numberStates.POINT;
-          } else if (isExp(char)) {
-            state = numberStates.EXP;
-          } else {
-            break iterator;
-          }
-          break;
-        }
-
-        case numberStates.POINT: {
-          if (isDigit(char)) {
-            passedValueIndex = i + 1;
-            state = numberStates.DIGIT_FRACTION;
-          } else {
-            break iterator;
-          }
-          break;
-        }
-
-        case numberStates.DIGIT_FRACTION: {
-          if (isDigit(char)) {
-            passedValueIndex = i + 1;
-          } else if (isExp(char)) {
-            state = numberStates.EXP;
-          } else {
-            break iterator;
-          }
-          break;
-        }
-      }
-
-      i++;
+    // Support integers, decimals, and exponent: 123, 1.23, 1e10, 2.3E-5
+    const slice = input.substring(index);
+    const m = slice.match(/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+    if (!m) {
+      return null;
     }
-
-    if (passedValueIndex > 0) {
-      const value = input.slice(index, passedValueIndex);
-      return {
-        type: TokenName[TokenEnum.NumericLiteral],
-        value: formatNumber(value),
-        raw: value,
-        start: position(),
-        end: position(value)
-      };
-    }
-
-    return null;
+    const raw = m[0];
+    return {
+      type: TokenName[TokenEnum.NumericLiteral],
+      value: formatNumber(raw),
+      raw,
+      start: position(),
+      end: position(raw)
+    };
   }
 
   function stringLiteral() {
@@ -728,7 +730,7 @@ export function lexer(input: string, options?: LexerOptions) {
     // 所以纯变量模式支持纯数字作为变量名
     const reg = options?.variableMode
       ? /^[\u4e00-\u9fa5A-Za-z0-9_$@][\u4e00-\u9fa5A-Za-z0-9_\-$@]*/
-      : /^(?:[\u4e00-\u9fa5A-Za-z_$@]([\u4e00-\u9fa5A-Za-z0-9_\-$@]|\\(?:\.|\[|\]|\(|\)|\{|\}|\s|=|!|>|<|\||&|\+|-|\*|\/|\^|~|%|&|\?|:|;|,))*|\d+[\u4e00-\u9fa5A-Za-z_$@](?:[\u4e00-\u9fa5A-Za-z0-9_\-$@]|\\(?:\.|\[|\]|\(|\)|\{|\}|\s|=|!|>|<|\||&|\+|-|\*|\/|\^|~|%|&|\?|:|;|,))*)/;
+      : /^(?:[\u4e00-\u9fa5A-Za-z_$@]([\u4e00-\u9fa5A-Za-z0-9_$@]|\\(?:\.|\[|\]|\(|\)|\{|\}|\s|=|!|>|<|\||&|\+|-|\*|\/|\^|~|%|&|\?|:|;|,))*|\d+(?![eE][+-]?\d)[\u4e00-\u9fa5A-Za-z_$@](?:[\u4e00-\u9fa5A-Za-z0-9_$@]|\\(?:\.|\[|\]|\(|\)|\{|\}|\s|=|!|>|<|\||&|\+|-|\*|\/|\^|~|%|&|\?|:|;|,))*)/;
 
     const match = reg.exec(
       input.substring(index, index + 256) // 变量长度不能超过 256

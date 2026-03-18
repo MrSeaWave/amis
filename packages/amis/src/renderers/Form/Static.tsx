@@ -1,5 +1,10 @@
 import React from 'react';
-import {FormItem, FormControlProps, FormBaseControl} from 'amis-core';
+import {
+  FormItem,
+  FormControlProps,
+  FormBaseControl,
+  AMISFormItem
+} from 'amis-core';
 import {TableCell} from '../Table';
 import PopOver, {SchemaPopOver} from '../PopOver';
 import QuickEdit, {SchemaQuickEdit} from '../QuickEdit';
@@ -16,13 +21,16 @@ import {
 
 /**
  * Static
- * 文档：https://baidu.gitee.io/amis/docs/components/form/static
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/static
  */
-export interface StaticExactControlSchema extends FormBaseControlSchema {
+/**
+ * Static 静态内容展示控件，支持模板渲染、内容复制、快速编辑和详情弹窗配置，一般用于只读显示表单项内容。
+ */
+export interface AMISStaticSchema extends AMISFormItem {
   type: 'static';
 
   /**
-   * 内容模板， 支持 HTML
+   * 内容模板，支持 HTML
    */
   tpl?: SchemaTpl;
 
@@ -47,7 +55,7 @@ export interface StaticExactControlSchema extends FormBaseControlSchema {
   copyable?: SchemaCopyable;
 
   /**
-   * 边框模式，默认是无边框的
+   * 边框模式
    */
   borderMode?: 'full' | 'half' | 'none';
 }
@@ -56,6 +64,7 @@ export interface StaticProps extends FormControlProps {
   placeholder?: string;
   tpl?: string;
   text?: string;
+  contentsOnly?: boolean;
 }
 
 export default class StaticControl extends React.Component<StaticProps, any> {
@@ -99,6 +108,7 @@ export default class StaticControl extends React.Component<StaticProps, any> {
   render() {
     const {
       className,
+      style,
       value,
       label,
       type,
@@ -122,6 +132,7 @@ export default class StaticControl extends React.Component<StaticProps, any> {
       label,
       name,
       ...$schema,
+      style: $schema.innerStyle,
       type: subType
     };
 
@@ -177,6 +188,7 @@ export class StaticFieldRenderer extends TableCell {
       render,
       style,
       wrapperComponent: Component,
+      contentsOnly,
       labelClassName,
       value,
       data,
@@ -209,17 +221,14 @@ export class StaticFieldRenderer extends TableCell {
       style.width = style.width || width;
     }
 
-    if (!Component) {
+    if (contentsOnly) {
       return body as JSX.Element;
     }
 
+    Component = Component || 'div';
+
     return (
-      <Component
-        style={style}
-        className={className}
-        tabIndex={tabIndex}
-        onKeyUp={onKeyUp}
-      >
+      <Component className={className} tabIndex={tabIndex} onKeyUp={onKeyUp}>
         {body}
       </Component>
     );

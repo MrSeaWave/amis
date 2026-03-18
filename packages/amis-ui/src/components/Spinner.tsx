@@ -6,10 +6,10 @@
  */
 
 import React from 'react';
+import ReactDOM from 'react-dom';
 import {themeable, ThemeProps} from 'amis-core';
 import Transition, {ENTERED, ENTERING} from 'react-transition-group/Transition';
 import {Icon, hasIcon} from './icons';
-import {generateIcon} from 'amis-core';
 import {types} from 'mobx-state-tree';
 import {observable, reaction} from 'mobx';
 
@@ -21,8 +21,8 @@ const fadeStyles: {
 };
 
 // Spinner Props
-export interface SpinnerProps extends ThemeProps {
-  show: boolean; // 控制Spinner显示与隐藏
+export interface SpinnerProps extends ThemeProps, SpinnerExtraProps {
+  show?: boolean; // 控制Spinner显示与隐藏
   className?: string; // 自定义最外层元素class
   spinnerClassName?: string; // spin图标位置包裹元素的自定义class
   /**
@@ -35,6 +35,15 @@ export interface SpinnerProps extends ThemeProps {
   tipPlacement?: 'top' | 'right' | 'bottom' | 'left'; // spinner文案位置
   delay?: number; // 延迟显示
   overlay?: boolean; // 是否显示遮罩层，有children属性才生效
+  /** 是否处于禁用状态 */
+  disabled?: boolean;
+}
+
+export interface SpinnerExtraProps {
+  loadingConfig?: {
+    root?: string;
+    show?: boolean;
+  };
 }
 
 const SpinnerSharedStore = types
@@ -42,7 +51,7 @@ const SpinnerSharedStore = types
   .volatile(self => {
     return {
       // 保存所有可以进入 loading 状态（props.show = true）的 Spinner 的父级容器
-      spinnerContainers: observable.set([] as HTMLElement[], {
+      spinningContainers: observable.set([] as HTMLElement[], {
         deep: false
       })
     };
@@ -50,14 +59,14 @@ const SpinnerSharedStore = types
   .actions(self => {
     return {
       push: (spinnerContainer: HTMLElement) => {
-        if (self.spinnerContainers.has(spinnerContainer)) {
+        if (self.spinningContainers.has(spinnerContainer)) {
           return;
         }
-        self.spinnerContainers.add(spinnerContainer);
+        self.spinningContainers.add(spinnerContainer);
       },
       remove: (spinnerContainer: HTMLElement) => {
-        if (self.spinnerContainers.has(spinnerContainer)) {
-          self.spinnerContainers.delete(spinnerContainer);
+        if (self.spinningContainers.has(spinnerContainer)) {
+          self.spinningContainers.delete(spinnerContainer);
         }
       },
       /**
@@ -66,15 +75,15 @@ const SpinnerSharedStore = types
        * @returns {boolean} 是否可以进入 loading
        */
       checkLoading: (spinnerContainerWillCheck: HTMLElement | null) => {
-        if (self.spinnerContainers.has(spinnerContainerWillCheck)) {
-          if (!self.spinnerContainers.size) {
+        if (self.spinningContainers.has(spinnerContainerWillCheck)) {
+          if (!self.spinningContainers.size) {
             return false;
           }
 
           let loading = true;
 
           // 检查缓存的容器中是否有当前容器的父级元素
-          self.spinnerContainers.forEach(container => {
+          self.spinningContainers.forEach(container => {
             if (
               container.contains(spinnerContainerWillCheck) &&
               container !== spinnerContainerWillCheck
@@ -95,7 +104,7 @@ const store = SpinnerSharedStore.create({});
 
 export class Spinner extends React.Component<
   SpinnerProps,
-  {spinning: boolean; showMark: boolean}
+  {spinning: boolean; showMarker: boolean; idDarkBg: boolean}
 > {
   static defaultProps = {
     show: true,
@@ -106,41 +115,62 @@ export class Spinner extends React.Component<
     tip: '',
     tipPlacement: 'bottom' as 'bottom',
     delay: 0,
-    overlay: false
+    overlay: false,
+    loadingConfig: {},
+    disabled: false
   };
 
   state = {
     spinning: false,
-    showMark: true
+    showMarker: true,
+    idDarkBg: false
   };
 
   parent: HTMLElement | null = null;
 
   /**
    * 解决同级（same parent node） spinner 的 show 不全为 true 时
-   * 辅助控制 spinning; push: + 1 ; remove: -1;
-   * > 0 : spinning = checkLoading
-   * = 0 : spinning = false; cannot remove
+   * 标记 loading 是由当前组件触发的
    */
-  count: number = 0;
+  loadingTriggered: boolean = false;
 
   spinnerRef = (dom: HTMLElement) => {
     if (dom) {
       this.parent = dom.parentNode as HTMLElement;
-      this.setState({
-        showMark: false
-      });
     }
   };
 
   componentDidUpdate() {
-    if (this.parent) {
+    const showLoading =
+      this.props.loadingConfig?.show === true ||
+      typeof this.props.loadingConfig?.show === 'undefined';
+
+    if (this.parent && showLoading) {
       if (this.props.show) {
-        this.count++;
+        this.loadingTriggered = true;
         store.push(this.parent);
-      } else if (this.state.spinning && this.count > 0) {
+      } else if (this.state.spinning && this.loadingTriggered) {
+        this.loadingTriggered = false;
         store.remove(this.parent);
-        this.count--;
+      }
+    }
+  }
+
+  componentDidMount() {
+    if (this.parent && this.state.showMarker) {
+      this.setState({showMarker: false});
+    }
+    if (this.parent) {
+      const backgroundColor = getComputedStyle(this.parent).getPropertyValue(
+        'background-color'
+      );
+      const rgba = backgroundColor.match(/\d+/g)?.map(Number) || [];
+
+      const brightness = (rgba[0] * 299 + rgba[1] * 587 + rgba[2] * 114) / 1000;
+      rgba[3] = rgba[3] ?? 1; // 没有设置颜色时取到的是 rgba(0, 0, 0, 0)
+
+      if (brightness < 200 && rgba[3] > 0.4) {
+        this.setState({idDarkBg: true});
       }
     }
   }
@@ -153,18 +183,20 @@ export class Spinner extends React.Component<
   }
 
   /**
-   * 监控着 spinnerContainers 的变化
+   * 监控着 spinningContainers 的变化
    */
   loadingChecker = reaction(
-    () => store.spinnerContainers.size,
+    () => store.spinningContainers.size,
     () => {
-      this.setState({
-        spinning: store.checkLoading(this.parent) && this.count > 0
-      });
+      if (this.parent) {
+        this.setState({
+          spinning: store.checkLoading(this.parent) && this.loadingTriggered
+        });
+      }
     }
   );
 
-  render() {
+  renderBody() {
     const {
       classnames: cx,
       className,
@@ -172,16 +204,22 @@ export class Spinner extends React.Component<
       size = '',
       overlay,
       delay,
-      icon,
+      icon: iconConfig,
       tip,
-      tipPlacement = ''
+      tipPlacement = '',
+      loadingConfig,
+      disabled
     } = this.props;
+    // 定义了挂载位置时只能使用默认icon
+    const icon = loadingConfig?.root ? undefined : iconConfig;
     const isCustomIcon = icon && React.isValidElement(icon);
     const timeout = {enter: delay, exit: 0};
 
+    const showOverlay = loadingConfig?.root || overlay;
+
     return (
       <>
-        {this.state.showMark && (
+        {this.state.showMarker && (
           <span className={cx('Spinner-mark')} ref={this.spinnerRef as any} />
         )}
         <Transition
@@ -194,7 +232,7 @@ export class Spinner extends React.Component<
             return (
               <>
                 {/* 遮罩层 */}
-                {overlay ? (
+                {showOverlay ? (
                   <div className={cx(`Spinner-overlay`, fadeStyles[status])} />
                 ) : null}
 
@@ -211,7 +249,7 @@ export class Spinner extends React.Component<
                         'left'
                       ].includes(tipPlacement)
                     },
-                    {[`Spinner--overlay`]: overlay},
+                    {[`Spinner--overlay`]: showOverlay},
                     fadeStyles[status],
                     className
                   )}
@@ -221,21 +259,17 @@ export class Spinner extends React.Component<
                       `Spinner-icon`,
                       {
                         [`Spinner-icon--${size}`]: ['lg', 'sm'].includes(size),
-                        [`Spinner-icon--default`]: !icon,
-                        [`Spinner-icon--simple`]: !isCustomIcon && icon,
-                        [`Spinner-icon--custom`]: isCustomIcon
+                        'Spinner-icon--default': !icon,
+                        'Spinner-icon--simple': !isCustomIcon && icon,
+                        'Spinner-icon--custom': isCustomIcon,
+                        'Spinner-icon--disabled': disabled
                       },
-                      spinnerClassName
+                      spinnerClassName,
+                      this.state.idDarkBg && 'Spinner-icon--darkBg'
                     )}
                   >
                     {icon ? (
-                      isCustomIcon ? (
-                        icon
-                      ) : hasIcon(icon as string) ? (
-                        <Icon icon={icon} className="icon" />
-                      ) : (
-                        generateIcon(cx, icon as string, 'icon')
-                      )
+                      <Icon cx={cx} icon={icon} className="icon" />
                     ) : null}
                   </div>
                   {tip ? <span className={cx(`Spinner-tip`)}>{tip}</span> : ''}
@@ -246,6 +280,21 @@ export class Spinner extends React.Component<
         </Transition>
       </>
     );
+  }
+
+  render() {
+    const {loadingConfig} = this.props;
+
+    const spinnerBody = this.renderBody();
+    const root = loadingConfig?.root;
+    const dom = root ? document.querySelector(root) : null;
+
+    if (dom) {
+      // TODO: 找到准确的 元素
+      return ReactDOM.createPortal(spinnerBody, dom);
+    }
+
+    return spinnerBody;
   }
 }
 

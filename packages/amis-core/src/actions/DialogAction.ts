@@ -1,5 +1,12 @@
-import {SchemaNode} from '../types';
+import {
+  AMISDefaultData,
+  AMISDialogSchemaBase,
+  AMISLegacyReloadActionButton
+} from '../schema';
+import {Schema, SchemaNode} from '../types';
+import {extendObject} from '../utils';
 import {RendererEvent} from '../utils/renderer-event';
+import {filter} from '../utils/tpl';
 import {
   RendererAction,
   ListenerAction,
@@ -9,6 +16,8 @@ import {
 
 export interface IAlertAction extends ListenerAction {
   actionType: 'alert';
+  dialog?: AMISDialogSchemaBase;
+  // 兼容历史，保留。为了和其他弹窗保持一致
   args: {
     msg: string;
     [propName: string]: any;
@@ -26,10 +35,39 @@ export interface IConfirmAction extends ListenerAction {
 
 export interface IDialogAction extends ListenerAction {
   actionType: 'dialog';
+  // 兼容历史，保留。不建议用args
   args: {
-    dialog: SchemaNode;
+    dialog: AMISDialogSchemaBase;
   };
-  dialog?: SchemaNode; // 兼容历史
+  dialog?: AMISDialogSchemaBase;
+
+  /**
+   * 是否等待确认结果
+   */
+  waitForAction?: boolean;
+
+  /**
+   * 如果等待结果，将弹窗结果保存到此处变量
+   */
+  outputVar?: string;
+}
+
+export interface IConfirmDialogAction extends ListenerAction {
+  actionType: 'confirmDialog';
+  dialog?: AMISDialogSchemaBase;
+
+  // 兼容历史，保留。不建议用args
+  args: {
+    msg: string;
+    title: string;
+    body?: AMISLegacyReloadActionButton;
+    closeOnEsc?: boolean;
+    size?: '' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+    confirmText?: string;
+    cancelText?: string;
+    confirmBtnLevel?: string;
+    cancelBtnLevel?: string;
+  };
 }
 
 /**
@@ -45,15 +83,46 @@ export class DialogAction implements RendererAction {
     renderer: ListenerContext,
     event: RendererEvent<any>
   ) {
-    renderer.props.onAction?.(
-      event,
-      {
-        actionType: 'dialog',
-        dialog: action.args?.dialog || action.dialog,
-        reload: 'none'
-      },
-      action.data
-    );
+    // 防止editor preview模式下执行
+    if ((action as any).$$id !== undefined) {
+      return;
+    }
+
+    let ret = renderer.handleAction
+      ? renderer.handleAction(
+          event,
+          {
+            actionType: 'dialog',
+            dialog: action.dialog,
+            reload: 'none',
+            data: action.rawData
+          },
+          action.data
+        )
+      : renderer.props.onAction?.(
+          event,
+          {
+            actionType: 'dialog',
+            dialog: action.dialog,
+            reload: 'none',
+            data: action.rawData
+          },
+          action.data
+        );
+
+    event.pendingPromise.push(ret);
+    if (action.waitForAction) {
+      const {confirmed, value} = await ret;
+
+      event.setData(
+        extendObject(event.data, {
+          [action.outputVar || 'dialogResponse']: {
+            confirmed,
+            value
+          }
+        })
+      );
+    }
   }
 }
 
@@ -74,6 +143,7 @@ export class CloseDialogAction implements RendererAction {
     renderer: ListenerContext,
     event: RendererEvent<any>
   ) {
+    // todo 支持 waitForAction，等待弹窗关闭后再执行后续动作
     if (action.componentId) {
       // 关闭指定弹窗
       event.context.scoped.closeById(action.componentId);
@@ -100,7 +170,11 @@ export class AlertAction implements RendererAction {
     renderer: ListenerContext,
     event: RendererEvent<any>
   ) {
-    event.context.env.alert?.(action.args?.msg);
+    event.context.env.alert?.(
+      filter(action.dialog?.msg, event.data) ?? action.args?.msg,
+      filter(action.dialog?.title, event.data) ?? action.args?.title,
+      filter(action.dialog?.className, event.data) ?? ''
+    );
   }
 }
 
@@ -109,11 +183,77 @@ export class AlertAction implements RendererAction {
  */
 export class ConfirmAction implements RendererAction {
   async run(
-    action: IConfirmAction,
+    action: IConfirmDialogAction,
     renderer: ListenerContext,
     event: RendererEvent<any>
   ) {
-    event.context.env.confirm?.(action.args?.msg, action.args?.title);
+    let modal: any = action.dialog ?? action.args;
+
+    if (modal.$ref && renderer.props.resolveDefinitions) {
+      modal = {
+        ...renderer.props.resolveDefinitions(modal.$ref),
+        ...modal
+      };
+    }
+
+    const type = modal?.type;
+
+    if (!type) {
+      const confirmed = await event.context.env.confirm?.(
+        filter(modal?.msg, event.data) || action.args?.msg,
+        filter(action.dialog?.title, event.data) || action.args?.title,
+        {
+          closeOnEsc:
+            filter(action.dialog?.closeOnEsc, event.data) ||
+            action.args?.closeOnEsc,
+          size: filter(action.dialog?.size, event.data) || action.args?.size,
+          confirmText:
+            filter(action.dialog?.confirmText, event.data) ||
+            action.args?.confirmText,
+          cancelText:
+            filter(action.dialog?.cancelText, event.data) ||
+            action.args?.cancelText,
+          confirmBtnLevel:
+            filter(action.dialog?.confirmBtnLevel, event.data) ||
+            action.args?.confirmBtnLevel,
+          cancelBtnLevel:
+            filter(action.dialog?.cancelBtnLevel, event.data) ||
+            action.args?.cancelBtnLevel,
+          className: filter(action.dialog?.className, event.data) || ''
+        }
+      );
+
+      return confirmed;
+    }
+
+    // 自定义弹窗内容
+    const confirmed = await new Promise((resolve, reject) => {
+      renderer.handleAction
+        ? renderer.handleAction(
+            event,
+            {
+              actionType: 'dialog',
+              dialog: modal,
+              data: action.rawData,
+              reload: 'none',
+              callback: (result: boolean) => resolve(result)
+            },
+            action.data
+          )
+        : renderer.props.onAction?.(
+            event,
+            {
+              actionType: 'dialog',
+              dialog: modal,
+              data: action.rawData,
+              reload: 'none',
+              callback: (result: boolean) => resolve(result)
+            },
+            action.data
+          );
+    });
+
+    return confirmed;
   }
 }
 

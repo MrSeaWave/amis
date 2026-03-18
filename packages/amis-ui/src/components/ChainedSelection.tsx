@@ -9,10 +9,13 @@ import Checkbox from './Checkbox';
 import {Option} from './Select';
 import {getTreeDepth} from 'amis-core';
 import times from 'lodash/times';
-import Spinner from './Spinner';
+import Spinner, {SpinnerExtraProps} from './Spinner';
 import {localeable} from 'amis-core';
+import VirtualList, {AutoSizer} from './virtual-list';
 
-export interface ChainedSelectionProps extends BaseSelectionProps {
+export interface ChainedSelectionProps
+  extends BaseSelectionProps,
+    SpinnerExtraProps {
   defaultSelectedIndex?: string;
 }
 
@@ -32,6 +35,7 @@ export class ChainedSelection extends BaseSelection<
   componentDidMount() {
     const defaultSelectedIndex = this.props.defaultSelectedIndex;
 
+    // todo 以后支持自动展开
     if (defaultSelectedIndex !== undefined) {
       this.setState({
         selected: [`${defaultSelectedIndex}`]
@@ -40,7 +44,7 @@ export class ChainedSelection extends BaseSelection<
   }
 
   selectOption(option: Option, depth: number, id: string) {
-    const {onDeferLoad} = this.props;
+    const {onDeferLoad, deferField = 'defer'} = this.props;
 
     const selected = this.state.selected.concat();
     selected.splice(depth, selected.length - depth);
@@ -50,11 +54,17 @@ export class ChainedSelection extends BaseSelection<
       {
         selected
       },
-      option.defer && onDeferLoad ? () => onDeferLoad(option) : undefined
+      option[deferField] && onDeferLoad ? () => onDeferLoad(option) : undefined
     );
   }
 
-  renderItem(option: Option, index: number, depth: number, id: string) {
+  renderItem(
+    option: Option,
+    index: number,
+    depth: number,
+    id: string,
+    styles: object = {}
+  ) {
     const {
       labelClassName,
       disabled,
@@ -62,12 +72,15 @@ export class ChainedSelection extends BaseSelection<
       itemClassName,
       itemRender,
       multiple,
-      labelField
+      labelField,
+      testIdBuilder
     } = this.props;
     const valueArray = this.valueArray;
+    const itemTIB = testIdBuilder?.getChild(`item-${option.value || index}`);
 
     return (
       <div
+        style={styles}
         key={index}
         className={cx(
           'ChainedSelection-item',
@@ -85,6 +98,7 @@ export class ChainedSelection extends BaseSelection<
             disabled={disabled || option.disabled}
             labelClassName={labelClassName}
             description={option.description}
+            testIdBuilder={itemTIB}
           />
         ) : null}
 
@@ -95,14 +109,21 @@ export class ChainedSelection extends BaseSelection<
             checked: !!~valueArray.indexOf(option),
             onChange: () => this.toggleOption(option),
             disabled: disabled || option.disabled,
-            labelField
+            labelField,
+            classnames: cx
           })}
         </div>
       </div>
     );
   }
 
-  renderOption(option: Option, index: number, depth: number, id: string) {
+  renderOption(
+    option: Option,
+    index: number,
+    depth: number,
+    id: string,
+    styles: object = {}
+  ) {
     const {
       labelClassName,
       disabled,
@@ -110,13 +131,18 @@ export class ChainedSelection extends BaseSelection<
       itemClassName,
       itemRender,
       multiple,
-      labelField
+      labelField,
+      deferField = 'defer',
+      loadingConfig,
+      testIdBuilder
     } = this.props;
     const valueArray = this.valueArray;
+    const itemTIB = testIdBuilder?.getChild(`item-${option.value || index}`);
 
-    if (Array.isArray(option.children) || option.defer) {
+    if (Array.isArray(option.children) || option[deferField]) {
       return (
         <div
+          style={styles}
           key={index}
           className={cx(
             'ChainedSelection-item',
@@ -126,6 +152,7 @@ export class ChainedSelection extends BaseSelection<
             ~this.state.selected.indexOf(id) ? 'is-active' : ''
           )}
           onClick={() => this.selectOption(option, depth, id)}
+          {...itemTIB?.getTestId()}
         >
           <div className={cx('ChainedSelection-itemLabel')}>
             {itemRender(option, {
@@ -134,16 +161,67 @@ export class ChainedSelection extends BaseSelection<
               checked: !!~this.state.selected.indexOf(id),
               onChange: () => this.selectOption(option, depth, id),
               disabled: disabled || option.disabled,
-              labelField
+              labelField,
+              classnames: cx
             })}
           </div>
 
-          {option.defer && option.loading ? <Spinner size="sm" show /> : null}
+          {option[deferField] && option.loading ? (
+            <Spinner loadingConfig={loadingConfig} size="sm" show />
+          ) : null}
         </div>
       );
     }
 
-    return this.renderItem(option, index, depth, id);
+    return this.renderItem(option, index, depth, id, styles);
+  }
+
+  renderCheckAll() {
+    const {
+      multiple,
+      checkAll,
+      checkAllLabel,
+      classnames: cx,
+      translate: __,
+      labelClassName,
+      itemClassName
+    } = this.props;
+
+    if (!multiple || !checkAll) {
+      return null;
+    }
+    const availableOptions = this.getAvailableOptions();
+
+    const valueArray = this.valueArray;
+
+    const checkedAll = availableOptions.every(
+      option => valueArray.indexOf(option) > -1
+    );
+    const checkedPartial = availableOptions.some(
+      option => valueArray.indexOf(option) > -1
+    );
+
+    return (
+      <div
+        className={cx(
+          'ChainedSelection-item',
+          'ChainedSelection-checkAll',
+          itemClassName
+        )}
+        onClick={this.toggleAll}
+      >
+        <Checkbox
+          checked={checkedPartial}
+          partial={checkedPartial && !checkedAll}
+          size="sm"
+          labelClassName={labelClassName}
+        />
+
+        <div className={cx('ChainedSelection-itemLabel')}>
+          <span>{__(checkAllLabel)}</span>
+        </div>
+      </div>
+    );
   }
 
   render() {
@@ -155,7 +233,11 @@ export class ChainedSelection extends BaseSelection<
       classnames: cx,
       option2value,
       itemRender,
-      translate: __
+      translate: __,
+      virtualThreshold = 1000,
+      itemHeight = 32,
+      virtualListHeight,
+      testIdBuilder
     } = this.props;
 
     this.valueArray = BaseSelection.value2array(value, options, option2value);
@@ -189,33 +271,103 @@ export class ChainedSelection extends BaseSelection<
           let nextPlaceholder: string = '';
           let nextIndexes = indexes;
 
-          body.push(
-            <div key={depth} className={cx('ChainedSelection-col')}>
-              {subTitle ? (
-                <div className={cx('ChainedSelection-subTitle')}>
-                  {subTitle}
-                </div>
-              ) : null}
-              {Array.isArray(options) && options.length ? (
-                options.map((option, index) => {
-                  const id = indexes.concat(index).join('-');
+          if (Array.isArray(options) && options.length > virtualThreshold) {
+            options.forEach((option, index) => {
+              const id = indexes.concat(index).join('-');
+              if (id === selected) {
+                nextSubTitle = option.subTitle;
+                nextOptions = option.children!;
+                nextIndexes = indexes.concat(index);
+                nextPlaceholder = option.placeholder;
+              }
+            });
 
-                  if (id === selected) {
-                    nextSubTitle = option.subTitle;
-                    nextOptions = option.children!;
-                    nextIndexes = indexes.concat(index);
-                    nextPlaceholder = option.placeholder;
-                  }
+            const finalOptions = options.concat();
+            if (subTitle) {
+              finalOptions.unshift({
+                type: 'chainedSelection-subTitle',
+                value: subTitle
+              });
+            }
 
-                  return this.renderOption(option, index, depth, id);
-                })
-              ) : (
-                <div className={cx('ChainedSelection-placeholder')}>
-                  {__(placeholder)}
-                </div>
-              )}
-            </div>
-          );
+            body.push(
+              <div key={depth} className={cx('ChainedSelection-col')}>
+                <AutoSizer minHeight={virtualListHeight}>
+                  {({height}: {height: number}) => (
+                    <VirtualList
+                      height={height}
+                      itemCount={finalOptions.length}
+                      itemSize={itemHeight}
+                      renderItem={({
+                        index,
+                        style
+                      }: {
+                        index: number;
+                        style?: object;
+                      }) => {
+                        const option = finalOptions[index];
+                        if (!option) {
+                          return null;
+                        }
+
+                        if (option?.type === 'chainedSelection-subTitle') {
+                          return (
+                            <div
+                              style={{
+                                ...style,
+                                width: '100%'
+                              }}
+                              key={indexes.join('-') + 'subTitle'}
+                              className={cx('ChainedSelection-subTitle')}
+                            >
+                              {option.value}
+                            </div>
+                          );
+                        }
+
+                        index = subTitle ? index - 1 : index;
+
+                        const id = indexes.concat(index).join('-');
+                        return this.renderOption(option, index, depth, id, {
+                          ...style,
+                          width: '100%'
+                        });
+                      }}
+                    />
+                  )}
+                </AutoSizer>
+              </div>
+            );
+          } else {
+            body.push(
+              <div key={depth} className={cx('ChainedSelection-col')}>
+                {subTitle ? (
+                  <div className={cx('ChainedSelection-subTitle')}>
+                    {subTitle}
+                  </div>
+                ) : null}
+
+                {Array.isArray(options) && options.length ? (
+                  options.map((option, index) => {
+                    const id = indexes.concat(index).join('-');
+
+                    if (id === selected) {
+                      nextSubTitle = option.subTitle;
+                      nextOptions = option.children!;
+                      nextIndexes = indexes.concat(index);
+                      nextPlaceholder = option.placeholder;
+                    }
+
+                    return this.renderOption(option, index, depth, id);
+                  })
+                ) : (
+                  <div className={cx('ChainedSelection-placeholder')}>
+                    {__(placeholder)}
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           return {
             options: nextOptions,
@@ -237,7 +389,10 @@ export class ChainedSelection extends BaseSelection<
     return (
       <div className={cx('ChainedSelection', className)}>
         {body && body.length ? (
-          body
+          <>
+            {this.renderCheckAll()}
+            {body}
+          </>
         ) : (
           <div className={cx('ChainedSelection-placeholder')}>
             {__(placeholder)}

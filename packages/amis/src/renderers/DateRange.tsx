@@ -1,5 +1,10 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {
+  AMISSchemaBase,
+  Renderer,
+  RendererProps,
+  normalizeDate
+} from 'amis-core';
 import moment from 'moment';
 import {BaseSchema} from '../Schema';
 import {getPropValue} from 'amis-core';
@@ -7,21 +12,29 @@ import {getPropValue} from 'amis-core';
 /**
  * DateRange 展示渲染器。
  */
-export interface DateRangeSchema extends BaseSchema {
+/**
+ * 日期范围展示组件，用于显示开始-结束时间段。
+ */
+export interface AMISDateRangeSchema extends AMISSchemaBase {
   /**
-   * 指定为日期展示类型
+   * 指定为 date-range 组件
    */
   type: 'date-range';
 
   /**
-   * 值的时间格式，参考 moment 中的格式说明。
+   * 值的时间格式
    */
   valueFormat?: string;
 
   /**
-   * 展示的时间格式，参考 moment 中的格式说明。
+   * 展示的时间格式
    */
   format?: string;
+
+  /**
+   * 展示的时间格式（新：同format）
+   */
+  displayFormat?: string;
 
   /**
    * 分割符
@@ -36,14 +49,14 @@ export interface DateRangeSchema extends BaseSchema {
 
 export interface DateRangeProps
   extends RendererProps,
-    Omit<DateRangeSchema, 'type' | 'className'> {}
+    Omit<AMISDateRangeSchema, 'type' | 'className'> {}
 
 export class DateRangeField extends React.Component<DateRangeProps, Object> {
   refreshInterval: ReturnType<typeof setTimeout>;
 
   static defaultProps: Pick<
     DateRangeProps,
-    'valueFormat'| 'format' | 'connector'
+    'valueFormat' | 'format' | 'connector' | 'displayFormat'
   > = {
     format: 'YYYY-MM-DD',
     valueFormat: 'X',
@@ -57,8 +70,10 @@ export class DateRangeField extends React.Component<DateRangeProps, Object> {
       value,
       valueFormat,
       format = 'YYYY-MM-DD',
+      displayFormat,
       classnames: cx,
-      className
+      className,
+      style
     } = this.props;
 
     if (!value) {
@@ -71,21 +86,20 @@ export class DateRangeField extends React.Component<DateRangeProps, Object> {
     let [startTime = '', endTime = ''] = value;
 
     if (valueFormat) {
-      startTime = moment(startTime, valueFormat);
-      endTime = moment(endTime, valueFormat);
-    }
-    else {
-      startTime = moment(startTime * 1000);
-      endTime = moment(endTime * 1000);
+      startTime = normalizeDate(startTime, valueFormat);
+      endTime = normalizeDate(endTime, valueFormat);
+    } else {
+      startTime = normalizeDate(startTime * 1000);
+      endTime = normalizeDate(endTime * 1000);
     }
 
-    startTime = startTime.isValid() ? startTime.format(format) : '';
-    endTime = endTime.isValid() ? endTime.format(format) : '';
+    startTime = startTime?.isValid()
+      ? startTime.format(displayFormat || format)
+      : '';
+    endTime = endTime?.isValid() ? endTime.format(displayFormat || format) : '';
 
     return (
-      <span
-        className={cx('DateRangeField', className)}
-      >
+      <span className={cx('DateRangeField', className)} style={style}>
         {[startTime, endTime].join(` ${connector} `)}
       </span>
     );
@@ -95,4 +109,4 @@ export class DateRangeField extends React.Component<DateRangeProps, Object> {
 @Renderer({
   type: 'date-range'
 })
-export class DateRangeFieldRenderer extends DateRangeField {};
+export class DateRangeFieldRenderer extends DateRangeField {}

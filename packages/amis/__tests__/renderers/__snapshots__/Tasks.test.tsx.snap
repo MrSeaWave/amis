@@ -13,6 +13,7 @@ exports[`Renderer:tesks 1`] = `
       >
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <div
             class="cxd-Table-content"
@@ -39,11 +40,15 @@ exports[`Renderer:tesks 1`] = `
               <tbody>
                 <tr>
                   <td>
-                    hive 任务
+                    <span
+                      class="word-break"
+                    >
+                      hive 任务
+                    </span>
                   </td>
                   <td>
                     <a
-                      class="cxd-Button cxd-Button--default cxd-Button--size-md disabled"
+                      class="cxd-Button cxd-Button--default cxd-Button--size-md is-disabled"
                     >
                       上线
                     </a>
@@ -57,7 +62,7 @@ exports[`Renderer:tesks 1`] = `
                   </td>
                   <td>
                     <span
-                      class="cxd-TplField"
+                      class="cxd-TplField fr-view"
                     >
                       <span>
                         查看详情
@@ -74,11 +79,15 @@ exports[`Renderer:tesks 1`] = `
                 </tr>
                 <tr>
                   <td>
-                    小流量
+                    <span
+                      class="word-break"
+                    >
+                      小流量
+                    </span>
                   </td>
                   <td>
                     <a
-                      class="cxd-Button cxd-Button--default cxd-Button--size-md disabled"
+                      class="cxd-Button cxd-Button--default cxd-Button--size-md is-disabled"
                     >
                       上线
                     </a>
@@ -94,11 +103,15 @@ exports[`Renderer:tesks 1`] = `
                 </tr>
                 <tr>
                   <td>
-                    全量
+                    <span
+                      class="word-break"
+                    >
+                      全量
+                    </span>
                   </td>
                   <td>
                     <a
-                      class="cxd-Button cxd-Button--default cxd-Button--size-md disabled"
+                      class="cxd-Button cxd-Button--default cxd-Button--size-md is-disabled"
                     >
                       上线
                     </a>

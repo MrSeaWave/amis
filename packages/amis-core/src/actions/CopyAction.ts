@@ -28,13 +28,13 @@ export class CopyAction implements RendererAction {
     renderer: ListenerContext,
     event: RendererEvent<any>
   ) {
-    if (!renderer.props.env?.copy) {
+    if (!event.context.env?.copy) {
       throw new Error('env.copy is required!');
     }
 
     if (action.args?.content) {
-      renderer.props.env.copy?.(action.args.content, {
-        format: action.args?.copyFormat ?? 'text/html'
+      event.context.env?.copy?.(action.args.content, {
+        format: action.args?.copyFormat
       });
     }
   }

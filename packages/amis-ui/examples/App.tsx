@@ -18,6 +18,11 @@ const pages: TreeArray = [
         label: '按钮',
         path: '/basic/button',
         component: React.lazy(() => import('./basic/Button'))
+      },
+      {
+        label: '文字提示',
+        path: '/basic/overflow-tpl',
+        component: React.lazy(() => import('./basic/OverflowTpl'))
       }
     ]
   },
@@ -25,6 +30,11 @@ const pages: TreeArray = [
   {
     label: '表单',
     children: [
+      {
+        label: '受控表单',
+        path: '/form/controlled-form',
+        component: React.lazy(() => import('./form/ControlledForm'))
+      },
       {
         label: 'InputTable',
         path: '/form/input-table',
@@ -35,6 +45,12 @@ const pages: TreeArray = [
         label: 'Combo',
         path: '/form/combo',
         component: React.lazy(() => import('./form/Combo'))
+      },
+
+      {
+        label: 'MixedInput',
+        path: '/form/mixed-input',
+        component: React.lazy(() => import('./form/MixedInput'))
       }
     ]
   },

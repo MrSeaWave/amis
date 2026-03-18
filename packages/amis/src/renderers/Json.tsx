@@ -1,19 +1,31 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {AMISSchemaBase, Renderer, RendererProps} from 'amis-core';
 
-import JsonView, {InteractionProps} from 'react-json-view';
+import type {InteractionProps} from 'react-json-view';
 import {autobind, getPropValue, noop} from 'amis-core';
 import {BaseSchema} from '../Schema';
-import {resolveVariableAndFilter, isPureVariable} from 'amis-core';
+import {
+  resolveVariableAndFilter,
+  isPureVariable,
+  importLazyComponent
+} from 'amis-core';
+
+export const JsonView = React.lazy(() =>
+  import('react-json-view').then(importLazyComponent)
+);
 /**
- * JSON 数据展示控件。
- * 文档：https://baidu.gitee.io/amis/docs/components/json
+ * JSON 数据查看/编辑控件。用于展示或编辑 JSON 数据，支持复制、折叠、键排序等。
  */
-export interface JsonSchema extends BaseSchema {
+export interface AMISJsonSchema extends AMISSchemaBase {
   /**
-   * 指定为Json展示类型
+   * 指定为 json 组件
    */
   type: 'json' | 'static-json';
+
+  /**
+   * 要展示的 JSON 数据
+   */
+  value?: Record<string, any> | any[];
 
   /**
    * 默认展开的级别
@@ -56,12 +68,12 @@ export interface JsonSchema extends BaseSchema {
   sortKeys?: boolean;
 
   /**
-   * 设置字符串的最大展示长度，超出长度阈值的字符串将被截断，点击value可切换字符串展示方式，默认为false
+   * 设置字符串的最大展示长度
    */
   ellipsisThreshold?: number | false;
 }
 
-export interface JSONProps extends RendererProps, JsonSchema {
+export interface JSONProps extends RendererProps, AMISJsonSchema {
   levelExpand: number;
   className?: string;
   placeholder?: string;
@@ -109,6 +121,7 @@ export class JSONField extends React.Component<JSONProps, object> {
   render() {
     const {
       className,
+      style,
       jsonTheme,
       classnames: cx,
       placeholder,
@@ -153,25 +166,27 @@ export class JSONField extends React.Component<JSONProps, object> {
     }
 
     return (
-      <div className={cx('JsonField', className)}>
+      <div className={cx('JsonField', className)} style={style}>
         {typeof data === 'undefined' || data === null ? (
           placeholder
         ) : (
-          <JsonView
-            name={false}
-            src={data}
-            theme={(jsonThemeValue as any) ?? 'rjv-default'}
-            shouldCollapse={this.shouldExpandNode}
-            enableClipboard={enableClipboard}
-            displayDataTypes={displayDataTypes}
-            collapseStringsAfterLength={ellipsisThreshold}
-            iconStyle={iconStyle}
-            quotesOnKeys={quotesOnKeys}
-            sortKeys={sortKeys}
-            onEdit={name && mutable ? this.emitChange : false}
-            onDelete={name && mutable ? this.emitChange : false}
-            onAdd={name && mutable ? this.emitChange : false}
-          />
+          <React.Suspense fallback={<div>...</div>}>
+            <JsonView
+              name={false}
+              src={data}
+              theme={(jsonThemeValue as any) ?? 'rjv-default'}
+              shouldCollapse={this.shouldExpandNode}
+              enableClipboard={enableClipboard}
+              displayDataTypes={displayDataTypes}
+              collapseStringsAfterLength={ellipsisThreshold}
+              iconStyle={iconStyle}
+              quotesOnKeys={quotesOnKeys}
+              sortKeys={sortKeys}
+              onEdit={name && mutable ? this.emitChange : false}
+              onDelete={name && mutable ? this.emitChange : false}
+              onAdd={name && mutable ? this.emitChange : false}
+            />
+          </React.Suspense>
         )}
       </div>
     );

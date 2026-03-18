@@ -10,13 +10,15 @@ import {ThemeProps, themeable} from 'amis-core';
 import {autobind} from 'amis-core';
 import {uncontrollable} from 'amis-core';
 import find from 'lodash/find';
-import type {PlainObject, Schema} from 'amis-core';
+import type {Schema} from 'amis-core';
 
 export interface AnchorNavSectionProps extends ThemeProps {
   title?: string; // 标题
   name: string | number; // 标识
   body?: Schema; // Schema
   className?: string; // 样式名
+  style?: any;
+  children?: React.ReactNode | Array<React.ReactNode>;
 }
 
 class AnchorNavSectionComponent extends React.PureComponent<AnchorNavSectionProps> {
@@ -24,10 +26,14 @@ class AnchorNavSectionComponent extends React.PureComponent<AnchorNavSectionProp
   contentRef = (ref: any) => (this.contentDom = ref);
 
   render() {
-    const {classnames: cx, children, className} = this.props;
+    const {classnames: cx, children, className, name} = this.props;
 
     return (
-      <div ref={this.contentRef} className={cx('AnchorNav-section', className)}>
+      <div
+        ref={this.contentRef}
+        className={cx('AnchorNav-section', className)}
+        data-id={name + ''}
+      >
         {children}
       </div>
     );
@@ -47,19 +53,10 @@ export interface AnchorNavProps extends ThemeProps {
   ) => JSX.Element; // 锚点区域渲染器
   onSelect?: (key: string | number) => void; // 选中回调方法
   direction?: 'vertical' | 'horizontal'; // 导航方向
+  children?: React.ReactNode | Array<React.ReactNode>;
 }
 
-interface SectionOffset {
-  key: string | number;
-  offsetTop: number;
-}
-
-export interface AnchorNavState {
-  offsetArr: SectionOffset[]; // 记录每个段落的offsetTop
-  fromSelect: boolean; // 标识滚动触发来源
-}
-
-export class AnchorNav extends React.Component<AnchorNavProps, AnchorNavState> {
+export class AnchorNav extends React.Component<AnchorNavProps> {
   static defaultProps: Pick<
     AnchorNavProps,
     'linkClassName' | 'sectionClassName' | 'direction'
@@ -73,130 +70,66 @@ export class AnchorNav extends React.Component<AnchorNavProps, AnchorNavState> {
   contentDom: React.RefObject<HTMLDivElement> = React.createRef();
 
   // 后代节点观察器
-  observer: MutationObserver;
+  observer: IntersectionObserver;
+
+  sections: {
+    key: string | number;
+    element: HTMLDivElement;
+    isIntersecting?: boolean;
+  }[] = [];
+
+  fromSelect: boolean = false;
+  fromSelectTimer: any;
 
   componentDidMount() {
-    // 初始化滚动标识
-    this.setState({fromSelect: false});
-
-    const sectionRootDom =
-      this.contentDom && (this.contentDom.current as HTMLElement);
-
-    this.updateSectionOffset(sectionRootDom, false);
-    this.observer = new MutationObserver(() =>
-      // TODO: 牺牲性能
-      this.updateSectionOffset(sectionRootDom, true)
-    );
-    this.observer.observe(sectionRootDom, {childList: true, subtree: true});
+    this.observer = new IntersectionObserver(this.scrollToNav);
+    this.sections.forEach(item => {
+      this.observer.observe(item.element);
+    });
+    if (this.props.active) {
+      this.scrollToSection(this.props.active);
+    }
   }
 
   componentWillUnmount() {
-    if (this.contentDom && this.contentDom.current) {
-      this.contentDom.current.removeEventListener('scroll', this.scrollToNav);
-    }
-    this.observer && this.observer.disconnect();
-  }
-
-  updateSectionOffset(parentNode: HTMLElement, inited: boolean) {
-    const offsetArr: Array<SectionOffset> = [];
-    const {children, active} = this.props;
-
-    if (!inited) {
-      // add scroll event
-      parentNode.addEventListener('scroll', this.scrollToNav);
-    }
-
-    // 收集段落区域offsetTop
-    children &&
-      React.Children.forEach(
-        children,
-        (section: AnchorNavSectionComponent, index: number) => {
-          offsetArr.push({
-            key: section.props.name,
-            offsetTop: (parentNode.children[index] as HTMLElement).offsetTop
-          });
-        }
-      );
-
-    this.setState(
-      {
-        offsetArr
-      },
-      !inited ? () => active && this.scrollToSection(active) : undefined
-    );
+    this.observer.disconnect();
   }
 
   @autobind
-  scrollToNav(e: Event) {
-    if (this.state.fromSelect) {
-      return;
-    }
-
-    // 获取滚动的scrollTop
-    const {scrollTop, scrollHeight, clientHeight} = e.target as HTMLElement;
-
-    // 是否到达最底部，以防最后一个因为高度不够无法高亮
-    const isReachBottom = scrollTop + clientHeight >= scrollHeight;
-
-    // 判断scrollTop所在区域
-    const offsetArr = this.state.offsetArr;
-    const firstSection = offsetArr[0];
-    const lastSection = offsetArr[offsetArr.length - 1];
-    // 首层偏移
-    const offset = scrollTop + firstSection.offsetTop;
-
-    // 首层
-    if (offset <= firstSection.offsetTop) {
-      this.fireSelect(firstSection.key);
-    }
-    // 最后一层
-    else if (isReachBottom || offset >= lastSection.offsetTop) {
-      this.fireSelect(lastSection.key);
+  scrollToNav(entries: IntersectionObserverEntry[]) {
+    entries.forEach(entry => {
+      const key = entry.target.getAttribute('data-id');
+      const currentSection = this.sections.find(item => item.key === key);
+      if (currentSection) {
+        currentSection.isIntersecting = entry.isIntersecting;
+      }
+    });
+    // 找到第一个可见的区域
+    const firstIntersectingSection = this.sections.find(
+      item => item.isIntersecting
+    );
+    if (!this.fromSelect) {
+      firstIntersectingSection && this.fireSelect(firstIntersectingSection.key);
     } else {
-      // 段落区间判断
-      offsetArr.forEach((item, index) => {
-        if (
-          offset >= item.offsetTop &&
-          offset < offsetArr[index + 1].offsetTop
-        ) {
-          this.fireSelect(item.key);
-        }
-      });
+      // 滚动结束后，重置fromSelect状态
+      if (this.fromSelectTimer) {
+        clearTimeout(this.fromSelectTimer);
+      }
+      this.fromSelectTimer = setTimeout(() => {
+        this.fromSelect = false;
+      }, 300);
     }
   }
 
   scrollToSection(key: string | number) {
-    // 获取指定段落的offsettop
-    const offsetArr = this.state.offsetArr;
-    const section = find(offsetArr, item => item.key === key);
-    const sectionRootDom =
-      this.contentDom && (this.contentDom.current as HTMLElement);
-
-    // 滚动到指定段落
-    section &&
-      (sectionRootDom.scrollTop = section.offsetTop - offsetArr[0].offsetTop);
+    this.fromSelect = true;
+    const node = find(this.sections, item => item.key === key)?.element;
+    node?.scrollIntoView?.({behavior: 'smooth'});
   }
 
   handleSelect(key: string | number) {
-    // 标记滚动来自导航选择
-    this.setState({fromSelect: true});
-    // 滚动到对应段落
     this.scrollToSection(key);
-
-    const sectionRootDom =
-      this.contentDom && (this.contentDom.current as HTMLElement);
-
-    // 如果已经滚到底就不去更新导航选中了
-    if (
-      sectionRootDom.scrollHeight - sectionRootDom.scrollTop <
-      sectionRootDom.clientHeight
-    ) {
-      // fire event
-      this.fireSelect(key);
-    }
-
-    // 取消标记
-    this.setState({fromSelect: false});
+    this.fireSelect(key);
   }
 
   fireSelect(key: string | number) {
@@ -212,11 +145,17 @@ export class AnchorNav extends React.Component<AnchorNavProps, AnchorNavState> {
     const {classnames: cx, active: activeProp} = this.props;
     const {title, name} = link.props;
     const active = activeProp === undefined && index === 0 ? name : activeProp;
+    // 判断是否为子节点，子节点key为 <父节点索引>-<子节点索引>
+    const isChild = link.key?.split('-').length >= 2;
 
     return (
       <li
-        className={cx('AnchorNav-link', active === name ? 'is-active' : '')}
-        key={index}
+        className={cx(
+          'AnchorNav-link',
+          isChild ? 'AnchorNav-link-child' : '',
+          String(active) === String(name) ? 'is-active' : ''
+        )}
+        key={link.key}
         onClick={() => this.handleSelect(name)}
       >
         <a title={title}>{title}</a>
@@ -231,13 +170,19 @@ export class AnchorNav extends React.Component<AnchorNavProps, AnchorNavState> {
 
     const {active: activeProp, classnames} = this.props;
     const name = section.props.name;
+    const key = section.key;
     const active = activeProp === undefined && index === 0 ? name : activeProp;
-
     return React.cloneElement(section, {
       ...section.props,
-      key: index,
+      key,
       classnames,
-      active
+      active,
+      ref: (props: any) => {
+        if (props && !this.sections.find(item => item.key === name)) {
+          // 收集每个段落的真实dom节点
+          this.sections.push({key: name, element: props.ref.contentDom});
+        }
+      }
     });
   }
 
@@ -245,6 +190,7 @@ export class AnchorNav extends React.Component<AnchorNavProps, AnchorNavState> {
     const {
       classnames: cx,
       className,
+      style,
       linkClassName,
       sectionClassName,
       children,
@@ -264,6 +210,7 @@ export class AnchorNav extends React.Component<AnchorNavProps, AnchorNavState> {
           },
           className
         )}
+        style={style}
       >
         <ul
           className={cx('AnchorNav-link-wrap', linkClassName)}

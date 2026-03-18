@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ConditionFieldFunc,
-  ExpressionFunc,
   ConditionBuilderField,
   ConditionBuilderFuncs
 } from './types';
@@ -21,16 +20,18 @@ import ResultBox from '../ResultBox';
 import {Icon} from '../icons';
 import Expression from './Expression';
 import {ConditionBuilderConfig} from './config';
+import type {TestIdBuilder, AMISExpressionFunc} from 'amis-core';
 
 export interface ConditionFuncProps extends ThemeProps, LocaleProps {
-  value: ExpressionFunc;
-  onChange: (value: ExpressionFunc) => void;
+  value: AMISExpressionFunc;
+  onChange: (value: AMISExpressionFunc) => void;
   disabled?: boolean;
   config: ConditionBuilderConfig;
   fields?: ConditionBuilderField[];
   funcs?: ConditionBuilderFuncs;
-  allowedTypes?: Array<'value' | 'field' | 'func' | 'formula'>;
+  allowedTypes?: Array<'value' | 'field' | 'func'>;
   fieldClassName?: string;
+  testIdBuilder?: TestIdBuilder;
 }
 
 const option2value = (item: ConditionFieldFunc) => item.type;
@@ -52,7 +53,15 @@ export class ConditionFunc extends React.Component<ConditionFuncProps> {
   }
 
   renderFunc(func: ConditionFieldFunc) {
-    const {classnames: cx, fields, value, funcs, config, disabled} = this.props;
+    const {
+      classnames: cx,
+      fields,
+      value,
+      funcs,
+      config,
+      disabled,
+      testIdBuilder
+    } = this.props;
 
     return (
       <div className={cx('CBFunc-args')}>
@@ -70,6 +79,7 @@ export class ConditionFunc extends React.Component<ConditionFuncProps> {
                 onChange={this.handleArgChange}
                 funcs={funcs}
                 disabled={disabled}
+                testIdBuilder={testIdBuilder?.getChild(`exp-${index}`)}
                 // allowedTypes={allowedTypes}
               />
             ))}
@@ -87,6 +97,7 @@ export class ConditionFunc extends React.Component<ConditionFuncProps> {
       fieldClassName,
       funcs,
       disabled,
+      testIdBuilder,
       translate: __
     } = this.props;
     const func = value
@@ -107,6 +118,7 @@ export class ConditionFunc extends React.Component<ConditionFuncProps> {
               option2value={option2value}
               onChange={this.handleFuncChange}
               multiple={false}
+              testIdBuilder={testIdBuilder?.getChild('group')}
             />
           )}
         >
@@ -125,9 +137,10 @@ export class ConditionFunc extends React.Component<ConditionFuncProps> {
                 onResultClick={onClick}
                 placeholder={__('Condition.field_placeholder')}
                 disabled={disabled}
+                testIdBuilder={testIdBuilder?.getChild('resbox')}
               >
                 <span className={cx('CBGroup-fieldCaret')}>
-                  <Icon icon="caret" className="icon" />
+                  <Icon icon="right-arrow-bold" className="icon" />
                 </span>
               </ResultBox>
             </div>

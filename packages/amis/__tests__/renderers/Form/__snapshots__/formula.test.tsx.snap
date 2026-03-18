@@ -4,7 +4,7 @@ exports[`Renderer:formula 1`] = `
 <div>
   <div
     class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-    style="position: relative;"
+    data-role="container"
   >
     <div
       class="cxd-Panel-heading"
@@ -13,7 +13,7 @@ exports[`Renderer:formula 1`] = `
         class="cxd-Panel-title"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           <span>
             The form
@@ -34,6 +34,7 @@ exports[`Renderer:formula 1`] = `
         />
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="a"
           data-role="form-item"
         >
           <label
@@ -41,7 +42,7 @@ exports[`Renderer:formula 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   a
@@ -90,6 +91,7 @@ exports[`Renderer:formula 1`] = `
                   aria-valuenow="1"
                   autocomplete="off"
                   class="cxd-Number-input"
+                  name="a"
                   role="spinbutton"
                   step="1"
                   value="1"
@@ -100,6 +102,7 @@ exports[`Renderer:formula 1`] = `
         </div>
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="b"
           data-role="form-item"
         >
           <label
@@ -107,7 +110,7 @@ exports[`Renderer:formula 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   b
@@ -156,6 +159,7 @@ exports[`Renderer:formula 1`] = `
                   aria-valuenow="2"
                   autocomplete="off"
                   class="cxd-Number-input"
+                  name="b"
                   role="spinbutton"
                   step="1"
                   value="2"
@@ -166,6 +170,7 @@ exports[`Renderer:formula 1`] = `
         </div>
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="sum1"
           data-role="form-item"
         >
           <label
@@ -173,7 +178,7 @@ exports[`Renderer:formula 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   sum1
@@ -222,6 +227,7 @@ exports[`Renderer:formula 1`] = `
                   aria-valuenow="3"
                   autocomplete="off"
                   class="cxd-Number-input"
+                  name="sum1"
                   role="spinbutton"
                   step="1"
                   value="3"
@@ -232,6 +238,7 @@ exports[`Renderer:formula 1`] = `
         </div>
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="sum2"
           data-role="form-item"
         >
           <label
@@ -239,7 +246,7 @@ exports[`Renderer:formula 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   sum2
@@ -288,6 +295,7 @@ exports[`Renderer:formula 1`] = `
                   aria-valuenow="4"
                   autocomplete="off"
                   class="cxd-Number-input"
+                  name="sum2"
                   role="spinbutton"
                   step="1"
                   value="4"
@@ -298,6 +306,7 @@ exports[`Renderer:formula 1`] = `
         </div>
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="sum3"
           data-role="form-item"
         >
           <label
@@ -305,7 +314,7 @@ exports[`Renderer:formula 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   sum3
@@ -354,6 +363,7 @@ exports[`Renderer:formula 1`] = `
                   aria-valuenow="5"
                   autocomplete="off"
                   class="cxd-Number-input"
+                  name="sum3"
                   role="spinbutton"
                   step="1"
                   value="5"
@@ -364,6 +374,7 @@ exports[`Renderer:formula 1`] = `
         </div>
         <div
           class="cxd-Form-item cxd-Form-item--normal"
+          data-amis-name="sum4"
           data-role="form-item"
         >
           <label
@@ -371,7 +382,7 @@ exports[`Renderer:formula 1`] = `
           >
             <span>
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   sum4
@@ -420,6 +431,7 @@ exports[`Renderer:formula 1`] = `
                   aria-valuenow="5"
                   autocomplete="off"
                   class="cxd-Number-input"
+                  name="sum4"
                   role="spinbutton"
                   step="1"
                   value="5"
@@ -429,45 +441,6 @@ exports[`Renderer:formula 1`] = `
           </div>
         </div>
       </form>
-    </div>
-    <div
-      class="resize-sensor"
-      style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-    >
-      
-  
-      <div
-        class="resize-sensor-expand"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-shrink"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-appear"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-      />
     </div>
   </div>
 </div>

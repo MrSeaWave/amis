@@ -3,20 +3,27 @@ import {
   FormItem,
   FormControlProps,
   resolveEventData,
-  autobind
+  autobind,
+  getVariable,
+  CustomStyle,
+  setThemeClassName
 } from 'amis-core';
 import {Textarea} from 'amis-ui';
-import type {ListenerAction} from 'amis-core';
+import type {AMISFormItem, ListenerAction} from 'amis-core';
 import {FormBaseControlSchema} from '../../Schema';
 import {supportStatic} from './StaticHoc';
+import cx from 'classnames';
 
 /**
  * TextArea 多行文本输入框。
- * 文档：https://baidu.gitee.io/amis/docs/components/form/textarea
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/textarea
  */
-export interface TextareaControlSchema extends FormBaseControlSchema {
+/**
+ * TextArea 多行文本输入框组件，支持最大/最小行数、只读、边框模式、最大长度、字符统计和清除等功能。
+ */
+export interface AMISTextareaSchema extends AMISFormItem {
   /**
-   * 指定为多行文本输入框
+   * 指定为 textarea 组件
    */
   type: 'textarea';
 
@@ -36,27 +43,27 @@ export interface TextareaControlSchema extends FormBaseControlSchema {
   readOnly?: boolean;
 
   /**
-   * 边框模式，全边框，还是半边框，或者没边框。
+   * 边框模式
    */
   borderMode?: 'full' | 'half' | 'none';
 
   /**
-   * 限制文字个数
+   * 最大长度
    */
   maxLength?: number;
 
   /**
-   * 是否显示计数
+   * 是否显示字符计数
    */
   showCounter?: boolean;
 
   /**
-   * 输入内容是否可清除
+   * 是否显示清除按钮
    */
   clearable?: boolean;
 
   /**
-   * 重置值
+   * 重置时的默认值
    */
   resetValue?: string;
 }
@@ -89,12 +96,22 @@ export default class TextAreaControl extends React.Component<
 
   inputRef = React.createRef<any>();
 
-  doAction(action: ListenerAction, args: any) {
+  doAction(
+    action: ListenerAction,
+    data: any,
+    throwErrors: boolean = false,
+    args?: any
+  ) {
     const actionType = action?.actionType as string;
-    const onChange = this.props.onChange;
+    const {onChange, formStore, store, name, resetValue} = this.props;
 
-    if (!!~['clear', 'reset'].indexOf(actionType)) {
-      onChange?.(this.props.resetValue);
+    if (actionType === 'clear') {
+      onChange?.('');
+      this.focus();
+    } else if (actionType === 'reset') {
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange?.(pristineVal);
       this.focus();
     } else if (actionType === 'focus') {
       this.focus();
@@ -109,7 +126,7 @@ export default class TextAreaControl extends React.Component<
   handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const {onChange, dispatchEvent} = this.props;
 
-    dispatchEvent('change', resolveEventData(this.props, {value: e}, 'value'));
+    dispatchEvent('change', resolveEventData(this.props, {value: e}));
 
     onChange && onChange(e);
   }
@@ -125,7 +142,7 @@ export default class TextAreaControl extends React.Component<
       async () => {
         const rendererEvent = await dispatchEvent(
           'focus',
-          resolveEventData(this.props, {value}, 'value')
+          resolveEventData(this.props, {value})
         );
 
         if (rendererEvent?.prevented) {
@@ -151,7 +168,7 @@ export default class TextAreaControl extends React.Component<
 
         const rendererEvent = await dispatchEvent(
           'blur',
-          resolveEventData(this.props, {value}, 'value')
+          resolveEventData(this.props, {value})
         );
 
         if (rendererEvent?.prevented) {
@@ -164,28 +181,73 @@ export default class TextAreaControl extends React.Component<
   }
 
   renderStatic(displayValue = '-') {
-    const {
-      render,
-      staticSchema = {}
-    } = this.props;
+    const {render, staticSchema = {}} = this.props;
 
-    return render('static-textarea', {
-      type: 'multiline-text',
-      text: displayValue,
-      maxRows: staticSchema.limit || 5
-    }, staticSchema);
+    return render(
+      'static-textarea',
+      {
+        type: 'multiline-text',
+        maxRows: staticSchema.limit || 5,
+        ...staticSchema
+      },
+      {
+        value: displayValue
+      }
+    );
   }
 
   @supportStatic()
   render() {
     const {...rest} = this.props;
+    const {id, themeCss, env, className, classPrefix: ns} = this.props;
     return (
-      <Textarea
-        {...rest}
-        onFocus={this.handleFocus}
-        onBlur={this.handleBlur}
-        onChange={this.handleChange}
-      />
+      <>
+        <Textarea
+          {...rest}
+          forwardRef={this.inputRef}
+          onFocus={this.handleFocus}
+          onBlur={this.handleBlur}
+          onChange={this.handleChange}
+          className={cx(
+            className,
+            setThemeClassName({
+              ...this.props,
+              name: 'inputControlClassName',
+              id,
+              themeCss: themeCss
+            })
+          )}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss,
+            classNames: [
+              {
+                key: 'inputControlClassName',
+                weights: {
+                  default: {
+                    inner: `.${ns}TextareaControl-input`
+                  },
+                  hover: {
+                    inner: `.${ns}TextareaControl-input`
+                  },
+                  focused: {
+                    suf: '.is-focused',
+                    inner: `.${ns}TextareaControl-input`
+                  },
+                  disabled: {
+                    suf: '.is-disabled',
+                    inner: `.${ns}TextareaControl-input`
+                  }
+                }
+              }
+            ],
+            id: id
+          }}
+          env={env}
+        />
+      </>
     );
   }
 }

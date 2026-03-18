@@ -19,28 +19,37 @@ import {
   dependencies
 } from './package.json';
 import path from 'path';
+import fs from 'fs';
 import svgr from '@svgr/rollup';
 
 const settings = {
   globals: {}
 };
 
+const pkgs = [];
+// 读取所有的node_modules目录，获取所有的包名
+[
+  path.join(__dirname, './node_modules'),
+  path.join(__dirname, '../../node_modules')
+].forEach(dir => {
+  if (fs.existsSync(dir)) {
+    fs.readdirSync(dir).forEach(item => {
+      if (item.startsWith('.')) {
+        return;
+      }
+
+      if (item.startsWith('@')) {
+        fs.readdirSync(path.join(dir, item)).forEach(subItem => {
+          pkgs.push(item + '/' + subItem);
+        });
+      }
+
+      return pkgs.push(item);
+    });
+  }
+});
 const external = id =>
-  new RegExp(
-    `^(?:${Object.keys(dependencies)
-      .concat([
-        'linkify-it',
-        'markdown-it',
-        'markdown-it-html5-media',
-        'mdurl',
-        'uc.micro',
-        'entities'
-      ])
-      .map(value =>
-        value.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&').replace(/-/g, '\\x2d')
-      )
-      .join('|')})`
-  ).test(id);
+  pkgs.some(pkg => id.startsWith(pkg) || ~id.indexOf(`node_modules/${pkg}`));
 const input = [
   './src/index.tsx',
   './src/components/ColorPicker.tsx', // 默认不加载的需要手动维护列表，否则不会编译
@@ -48,7 +57,8 @@ const input = [
   './src/components/Markdown.tsx',
   './src/components/Tinymce.tsx',
   './src/components/RichText.tsx',
-  './src/components/CityDB.ts'
+  './src/components/CityDB.ts',
+  './src/components/PdfViewer.tsx'
 ];
 
 /** 获取子包编译后的入口路径，需要使用相对路径 */
@@ -131,7 +141,8 @@ function transpileDynamicImportForCJS(options) {
 
       return {
         left: 'Promise.resolve().then(function() {return new Promise(function(fullfill) {require([',
-        right: '], function(mod) {fullfill(tslib.__importStar(mod))})})})'
+        right:
+          ', "tslib"], function(mod, tslib) {fullfill(tslib.__importStar(mod))})})})'
       };
 
       // return {
@@ -141,6 +152,37 @@ function transpileDynamicImportForCJS(options) {
       //     targetModuleId +
       //     '")))})})})'
       // };
+    }
+  };
+}
+
+// 参考：https://github.com/theKashey/jsx-compress-loader/blob/master/src/index.js
+function transpileReactCreateElement() {
+  return {
+    name: 'transpile-react-create-element',
+    enforce: 'post',
+    transform: (code, id) => {
+      if (
+        /\.(?:tsx|jsx|svg)$/.test(id) &&
+        code.indexOf('React.createElement') !== -1
+      ) {
+        const separator = '\n\n;';
+        const appendText =
+          `\n` +
+          `var __react_jsx__ = require('react');\n` +
+          `var _J$X_ = (__react_jsx__["default"] || __react_jsx__).createElement;\n` +
+          `var _J$F_ = (__react_jsx__["default"] || __react_jsx__).Fragment;\n`;
+
+        const newSource = code
+          .replace(/React\.createElement\(/g, '_J$X_(')
+          .replace(/React\.createElement\(/g, '_J$F_(');
+
+        code = [appendText, newSource].join(separator);
+      }
+
+      return {
+        code
+      };
     }
   };
 }
@@ -194,13 +236,16 @@ function getPlugins(format = 'esm') {
     commonjs({
       sourceMap: false
     }),
+
+    format === 'esm' ? null : transpileReactCreateElement(),
+
     license({
       banner: `
         ${name} v${version}
         Copyright 2018<%= moment().format('YYYY') > 2018 ? '-' + moment().format('YYYY') : null %> ${author}
       `
     })
-  ];
+  ].filter(item => item);
 }
 
 function processSass(context, payload) {

@@ -6,6 +6,7 @@
     .#{$ns}Select-value {
       position: static;
       white-space: normal;
+      flex-shrink: 0;
       user-select: none;
       line-height: calc(
         var(--Form-input-lineHeight) * var(--Form-input-fontSize) - #{px2rem(
@@ -15,13 +16,23 @@
       display: inline-block;
       vertical-align: middle;
       font-size: var(--Form-selectValue-fontSize);
+      font-weight: var(--select-multiple-fontWeight);
+      color: var(--select-multiple-color);
       background: var(--Form-select-value-bgColor);
       border: px2rem(1px) solid var(--Form-select-value-borderColor);
-      border-radius: px2rem(2px);
-      margin-right: var(--gap-xs);
-      margin-bottom: var(--gap-xs);
+      border-radius: var(--select-multiple-top-left-border-radius)
+        var(--select-multiple-top-right-border-radius)
+        var(--select-multiple-bottom-right-border-radius)
+        var(--select-multiple-bottom-left-border-radius);
+      padding: var(--select-multiple-paddingTop)
+        var(--select-multiple-paddingRight) var(--select-multiple-paddingBottom)
+        var(--select-multiple-paddingLeft);
 
-      &:hover {
+      &.is-disabled {
+        background-color: var(--Form-selectValue-onDisable-bg);
+      }
+
+      &:not(.is-disabled):hover {
         background-color: var(--Form-selectValue-onHover-bgColor);
       }
     }
@@ -29,7 +40,6 @@
     .#{$ns}Select-valueLabel {
       display: inline-block;
       max-width: var(--Form-valueLabel-maxWidth);
-      padding: 0 var(--gap-xs);
       overflow: hidden;
       vertical-align: top;
       text-overflow: ellipsis;
@@ -37,32 +47,48 @@
     }
   }
 
-  &--block {
-    display: flex;
-  }
   vertical-align: middle;
   text-align: left;
   align-items: center;
   outline: none;
   position: relative;
-  font-size: var(--Form-input-fontSize);
-  border: var(--Form-select-borderWidth) solid var(--Form-select-borderColor);
+  font-size: var(--select-base-default-fontSize);
+  font-weight: var(--select-base-default-fontWeight);
+  border-width: var(--Form-select-borderWidth);
+  border-style: var(--select-base-default-top-border-style)
+    var(--select-base-default-right-border-style)
+    var(--select-base-default-bottom-border-style)
+    var(--select-base-default-left-border-style);
+  border-color: var(--Form-select-borderColor);
   background: var(--Form-select-bg);
   border-radius: var(--Form-select-borderRadius);
   min-height: var(--Form-selectOption-height);
-  $paddingY: calc(
-    (
-        var(--Form-selectOption-height) - var(--Form-input-lineHeight) *
-          var(--Form-input-fontSize) - var(--Form-select-borderWidth) * 2
-      ) / 2
-  );
-  padding: $paddingY 0 $paddingY var(--Form-select-paddingX);
+  padding: var(--select-base-default-paddingTop)
+    var(--select-base-default-paddingRight)
+    var(--select-base-default-paddingBottom)
+    var(--select-base-default-paddingLeft);
   cursor: pointer;
   color: var(--Form-select-color);
+  transition: all var(--animation-duration) ease-in-out;
+
+  &--block {
+    display: flex;
+  }
 
   &:hover {
     background: var(--Form-select-onHover-bg);
-    border-color: var(--Form-input-onHover-borderColor);
+    border-width: var(--select-base-hover-top-border-width)
+      var(--select-base-hover-right-border-width)
+      var(--select-base-hover-bottom-border-width)
+      var(--select-base-hover-left-border-width);
+    border-style: var(--select-base-hover-top-border-style)
+      var(--select-base-hover-right-border-style)
+      var(--select-base-hover-bottom-border-style)
+      var(--select-base-hover-left-border-style);
+    border-color: var(--select-base-hover-top-border-color)
+      var(--select-base-hover-right-border-color)
+      var(--select-base-hover-bottom-border-color)
+      var(--select-base-hover-left-border-color);
 
     .#{$ns}Select-arrow:before {
       color: var(--Form-select-caret-onHover-iconColor);
@@ -70,13 +96,55 @@
   }
 
   &:active {
-    border-color: var(--Button--default-onActive-border);
+    border-width: var(--select-base-active-top-border-width)
+      var(--select-base-active-right-border-width)
+      var(--select-base-active-bottom-border-width)
+      var(--select-base-active-left-border-width);
+    border-style: var(--select-base-active-top-border-style)
+      var(--select-base-active-right-border-style)
+      var(--select-base-active-bottom-border-style)
+      var(--select-base-active-left-border-style);
+    border-color: var(--select-base-active-top-border-color)
+      var(--select-base-active-right-border-color)
+      var(--select-base-active-bottom-border-color)
+      var(--select-base-active-left-border-color);
+    box-shadow: var(--select-base-active-shadow);
+    background: var(--select-base-active-bg-color);
+  }
+
+  &.is-focused:not(.is-mobile),
+  &.is-opened:not(.is-mobile) {
+    border-width: var(--select-base-active-top-border-width)
+      var(--select-base-active-right-border-width)
+      var(--select-base-active-bottom-border-width)
+      var(--select-base-active-left-border-width);
+    border-style: var(--select-base-active-top-border-style)
+      var(--select-base-active-right-border-style)
+      var(--select-base-active-bottom-border-style)
+      var(--select-base-active-left-border-style);
+    border-color: var(--select-base-active-top-border-color)
+      var(--select-base-active-right-border-color)
+      var(--select-base-active-bottom-border-color)
+      var(--select-base-active-left-border-color);
+    box-shadow: var(--select-base-active-shadow);
+    background: var(--select-base-active-bg-color);
+    color: var(--Form-select-onFocused-color);
   }
 
   &.is-disabled {
-    color: var(--text--muted-color);
-    background: var(--Form-input-onDisabled-bg);
-    border-color: var(--Form-input-onDisabled-borderColor);
+    border-width: var(--select-base-disabled-top-border-width)
+      var(--select-base-disabled-right-border-width)
+      var(--select-base-disabled-bottom-border-width)
+      var(--select-base-disabled-left-border-width);
+    border-style: var(--select-base-disabled-top-border-style)
+      var(--select-base-disabled-right-border-style)
+      var(--select-base-disabled-bottom-border-style)
+      var(--select-base-disabled-left-border-style);
+    border-color: var(--select-base-disabled-top-border-color)
+      var(--select-base-disabled-right-border-color)
+      var(--select-base-disabled-bottom-border-color)
+      var(--select-base-disabled-left-border-color);
+    background: var(--select-base-disabled-bg-color);
   }
 
   &:focus {
@@ -84,15 +152,24 @@
   }
 
   .#{$ns}PopOver.#{$ns}Select-popover {
-    margin-top: px2rem(4px);
+    &.#{$ns}PopOver--v-top {
+      margin-top: px2rem(4px);
+    }
+    &.#{$ns}PopOver--v-bottom {
+      margin-bottom: px2rem(4px);
+    }
     .#{$ns}Select-menu {
+      .#{$ns}Checkbox span {
+        line-height: var(--select-base-default-option-line-height);
+        height: var(--select-base-default-option-line-height);
+      }
       .#{$ns}Select-option {
-        height: px2rem(32px);
-        line-height: px2rem(22px);
+        line-height: var(--select-base-default-option-line-height);
+        height: var(--select-base-default-option-line-height);
       }
       .#{$ns}Select-addBtn {
-        height: px2rem(32px);
-        line-height: px2rem(30px);
+        line-height: var(--select-base-default-option-line-height);
+        height: var(--select-base-default-option-line-height);
       }
     }
   }
@@ -103,12 +180,17 @@
     user-select: none;
     position: relative;
     flex-grow: 1;
-    line-height: 1;
+    min-width: 0;
     width: auto;
     max-width: 100%;
     overflow: hidden;
+    padding-right: px2rem(4px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--select-multiple-marginRight);
   }
   &-valuesNoWrap {
+    flex-wrap: nowrap;
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
@@ -123,9 +205,6 @@
   }
 
   &-value {
-    line-height: calc(
-      var(--Form-input-lineHeight) * var(--Form-input-fontSize)
-    );
     white-space: nowrap;
     max-width: 100%;
     overflow: hidden;
@@ -142,17 +221,16 @@
   &--multi {
     height: auto;
     min-height: var(--Form-selectOption-height);
-    padding: var(--gap-xs) 0 var(--gap-xs) var(--gap-xs);
+    padding: var(--select-base-default-paddingTop)
+      var(--select-base-default-paddingRight)
+      var(--select-base-default-paddingBottom)
+      var(--select-base-default-paddingLeft);
 
     .#{$ns}Select-valueWrap {
       > input {
         display: inline-block;
         width: px2rem(100px);
         margin-bottom: var(--gap-xs);
-      }
-
-      .#{$ns}Select-placeholder {
-        margin-left: var(--gap-sm);
       }
     }
     .#{$ns}Select-values + .#{$ns}Select-input {
@@ -163,7 +241,7 @@
   }
   &-valueIcon {
     cursor: pointer;
-    padding: 1px 5px;
+    margin-left: px2rem(10px);
     color: var(--Form-select-valueIcon-color);
 
     &:hover {
@@ -184,9 +262,6 @@
   }
 
   &-arrow {
-    margin-right: px2rem(12px);
-    // margin-right: var(--gap-xs);
-    // margin-left: var(--gap-xs);
     width: var(--gap-md);
     text-align: center;
     display: flex;
@@ -210,13 +285,13 @@
   }
 
   &.is-mobile {
-    min-height: calc(var(--Form-input-lineHeight) * var(--fontSizeLg));
+    min-height: var(--Form-select-height);
     border: none;
     padding: 0;
-    font-size: var(--fontSizeLg);
+    font-size: var(--select-base-default-fontSize);
 
     .#{$ns}Select-valueWrap {
-      text-align: right;
+      text-align: left;
       padding-right: 4px;
     }
     .#{$ns}Select-arrow {
@@ -233,7 +308,6 @@
     overflow: auto;
     user-select: none;
     .#{$ns}Checkbox--sm > i {
-      margin-top: px2rem(-3px);
       margin-right: px2rem(4px);
     }
     &.is-mobile {
@@ -285,39 +359,44 @@
   &-option {
     cursor: pointer;
     // min-width: px2rem(120px);
-    padding: calc(
-        (
-            var(--Form-select-menu-height) - var(--Form-input-lineHeight) *
-              var(--Form-input-fontSize)
-          ) / 2
-      )
-      var(--Form-select-paddingX);
+    padding: var(--select-base-default-option-paddingTop)
+      var(--select-base-default-option-paddingRight)
+      var(--select-base-default-option-paddingBottom)
+      var(--select-base-default-option-paddingLeft);
     display: flex;
+    color: var(--select-base-default-option-color);
+    font-size: var(--select-base-default-option-fontSize);
+    font-weight: var(--select-base-default-option-fontWeight);
+    background: var(--select-base-default-option-bg-color);
+    line-height: var(--select-base-default-option-line-height);
 
-    &-checkbox {
+    .#{$ns}Checkbox {
       width: 100%;
       display: flex;
+      align-items: center;
       text-overflow: ellipsis;
       overflow: hidden;
       white-space: nowrap;
-      align-items: center;
-      > label {
-        width: 100%;
-        display: flex;
+      margin: 0;
+      > i {
+        flex-shrink: 0;
+      }
+
+      > span {
         text-overflow: ellipsis;
         overflow: hidden;
         white-space: nowrap;
-        align-items: center;
-
-        > i {
-          flex-shrink: 0;
-        }
-
-        > span {
+        width: 100%;
+        font-size: var(--select-base-default-option-fontSize);
+        font-weight: var(--select-base-default-option-fontWeight);
+        color: var(--select-base-default-option-color);
+      }
+      .#{$ns}TplField {
+        > span > p {
+          margin: 0;
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
-          width: 100%;
         }
       }
     }
@@ -325,16 +404,28 @@
     &.is-active {
       color: var(--Form-select-menu-onActive-color);
       background: var(--Form-select-menu-onActive-bg);
+
+      .#{$ns}Select-option-checkbox > label > span {
+        color: var(--Form-select-menu-onActive-color);
+      }
     }
 
     &.is-highlight {
       color: var(--Form-select-menu-onHover-color);
       background: var(--Form-select-menu-onHover-bg);
+
+      .#{$ns}Select-option-checkbox > label > span {
+        color: var(--Form-select-menu-onHover-color);
+      }
     }
 
     &.is-disabled {
       color: var(--Form-select-menu-onDisabled-color);
       background: var(--Form-select-menu-onDisabled-bg);
+
+      .#{$ns}Select-option-checkbox > label > span {
+        color: var(--Form-select-menu-onDisabled-color);
+      }
     }
 
     > label {
@@ -357,8 +448,55 @@
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
-      display: inline-block;
+      // display: inline-block;
       max-width: 100%;
+
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-start;
+      align-items: center;
+    }
+
+    &.is-mobile {
+      position: relative;
+
+      & > a {
+        margin-right: calc(
+          20px + var(--select-base-default-option-paddingRight)
+        );
+      }
+
+      .#{$ns}Select-option-item-check {
+        min-width: 0;
+        min-height: 0;
+        flex: 1;
+        text-align: left;
+        border-bottom: px2rem(1px) solid var(--borderColor);
+      }
+
+      .#{$ns}Select-option-mcheck {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        right: var(--select-base-default-option-paddingRight);
+        flex: none;
+        width: px2rem(16px);
+        color: var(--Form-select-mobile-icon-check-color);
+      }
+
+      &:last-child {
+        .#{$ns}Select-option-item-check {
+          border-bottom: none;
+        }
+      }
+    }
+
+    &-disabledTip {
+      margin-left: var(--gap-xs);
+      color: #ff9326;
+      &:hover {
+        color: #ff9326;
+      }
     }
   }
 
@@ -383,13 +521,10 @@
   &-addBtn {
     display: block;
     cursor: pointer;
-    padding: calc(
-        (
-            var(--Form-select-menu-height) - var(--Form-input-lineHeight) *
-              var(--Form-input-fontSize)
-          ) / 2
-      )
-      var(--Form-select-paddingX);
+    padding: var(--select-base-default-option-paddingTop)
+      var(--select-base-default-option-paddingRight)
+      var(--select-base-default-option-paddingBottom)
+      var(--select-base-default-option-paddingLeft);
 
     &:hover {
       text-decoration: none;
@@ -400,12 +535,6 @@
       height: px2rem(14px);
       margin-right: var(--Checkbox-gap);
     }
-  }
-
-  &.is-focused:not(.is-mobile),
-  &.is-opened:not(.is-mobile) {
-    border-color: var(--Form-input-onFocused-borderColor);
-    color: var(--Form-select-onFocused-color);
   }
 
   &-spinner {
@@ -424,15 +553,14 @@
     z-index: 2;
 
     svg {
-      fill: var(--Form-input-iconColor);
-      width: px2rem(14px);
-      height: px2rem(14px);
+      fill: var(--Form-input-clearBtn-color);
+      color: var(--Form-input-clearBtn-color);
+      width: var(--Form-input-clearBtn-size);
+      height: var(--Form-input-clearBtn-size);
       top: 0;
 
-      &:hover > path {
-        &:first-of-type {
-          fill: var(--Form-select-valueIcon-color);
-        }
+      &:hover {
+        fill: var(--Form-input-clearBtn-color-onHover);
       }
     }
   }
@@ -479,26 +607,26 @@
   }
 }
 
-.#{$ns}Select-popover {
-  margin-top: calc(var(--Form-select-outer-borderWidth) * -1);
+.#{$ns}Select-overflow-wrapper {
+  .#{$ns}Select-value {
+    margin-bottom: var(--gap-xs);
+  }
+}
 
+.#{$ns}Select-popover {
   background: var(--Form-select-menu-bg);
   color: var(--Form-select-menu-color);
   border: var(--Form-select-outer-borderWidth) solid
-    var(--Form-input-onFocused-borderColor);
+    var(--Form-select-outer-borderColor);
   box-shadow: var(--Form-select-outer-boxShadow);
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  // min-width: px2rem(100px);
+  min-width: px2rem(120px);
 
   // PopOver 上已经配置了，这个要是配置就会覆盖，所以先干掉好了
   // z-index: 10;
-
-  &.#{$ns}PopOver--leftTopLeftBottom {
-    margin-top: calc(
-      (var(--Form-select-popoverGap) - var(--Form-select-outer-borderWidth)) *
-        -1
-    );
+}
+.#{$ns}InputGroup:hover {
+  .#{$ns}Select-popover {
+    border-color: var(--Form-select-outer-borderColor) !important;
   }
 }
 
@@ -513,8 +641,6 @@
   }
 
   .#{$ns}TransferDropDown-popover {
-    border: none;
-
     .#{$ns}Tree-list {
       .#{$ns}Tree-item {
         .#{$ns}Tree-itemLabel,
@@ -522,13 +648,13 @@
           &:hover {
             background-color: transparent;
             .#{$ns}Tree-itemText {
-              background: var(--Transfer-title-bg);
+              background: var(--select-tree-hover-bg-color);
             }
           }
           &:active {
             background-color: transparent;
             .#{$ns}Tree-itemText {
-              background: var(--Tree-item-onChekced-bg);
+              background: var(--select-tree-active-bg-color);
             }
           }
           &.is-checked {
@@ -557,6 +683,30 @@
 
     .#{$ns}Select-valueWrap {
       width: 0; // ! 没有这个会撑开。
+    }
+  }
+}
+
+// 下拉框在弹框中的的时候没有select层，所以把这部分单独提出来
+.#{$ns}PopOver.#{$ns}Select-popover {
+  &.#{$ns}PopOver--v-top {
+    margin-top: px2rem(4px);
+  }
+  &.#{$ns}PopOver--v-bottom {
+    margin-bottom: px2rem(4px);
+  }
+  .#{$ns}Select-menu {
+    .#{$ns}Checkbox span {
+      line-height: var(--select-base-default-option-line-height);
+      height: var(--select-base-default-option-line-height);
+    }
+    .#{$ns}Select-option {
+      line-height: var(--select-base-default-option-line-height);
+      height: var(--select-base-default-option-line-height);
+    }
+    .#{$ns}Select-addBtn {
+      line-height: var(--select-base-default-option-line-height);
+      height: var(--select-base-default-option-line-height);
     }
   }
 }

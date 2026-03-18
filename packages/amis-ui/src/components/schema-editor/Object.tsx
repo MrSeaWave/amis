@@ -3,8 +3,14 @@ import {autobind, guid, JSONSchema} from 'amis-core';
 import Button from '../Button';
 import {Icon} from '../icons';
 import InputBox from '../InputBox';
-import {SchemaEditorItemCommon, SchemaEditorItemCommonProps} from './Common';
+import {ITEMMAP, SchemaEditorItemCommon} from './Common';
 import {SchemaEditorItem} from './Item';
+
+import type {SchemaEditorItemCommonProps} from './Common';
+import PickerContainer from '../PickerContainer';
+import {Controller} from '../FormField';
+import Checkbox from '../Checkbox';
+import {UseFormReturn} from 'react-hook-form';
 
 export interface SchemaEditorItemObjectState {
   members: Array<{
@@ -119,6 +125,40 @@ export class SchemaEditorItemObject extends SchemaEditorItemCommon<
   }
 
   @autobind
+  handleAddProppertyConfirm({key, isRequired: required, ...value}: any) {
+    const members = this.state.members.concat();
+
+    if (members.some(member => member.key === key)) {
+      throw new Error(this.props.translate('JSONSchema.key_duplicated'));
+    }
+
+    members.push({
+      id: guid(),
+      key: key || '',
+      hasError: false,
+      required: required,
+      schema: value
+    });
+    this.setState(
+      {
+        members
+      },
+      this.pipeOut
+    );
+  }
+
+  @autobind
+  handleEditProppertyConfirm(index: number, value: any) {
+    const exists = this.state.members.some(
+      (m, i) => i !== index && m.key === value.key
+    );
+
+    if (exists) {
+      throw new Error(this.props.translate('JSONSchema.key_duplicated'));
+    }
+  }
+
+  @autobind
   handlePropKeyChange(index: number, key: string) {
     const members = this.state.members.concat();
     members[index] = {
@@ -152,10 +192,17 @@ export class SchemaEditorItemObject extends SchemaEditorItemCommon<
   }
 
   @autobind
-  handlePropChange(index: number, item: any) {
+  handlePropChange(index: number, {key, isRequired: required, ...item}: any) {
+    const {mini} = this.props;
     const members = this.state.members.concat();
     members[index] = {
       ...members[index],
+      ...(mini
+        ? {
+            key,
+            required
+          }
+        : undefined),
       schema: {
         ...item
       }
@@ -182,6 +229,47 @@ export class SchemaEditorItemObject extends SchemaEditorItemCommon<
     });
   }
 
+  @autobind
+  renderFormPrefix(
+    methods: UseFormReturn & {
+      onSubmit: (value: any) => void;
+    }
+  ) {
+    const {placeholder, mobileUI, classnames: cx, translate: __} = this.props;
+    return (
+      <>
+        <Controller
+          label={__('JSONSchema.key')}
+          name="key"
+          control={methods.control}
+          rules={{maxLength: 20, isVariableName: true}}
+          isRequired
+          render={({field}) => (
+            <InputBox
+              {...field}
+              placeholder={__(placeholder?.key ?? '')}
+              mobileUI={mobileUI}
+            />
+          )}
+        />
+
+        <Controller
+          label={__('JSONSchema.required')}
+          name="isRequired"
+          control={methods.control}
+          render={({field}) => (
+            <Checkbox
+              {...field}
+              value={!!field.value}
+              className={cx('SchemaEditor-required')}
+              label={__('Required')}
+            />
+          )}
+        />
+      </>
+    );
+  }
+
   rendererProps() {
     const {
       value,
@@ -195,7 +283,13 @@ export class SchemaEditorItemObject extends SchemaEditorItemCommon<
       showInfo,
       types,
       onTypeChange,
-      enableAdvancedSetting
+      enableAdvancedSetting,
+      popOverContainer,
+      placeholder,
+      mobileUI,
+      mini,
+      addButtonText,
+      dataName
     } = this.props;
     const members = this.state.members;
 
@@ -206,97 +300,236 @@ export class SchemaEditorItemObject extends SchemaEditorItemCommon<
         })}
       >
         {members.length ? (
-          members.map((member, index) => (
-            <SchemaEditorItem
-              key={member.id}
-              types={types}
-              onTypeChange={onTypeChange}
-              enableAdvancedSetting={enableAdvancedSetting}
-              prefix={
-                <>
-                  <InputBox
-                    className={cx('SchemaEditor-key')}
-                    hasError={member.hasError}
-                    value={member.key || ''}
-                    onChange={this.handlePropKeyChange.bind(this, index)}
-                    placeholder={__('JSONSchema.key')}
-                    disabled={disabled || !!value?.$ref}
-                  />
+          members.map((member, index) => {
+            const memberKey = dataName
+              ? dataName + '-' + member.key
+              : member.key;
+            return (
+              <SchemaEditorItem
+                dataName={memberKey}
+                mobileUI={mobileUI}
+                mini={mini}
+                key={member.id}
+                types={types}
+                onTypeChange={onTypeChange}
+                enableAdvancedSetting={enableAdvancedSetting}
+                popOverContainer={popOverContainer}
+                prefix={
+                  mini ? undefined : (
+                    <>
+                      <InputBox
+                        className={cx('SchemaEditor-key')}
+                        hasError={member.hasError}
+                        value={member.key || ''}
+                        onChange={this.handlePropKeyChange.bind(this, index)}
+                        placeholder={__(placeholder?.key ?? '')}
+                        disabled={disabled || !!value?.$ref}
+                        mobileUI={mobileUI}
+                        dataName={`${memberKey}-key`}
+                      />
 
-                  <InputBox
-                    className={cx('SchemaEditor-title')}
-                    value={member.schema.title || ''}
-                    onChange={this.handlePropTitleChange.bind(this, index)}
-                    placeholder={__('JSONSchema.title')}
+                      <InputBox
+                        className={cx('SchemaEditor-title')}
+                        value={member.schema.title || ''}
+                        onChange={this.handlePropTitleChange.bind(this, index)}
+                        placeholder={__(placeholder?.title ?? '')}
+                        disabled={disabled || !!value?.$ref}
+                        mobileUI={mobileUI}
+                        dataName={`${memberKey}-title`}
+                      />
+                    </>
+                  )
+                }
+                affix={
+                  <Button
+                    className={cx('SchemaEditor-btn')}
+                    onClick={this.handlePropRemove.bind(this, index)}
+                    iconOnly={!mini}
+                    level={mini ? 'link' : 'default'}
                     disabled={disabled || !!value?.$ref}
-                  />
-                </>
-              }
-              affix={
-                <Button
-                  className={cx('SchemaEditor-btn')}
-                  onClick={this.handlePropRemove.bind(this, index)}
-                  iconOnly
-                  disabled={disabled || !!value?.$ref}
-                >
-                  <Icon icon="remove" className="icon" />
-                </Button>
-              }
-              value={member.schema}
-              onChange={this.handlePropChange.bind(this, index)}
-              renderExtraProps={renderExtraProps}
-              renderModalProps={renderModalProps}
-              locale={locale}
-              translate={__}
-              classnames={cx}
-              classPrefix={classPrefix}
-              disabled={disabled || !!value?.$ref}
-              required={member.required}
-              onRequiredChange={this.handlePropRequiredChange.bind(this, index)}
-            />
-          ))
+                  >
+                    <Icon icon="remove" className="icon" />
+                  </Button>
+                }
+                value={
+                  mini
+                    ? ({
+                        ...member.schema,
+                        key: member.key,
+                        isRequired: member.required
+                      } as any)
+                    : member.schema
+                }
+                onChange={this.handlePropChange.bind(this, index)}
+                onFormConfirm={this.handleEditProppertyConfirm.bind(
+                  this,
+                  index
+                )}
+                renderExtraProps={renderExtraProps}
+                renderModalProps={renderModalProps}
+                locale={locale}
+                translate={__}
+                classnames={cx}
+                classPrefix={classPrefix}
+                disabled={disabled || !!value?.$ref}
+                required={member.required}
+                onRequiredChange={this.handlePropRequiredChange.bind(
+                  this,
+                  index
+                )}
+                placeholder={placeholder}
+                formPrefixRender={this.renderFormPrefix}
+              />
+            );
+          })
         ) : (
           <div className={cx('SchemaEditorProps-placeholder')}>
-            {__('placeholder.empty')}
+            {__(placeholder?.empty ?? '')}
           </div>
         )}
 
-        <Button
-          level="link"
-          onClick={this.handleAdd}
-          size="xs"
-          disabled={disabled || !!value?.$ref}
-        >
-          {__('JSONSchema.add_prop')}
-        </Button>
+        {mini ? (
+          <PickerContainer
+            mobileUI={mobileUI}
+            value={{
+              type: 'string'
+            }}
+            bodyRender={({isOpened, value, onChange, ref}: any) => {
+              return isOpened ? (
+                <SchemaEditorItem
+                  types={types}
+                  value={value}
+                  onChange={onChange}
+                  renderExtraProps={renderExtraProps}
+                  renderModalProps={renderModalProps}
+                  locale={locale}
+                  translate={__}
+                  classnames={cx}
+                  classPrefix={classPrefix}
+                  disabled={disabled}
+                  onTypeChange={this.handleTypeChange}
+                  enableAdvancedSetting={enableAdvancedSetting}
+                  popOverContainer={popOverContainer}
+                  placeholder={placeholder}
+                  mobileUI={mobileUI}
+                  mini={mini}
+                  formRef={ref}
+                  formMode
+                  formPrefixRender={this.renderFormPrefix}
+                />
+              ) : null;
+            }}
+            beforeConfirm={this.handleBeforeSubmit}
+            onConfirm={this.handleAddProppertyConfirm}
+            title={__('JSONSchema.add_prop')}
+            popOverContainer={popOverContainer}
+          >
+            {({onClick}) => (
+              <Button
+                level="enhance"
+                block
+                onClick={onClick}
+                size="sm"
+                disabled={disabled || !!value?.$ref}
+              >
+                {addButtonText ?? __('JSONSchema.add_prop')}
+              </Button>
+            )}
+          </PickerContainer>
+        ) : (
+          <Button
+            level="link"
+            onClick={this.handleAdd}
+            size="xs"
+            disabled={disabled || !!value?.$ref}
+          >
+            {addButtonText ?? __('JSONSchema.add_prop')}
+          </Button>
+        )}
       </div>
     );
   }
 
   render() {
-    const {classnames: cx, showInfo, translate: __, disabled} = this.props;
+    const {
+      classnames: cx,
+      showInfo,
+      translate: __,
+      formMode,
+      disabled,
+      locale,
+      classPrefix,
+      mini,
+      types,
+      placeholder,
+      mobileUI,
+      expandMembers
+    } = this.props;
+
+    if (formMode) {
+      return this.renderForm({
+        formAffixRender: methods => {
+          return (
+            <>
+              <Controller
+                label={__('JSONSchema.members')}
+                name="properties"
+                control={methods.control}
+                render={({field}) => (
+                  <SchemaEditorItem
+                    {...field}
+                    types={types}
+                    value={{
+                      type: 'object',
+                      required: [],
+                      properties: field.value
+                    }}
+                    onChange={(value: any) => field.onChange(value.properties)}
+                    placeholder={placeholder}
+                    mobileUI={mobileUI}
+                    locale={locale}
+                    translate={__}
+                    classnames={cx}
+                    classPrefix={classPrefix}
+                    mini={false}
+                  />
+                )}
+              />
+            </>
+          );
+        }
+      });
+    }
 
     return (
       <div
         className={cx('SchemaEditorItem SchemaEditorObject', {
-          'is-collapsed': this.state.collapsed
+          'is-collapsed': this.state.collapsed,
+          'SchemaEditorItem--mini': mini
         })}
+        data-amis-name={this.props.dataName}
       >
         {showInfo !== false ? (
           <>
-            <a
-              className={cx('SchemaEditor-caret', {
-                'is-collapsed': this.state.collapsed
-              })}
-              onClick={this.toggleCollapsed}
-            >
-              <Icon icon="caret" className="icon" />
-            </a>
+            {mini ? null : (
+              <a
+                className={cx('SchemaEditor-caret', {
+                  'is-collapsed': this.state.collapsed
+                })}
+                onClick={this.toggleCollapsed}
+              >
+                <Icon icon="caret" className="icon" />
+              </a>
+            )}
             {this.renderCommon()}
           </>
         ) : null}
-        {this.state.collapsed ? null : this.rendererProps()}
+        {this.state.collapsed || (mini && expandMembers !== true)
+          ? null
+          : this.rendererProps()}
       </div>
     );
   }
 }
+
+ITEMMAP.object = SchemaEditorItemObject;

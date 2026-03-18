@@ -5,62 +5,146 @@
 
 import React from 'react';
 import find from 'lodash/find';
+import values from 'lodash/values';
 import hoistNonReactStatic from 'hoist-non-react-statics';
-import {dataMapping} from './utils/tpl-builtin';
+import {dataMapping, registerFunction} from './utils/tpl-builtin';
 import {RendererEnv, RendererProps} from './factory';
 import {
   autobind,
   qsstringify,
   qsparse,
+  eachTree,
   findTree,
   TreeItem,
-  parseQuery
+  parseQuery,
+  getVariable
 } from './utils/helper';
 import {RendererData, ActionObject} from './types';
+import {isPureVariable} from './utils/isPureVariable';
+import {createObject, createRendererEvent, filter, memoParse} from './utils';
+import {ListenerAction, runActions} from './actions';
+
+/**
+ * target 里面可能包含 ?xxx=xxx，这种情况下，需要把 ?xxx=xxx 保留下来，然后对前面的部分进行 filter
+ * 因为后面会对 query 部分做不一样的处理。会保留原始的值。而不是会转成字符串。
+ * @param target
+ * @param data
+ * @returns
+ */
+export function filterTarget(target: string, data: Record<string, any>) {
+  const idx = target.indexOf('?');
+
+  if (~idx) {
+    return filter(target.slice(0, idx), data) + target.slice(idx);
+  }
+
+  return filter(target, data, '| raw');
+}
+
+/**
+ * 分割目标，如果里面有表达式，不要跟表达式里面的逗号冲突。
+ * @param target
+ * @returns
+ */
+export function splitTarget(target: string): Array<string> {
+  try {
+    const ast = memoParse(target);
+    const pos: Array<number> = [];
+    ast.body.forEach((item: any) => {
+      // 不要处理表达式里面的东西。
+      if (item.type === 'raw') {
+        const parts = (item.value as string).split(',');
+        if (parts.length > 1) {
+          parts.pop();
+          let start = item.start.index;
+          parts.forEach(part => {
+            pos.push(start + part.length);
+            start += part.length + 1;
+          });
+        }
+      }
+    });
+    if (pos.length) {
+      let parts: Array<string> = [];
+
+      pos.reduceRight((arr: Array<string>, index) => {
+        arr.unshift(target.slice(index + 1)?.trim());
+        target = target.slice(0, index);
+        return arr;
+      }, parts);
+      parts.unshift(target);
+
+      return parts;
+    }
+  } catch (e) {}
+  return [target];
+}
 
 export interface ScopedComponentType extends React.Component<RendererProps> {
   focus?: () => void;
   doAction?: (
     action: ActionObject,
     data: RendererData,
-    throwErrors?: boolean
+    throwErrors?: boolean,
+    args?: any
   ) => void;
   receive?: (values: RendererData, subPath?: string, replace?: boolean) => void;
   reload?: (
-    subPath?: string,
-    query?: RendererData | null,
-    ctx?: RendererData
+    subpath?: string,
+    query?: any,
+    ctx?: RendererData,
+    silent?: boolean,
+    replace?: boolean,
+    args?: any
   ) => void;
   context: any;
+  setData?: (value?: object, replace?: boolean, index?: number) => void;
 }
 
 export interface IScopedContext {
+  rendererType?: string;
+  component?: ScopedComponentType;
   parent?: AliasIScopedContext;
   children?: AliasIScopedContext[];
   registerComponent: (component: ScopedComponentType) => void;
   unRegisterComponent: (component: ScopedComponentType) => void;
   getComponentByName: (name: string) => ScopedComponentType;
   getComponentById: (id: string) => ScopedComponentType | undefined;
+  getComponentByIdUnderCurrentScope: (
+    id: string,
+    ignoreScope?: IScopedContext
+  ) => ScopedComponentType | undefined;
   getComponents: () => Array<ScopedComponentType>;
-  reload: (target: string, ctx: RendererData) => void;
+  reload: (target: string, ctx: RendererData) => void | Promise<void>;
   send: (target: string, ctx: RendererData) => void;
   close: (target: string) => void;
   closeById: (target: string) => void;
+  getComponentsByRefPath: (
+    session: string,
+    path: string
+  ) => ScopedComponentType[];
+  doAction: (actions: ListenerAction | ListenerAction[], ctx: any) => void;
 }
 type AliasIScopedContext = IScopedContext;
-export const ScopedContext = React.createContext(createScopedTools(''));
+
+const rootScopedContext = createScopedTools('');
+export const ScopedContext = React.createContext(rootScopedContext);
 
 function createScopedTools(
   path?: string,
   parent?: AliasIScopedContext,
-  env?: RendererEnv
+  env?: RendererEnv,
+  rendererType?: string
 ): IScopedContext {
   const components: Array<ScopedComponentType> = [];
-  const self = {
+  const self: IScopedContext = {
+    rendererType,
+    component: undefined,
     parent,
     registerComponent(component: ScopedComponentType) {
       // 不要把自己注册在自己的 Scoped 上，自己的 Scoped 是给子节点们注册的。
       if (component.props.$path === path && parent) {
+        self.component = component;
         return parent.registerComponent(component);
       }
 
@@ -72,6 +156,9 @@ function createScopedTools(
     unRegisterComponent(component: ScopedComponentType) {
       // 自己本身实际上注册在父级 Scoped 上。
       if (component.props.$path === path && parent) {
+        // 如果是自己，尝试把自己从父级 Scoped 上移除，否则在某些场景下会导致父级的 children 一直增长。
+        const idx = parent.children!.indexOf(self);
+        ~idx && parent.children!.splice(idx, 1);
         return parent.unRegisterComponent(component);
       }
 
@@ -100,30 +187,128 @@ function createScopedTools(
       const resolved = find(
         components,
         component =>
-          component.props.name === name || component.props.id === name
+          filter(component.props.name, component.props.data) === name ||
+          component.props.id === name
       );
       return resolved || (parent && parent.getComponentByName(name));
     },
 
+    getComponentByIdUnderCurrentScope(
+      id: string,
+      ignoreScope?: IScopedContext
+    ) {
+      let component = undefined;
+      findTree(
+        [this],
+        (item: TreeItem) =>
+          item !== ignoreScope &&
+          item.getComponents().find((cmpt: ScopedComponentType) => {
+            if (filter(cmpt.props.id, cmpt.props.data) === id) {
+              component = cmpt;
+              return true;
+            }
+            return false;
+          })
+      ) as ScopedComponentType | undefined;
+
+      return component;
+    },
+
     getComponentById(id: string) {
       let root: AliasIScopedContext = this;
+      let ignoreScope: AliasIScopedContext | undefined = undefined;
+
       // 找到顶端scoped
+      while (root) {
+        // 优先从当前scope查找
+        // 直接跑到顶层查找，对于有历史标签一次渲染多个页面的情况，会有问题
+        const component = root.getComponentByIdUnderCurrentScope(
+          id,
+          ignoreScope
+        );
+
+        if (component) {
+          return component;
+        }
+
+        if (!root.parent || root.parent === rootScopedContext) {
+          break;
+        }
+
+        ignoreScope = root;
+        root = root.parent;
+      }
+
+      return undefined;
+    },
+
+    /**
+     * 基于绑定的变量名称查找组件
+     * 支持形如${xxx}的格式
+     *
+     * @param session store的session, 默认为全局的
+     * @param path 变量路径, 包含命名空间
+     */
+    getComponentsByRefPath(
+      session: string,
+      path: string
+    ): ScopedComponentType[] {
+      if (!path || typeof path !== 'string') {
+        return [];
+      }
+
+      const cmptMaps: Record<string, ScopedComponentType> = {};
+      let root: AliasIScopedContext = this;
+
       while (root.parent) {
         root = root.parent;
       }
 
-      // 向下查找
-      let component = undefined;
-      findTree([root], (item: TreeItem) =>
-        item.getComponents().find((cmpt: ScopedComponentType) => {
-          if (cmpt.props.id === id) {
-            component = cmpt;
-            return true;
+      eachTree([root], (item: TreeItem) => {
+        const scopedCmptList: ScopedComponentType[] =
+          item.getComponents() || [];
+
+        if (Array.isArray(scopedCmptList)) {
+          for (const cmpt of scopedCmptList) {
+            const pathKey = cmpt?.props?.$path ?? 'unknown';
+            const schema = cmpt?.props?.$schema ?? {};
+            const cmptSession = cmpt?.props.env?.session ?? 'global';
+
+            /** 仅查找当前session的组件 */
+            if (cmptMaps[pathKey] || session !== cmptSession) {
+              continue;
+            }
+
+            /** 非Scoped组件, 查找其所属的父容器 */
+            if (cmpt?.setData && typeof cmpt.setData === 'function') {
+              cmptMaps[pathKey] = cmpt;
+              continue;
+            }
+
+            /** 查找Scoped组件中的引用 */
+            for (const key of Object.keys(schema)) {
+              const expression = schema[key];
+
+              if (
+                typeof expression === 'string' &&
+                isPureVariable(expression)
+              ) {
+                /** 考虑到数据映射函数的情况，将宿主变量提取出来 */
+                const host = expression
+                  .substring(2, expression.length - 1)
+                  .split('|')[0];
+
+                if (host && host === path) {
+                  cmptMaps[pathKey] = cmpt;
+                  break;
+                }
+              }
+            }
           }
-          return false;
-        })
-      ) as ScopedComponentType | undefined;
-      return component;
+        }
+      });
+
+      return values(cmptMaps);
     },
 
     getComponents() {
@@ -133,8 +318,7 @@ function createScopedTools(
     reload(target: string | Array<string>, ctx: any) {
       const scoped = this;
 
-      let targets =
-        typeof target === 'string' ? target.split(/\s*,\s*/) : target;
+      let targets = typeof target === 'string' ? splitTarget(target) : target;
       targets.forEach(name => {
         const idx2 = name.indexOf('?');
         let query = null;
@@ -168,7 +352,8 @@ function createScopedTools(
             location.reload();
           }
         } else {
-          const component = scoped.getComponentByName(name);
+          const component =
+            scoped.getComponentByName(name) || scoped.getComponentById(name);
           component &&
             component.reload &&
             component.reload(subPath, query, ctx);
@@ -179,7 +364,7 @@ function createScopedTools(
     send(receive: string | Array<string>, values: object) {
       const scoped = this;
       let receives =
-        typeof receive === 'string' ? receive.split(/\s*,\s*/) : receive;
+        typeof receive === 'string' ? splitTarget(receive) : receive;
 
       // todo 没找到做提示！
       receives.forEach(name => {
@@ -230,8 +415,7 @@ function createScopedTools(
 
       if (typeof target === 'string') {
         // 过滤已经关掉的，当用户 close 配置多个弹框 name 时会出现这种情况
-        target
-          .split(/\s*,\s*/)
+        splitTarget(target)
           .map(name => scoped.getComponentByName(name))
           .filter(component => component && component.props.show)
           .forEach(closeDialog);
@@ -248,8 +432,50 @@ function createScopedTools(
       if (component && component.props.show) {
         closeDialog(component);
       }
+    },
+
+    async doAction(actions: ListenerAction | ListenerAction[], ctx: any) {
+      const renderer = this.getComponents()[0]; // 直接拿最顶层
+      const rendererEvent = createRendererEvent('embed', {
+        env,
+        nativeEvent: undefined,
+        data: createObject(renderer.props.data, ctx),
+        scoped: this
+      });
+
+      await runActions(actions, renderer, rendererEvent);
+
+      if (rendererEvent.prevented) {
+        return;
+      }
     }
   };
+
+  registerFunction(
+    'GETRENDERERDATA',
+    (componentId: string, path?: string, scoped: any = self) => {
+      const component = scoped.getComponentById(componentId);
+      const data = component?.getData?.();
+      if (path) {
+        const variable = getVariable(data, path);
+        return variable;
+      }
+      return data;
+    }
+  );
+
+  registerFunction(
+    'GETRENDERERPROP',
+    (componentId: string, path?: string, scoped: any = self) => {
+      const component = scoped.getComponentById(componentId);
+      const props = component?.props;
+      if (path) {
+        const variable = getVariable(props, path);
+        return variable;
+      }
+      return props;
+    }
+  );
 
   if (!parent) {
     return self;
@@ -282,7 +508,8 @@ export function HocScoped<
     env: RendererEnv;
   }
 >(
-  ComposedComponent: React.ComponentType<T>
+  ComposedComponent: React.ComponentType<T>,
+  rendererType?: string
 ): React.ComponentType<
   T & {
     scopeRef?: (ref: any) => void;
@@ -308,7 +535,8 @@ export function HocScoped<
       this.scoped = createScopedTools(
         this.props.$path,
         context,
-        this.props.env
+        this.props.env,
+        rendererType
       );
 
       const scopeRef = props.scopeRef;

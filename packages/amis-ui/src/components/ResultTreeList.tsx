@@ -2,7 +2,9 @@
  * 结果树(暂时不支持结果排序)
  */
 import React from 'react';
-import {cloneDeep, isEqual, omit} from 'lodash';
+import cloneDeep from 'lodash/cloneDeep';
+import isEqual from 'lodash/isEqual';
+import omit from 'lodash/omit';
 
 import {Option, Options} from './Select';
 import {ThemeProps, themeable} from 'amis-core';
@@ -11,11 +13,13 @@ import {LocaleProps, localeable} from 'amis-core';
 import {BaseSelectionProps} from './Selection';
 import Tree from './Tree';
 import TransferSearch from './TransferSearch';
+import {SpinnerExtraProps} from './Spinner';
 
 export interface ResultTreeListProps
   extends ThemeProps,
     LocaleProps,
-    BaseSelectionProps {
+    BaseSelectionProps,
+    SpinnerExtraProps {
   className?: string;
   title?: string;
   searchable?: boolean;
@@ -159,6 +163,8 @@ export class BaseResultTreeList extends React.Component<
     searchTreeOptions: []
   };
 
+  searchRef?: any;
+
   static getDerivedStateFromProps(props: ResultTreeListProps) {
     const newOptions = getResultOptions(
       props.value,
@@ -170,6 +176,14 @@ export class BaseResultTreeList extends React.Component<
     };
   }
 
+  @autobind
+  domSearchRef(ref: any) {
+    while (ref && ref.getWrappedInstance) {
+      ref = ref.getWrappedInstance();
+    }
+    this.searchRef = ref;
+  }
+
   // 删除非选中节点
   @autobind
   deleteTreeChecked(option: Option) {
@@ -177,7 +191,8 @@ export class BaseResultTreeList extends React.Component<
     const {searching, treeOptions} = this.state;
     let temNode: Options = [];
     const cb = (node: Option) => {
-      if (isEqual(node, option)) {
+      // 对比时去掉 parent，因为其无限嵌套
+      if (isEqual(omit(node, 'parent'), omit(option, 'parent'))) {
         temNode = [node];
       }
     };
@@ -194,7 +209,11 @@ export class BaseResultTreeList extends React.Component<
         value.filter(
           item =>
             !arr.find(arrItem =>
-              isEqual(omit(arrItem, ['isChecked', 'childrens']), item)
+              // 对比时去掉 parent，因为其无限嵌套，且不相等
+              isEqual(
+                omit(arrItem, ['isChecked', 'childrens', 'parent']),
+                omit(item, 'parent')
+              )
             )
         )
       );
@@ -250,6 +269,14 @@ export class BaseResultTreeList extends React.Component<
     });
   }
 
+  @autobind
+  clearInput() {
+    if (this.props.searchable) {
+      this.searchRef?.clearInput?.();
+    }
+    this.clearSearch();
+  }
+
   renderTree() {
     const {
       className,
@@ -258,7 +285,11 @@ export class BaseResultTreeList extends React.Component<
       valueField,
       itemRender,
       translate: __,
-      placeholder
+      placeholder,
+      virtualThreshold,
+      itemHeight,
+      loadingConfig,
+      testIdBuilder
     } = this.props;
 
     const {treeOptions, searching, searchTreeOptions} = this.state;
@@ -275,7 +306,11 @@ export class BaseResultTreeList extends React.Component<
             showIcon={false}
             itemRender={itemRender}
             removable
+            loadingConfig={loadingConfig}
             onDelete={(option: Option) => this.deleteTreeChecked(option)}
+            virtualThreshold={virtualThreshold}
+            // itemHeight={itemHeight}
+            testIdBuilder={testIdBuilder}
           />
         ) : (
           <div className={cx('Selections-placeholder')}>{__(placeholder)}</div>
@@ -299,6 +334,7 @@ export class BaseResultTreeList extends React.Component<
         {title ? <div className={cx('Selections-title')}>{title}</div> : null}
         {searchable ? (
           <TransferSearch
+            ref={this.domSearchRef}
             placeholder={searchPlaceholder}
             onSearch={this.search}
             onCancelSearch={this.clearSearch}

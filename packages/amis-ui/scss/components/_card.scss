@@ -46,7 +46,6 @@
   &-heading {
     display: flex;
     padding: var(--gap-md);
-    flex: 1 0 auto;
   }
 
   &-avtar {
@@ -115,15 +114,36 @@
   &-fieldValue {
     position: relative;
     flex-basis: 0;
-    flex-grow: 1;
-    width: 0;
+    flex-grow: 2;
+    min-width: 0;
     text-overflow: ellipsis;
     overflow: hidden;
+    @media (max-width: 767px) {
+      .#{$ns}Form-item {
+        padding-top: 0;
+        padding-bottom: 0;
+        &:after {
+          display: none;
+        }
+        .#{$ns}Form-static {
+          padding-top: 0;
+          padding-bottom: 0;
+        }
+      }
+    }
   }
 
   &-fieldLabel {
-    width: px2rem(60px);
+    flex-grow: 0;
+    flex-shrink: 0;
+    flex-basis: 40%;
     color: var(--text--muted-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    word-wrap: break-word;
   }
 
   &-actions {
@@ -133,6 +153,7 @@
     width: 100%;
     table-layout: fixed;
     white-space: nowrap;
+    align-items: center;
 
     > a {
       background: transparent;
@@ -161,6 +182,7 @@
 
       &.is-disabled {
         color: var(--text--muted-color);
+        cursor: not-allowed;
 
         &:hover {
           text-decoration: none;
@@ -228,6 +250,8 @@
 
   &-actions-wrapper {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -237,7 +261,7 @@
     margin: 0 var(--gap-sm) !important;
   }
   &-secondary {
-    max-width: 12.5rem;
+    max-width: px2rem(200px);
     color: var(--Card-secondary-color);
     padding: 0 var(--gap-md);
     font-size: var(--fontSizeMd);
@@ -329,6 +353,8 @@
   }
   &-multiMedia-flex {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;

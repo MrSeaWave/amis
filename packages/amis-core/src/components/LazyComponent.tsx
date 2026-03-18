@@ -5,24 +5,26 @@
  */
 
 import React from 'react';
-import VisibilitySensor from 'react-visibility-sensor';
+import {InView} from 'react-intersection-observer';
+import {themeable, ThemeProps} from '../theme';
 
-export interface LazyComponentProps {
-  component?: React.ReactType;
-  getComponent?: () => Promise<React.ReactType>;
+export interface LazyComponentProps extends ThemeProps {
+  component?: React.ElementType;
+  getComponent?: () => Promise<React.ElementType>;
   placeholder?: React.ReactNode;
   unMountOnHidden?: boolean;
   childProps?: object;
-  visiblilityProps?: object;
+  defaultVisible?: boolean;
+  className?: string;
   [propName: string]: any;
 }
 
 export interface LazyComponentState {
   visible: boolean;
-  component?: React.ReactType;
+  component?: React.ElementType;
 }
 
-export default class LazyComponent extends React.Component<
+export class LazyComponent extends React.Component<
   LazyComponentProps,
   LazyComponentState
 > {
@@ -40,14 +42,14 @@ export default class LazyComponent extends React.Component<
     this.mounted = true;
 
     this.state = {
-      visible: false,
-      component: props.component as React.ReactType
+      visible: props.defaultVisible ?? false,
+      component: props.component as React.ElementType
     };
   }
 
   componentDidMount() {
     // jest 里面有点异常，先手动让它总是可见
-    if (typeof jest !== 'undefined') {
+    if (typeof jest !== 'undefined' || this.state.visible) {
       this.handleVisibleChange(true);
     }
   }
@@ -56,7 +58,7 @@ export default class LazyComponent extends React.Component<
     this.mounted = false;
   }
 
-  handleVisibleChange(visible: boolean) {
+  handleVisibleChange(visible: boolean, entry?: any) {
     this.setState({
       visible: visible
     });
@@ -86,49 +88,59 @@ export default class LazyComponent extends React.Component<
       );
   }
 
-  render() {
+  render(): React.ReactNode {
     const {
       placeholder,
       unMountOnHidden,
       childProps,
-      visiblilityProps,
       partialVisibility,
       children,
+      className,
       ...rest
     } = this.props;
+    const cx = this.props.classnames;
 
     const {visible, component: Component} = this.state;
 
     // 需要监听从可见到不可见。
     if (unMountOnHidden) {
       return (
-        <VisibilitySensor
-          {...visiblilityProps}
-          partialVisibility={partialVisibility}
+        <InView
           onChange={this.handleVisibleChange}
+          threshold={partialVisibility ? 0 : 1}
         >
-          <div className="visibility-sensor">
-            {Component && visible ? (
-              <Component {...rest} {...childProps} />
-            ) : children && visible ? (
-              children
-            ) : (
-              placeholder
-            )}
-          </div>
-        </VisibilitySensor>
+          {({ref}) => {
+            return (
+              <div
+                ref={ref}
+                className={`visibility-sensor ${visible ? 'in' : ''}`}
+              >
+                {Component && visible ? (
+                  <Component {...rest} {...childProps} />
+                ) : children && visible ? (
+                  children
+                ) : (
+                  placeholder
+                )}
+              </div>
+            );
+          }}
+        </InView>
       );
     }
 
     if (!visible) {
       return (
-        <VisibilitySensor
-          {...visiblilityProps}
-          partialVisibility={partialVisibility}
+        <InView
           onChange={this.handleVisibleChange}
+          threshold={partialVisibility ? 0 : 1}
         >
-          <div className="visibility-sensor">{placeholder}</div>
-        </VisibilitySensor>
+          {({ref}) => (
+            <div ref={ref} className="visibility-sensor">
+              {placeholder}
+            </div>
+          )}
+        </InView>
       );
     } else if (Component) {
       // 只监听不可见到可见，一旦可见了，就销毁检查。
@@ -137,6 +149,10 @@ export default class LazyComponent extends React.Component<
       return children;
     }
 
-    return <div>{placeholder}</div>;
+    return <div className={cx('LazyComponent', className)}>{placeholder}</div>;
   }
 }
+
+const themedLazyComponent = themeable(LazyComponent);
+(themedLazyComponent as any).defaultProps = LazyComponent.defaultProps;
+export default themedLazyComponent;

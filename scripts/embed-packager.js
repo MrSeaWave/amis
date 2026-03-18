@@ -11,11 +11,14 @@ var rSourceMap =
   /(?:\/\/\#\s*sourceMappingURL[^\r\n\'\"]*|\/\*\#\s*sourceMappingURL[^\r\n\'\"]*\*\/)(?:\r?\n|$)/gi;
 var caches = {};
 var createResource = fis.require('postpackager-loader/lib/resource.js');
+const package = require('../packages/amis/package.json');
 
 function prefixCss(code, prefix) {
   var cssAst = css.parse(code);
   prefixNode(cssAst);
-  return css.stringify(cssAst);
+  return css.stringify(cssAst, {
+    compress: true
+  });
 
   function prefixSelector(sel) {
     if (sel.match(/^@/)) return sel;
@@ -124,17 +127,12 @@ module.exports = function (ret, pack, settings, opt) {
 
           if (/_map\.js$/.test(file.subpath)) {
             contents = `(function() {
-    var d = '';
-    try {
-        throw new Error()
-    } catch (e) {
-        d = (/((?:https?|file):.*?)\\n/.test(e.stack) && RegExp.$1).replace(/\\/[^\\/]*$/, '');
-    }
-    amis.host = d;
     ${contents.replace(
       /\"url\"\s*\:\s*('|")(\.\/.*?)\1/g,
       function (_, quote, value) {
-        return `"url": d + ${quote}${value.substring(1)}${quote}`;
+        return `"url": amis['sdk@${
+          package.version
+        }BasePath'] + ${quote}${value.substring(1)}${quote}`;
       }
     )}
         })()`;

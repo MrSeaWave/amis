@@ -1,33 +1,41 @@
 import {SparkLine} from 'amis-ui';
-import {Renderer, RendererProps} from 'amis-core';
+import {
+  Renderer,
+  RendererProps,
+  autobind,
+  createObject,
+  getPropValue,
+  CustomStyle,
+  AMISSchemaBase
+} from 'amis-core';
 import React from 'react';
 import {resolveVariableAndFilter} from 'amis-core';
-import {BaseSchema, SchemaClassName} from '../Schema';
+import {BaseSchema, AMISClassName} from '../Schema';
 import {ActionSchema} from './Action';
-import {autobind, createObject, getPropValue} from 'amis-core';
 
-export interface SparkLineSchema extends BaseSchema {
+/**
+ * 迷你图组件，用于紧凑展示趋势数据。支持折线、柱状等类型。
+ */
+export interface AMISSparkLineSchema extends AMISSchemaBase {
   type: 'sparkline';
 
   /**
-   * css 类名
+   * CSS 类名
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
 
   /**
-   * 关联数据变量。
+   * 关联数据变量
    */
   name?: string;
 
   /**
    * 宽度
-   * @default 100
    */
   width?: number;
 
   /**
    * 高度
-   * @default 50
    */
   height?: number;
 
@@ -78,7 +86,7 @@ export interface SparkLineSchema extends BaseSchema {
 
 interface SparkLineRendProps
   extends RendererProps,
-    Omit<SparkLineSchema, 'type' | 'className'> {}
+    Omit<AMISSparkLineSchema, 'type' | 'className'> {}
 
 @Renderer({
   type: 'sparkline'
@@ -95,15 +103,32 @@ export class SparkLineRenderer extends React.Component<SparkLineRendProps> {
   }
 
   render() {
-    const {value, name, data, clickAction} = this.props;
+    const {value, name, clickAction, id, wrapperCustomStyle, env, themeCss} =
+      this.props;
     const finalValue = getPropValue(this.props) || [1, 1];
 
     return (
-      <SparkLine
-        onClick={clickAction ? this.handleClick : undefined}
-        {...this.props}
-        value={finalValue}
-      />
+      <>
+        <SparkLine
+          onClick={clickAction ? this.handleClick : undefined}
+          {...this.props}
+          value={finalValue}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'baseControlClassName'
+              }
+            ]
+          }}
+          env={env}
+        />
+      </>
     );
   }
 }

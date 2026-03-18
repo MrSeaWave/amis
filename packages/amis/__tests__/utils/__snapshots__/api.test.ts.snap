@@ -25,9 +25,10 @@ exports[`api:cache 1`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1
@@ -65,9 +66,10 @@ exports[`api:cache 2`] = `
         </div>
         <div
           class="cxd-Page-body"
+          role="page-body"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               The variable value is 1

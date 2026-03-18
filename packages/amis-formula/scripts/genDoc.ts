@@ -38,6 +38,10 @@ function formatType(tag: any): string {
     return `Array<${tag.applications
       .map((item: any) => formatType(item))
       .join(',')}>`;
+  } else if (tag.type === 'UnionType') {
+    return tag.elements
+      .map((item: any) => formatType(item))
+      .join('|');
   }
 
   return tag.name;
@@ -89,26 +93,14 @@ async function main(...params: Array<any>) {
 
   fs.writeFileSync(
     outputFile,
-    `/**\n * 公式文档 请运行 \`npm run genDoc\` 自动生成\n */\nexport const doc: ${[
-      `{`,
-      `  name: string;`,
-      `  description: string;`,
-      `  example: string;`,
-      `  params: {`,
-      `    type: string;`,
-      `    name: string;`,
-      `    description: string | null;`,
-      `  }[];`,
-      `  returns: {`,
-      `    type: string;`,
-      `    description: string | null;`,
-      `  };`,
-      `  namespace: string;`,
-      `}[]`
-    ].join('\n')} = ${JSON.stringify(result, null, 2).replace(
+    `/**\n * 公式文档 请运行 \`npm run genDoc\` 自动生成\n */\n
+import {bulkRegisterFunctionDoc} from './function';
+
+bulkRegisterFunctionDoc(${JSON.stringify(result, null, 2).replace(
       /\"(\w+)\"\:/g,
       (_, key) => `${key}:`
-    )};`,
+    )});
+`,
     'utf8'
   );
   console.log(`公式文档生成 > ${outputFile}`);

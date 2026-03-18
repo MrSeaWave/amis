@@ -18,25 +18,42 @@ export interface TransferPickerProps extends Omit<TransferProps, 'itemRender'> {
   borderMode?: 'full' | 'half' | 'none';
 
   onFocus?: () => void;
-
+  onItemClick?: (item: Object) => void;
   onBlur?: () => void;
+  popOverContainer?: any;
 }
 
-export class TransferPicker extends React.Component<TransferPickerProps> {
+export interface TransferPickerState {
+  tempValue?: any;
+}
+
+export class TransferPicker extends React.Component<
+  TransferPickerProps,
+  TransferPickerState
+> {
+  state: TransferPickerState = {
+    tempValue: null
+  };
   optionModified = false;
   @autobind
   handleConfirm(value: any) {
+    this.setState({
+      tempValue: null
+    });
     this.props.onChange?.(value, this.optionModified);
     this.optionModified = false;
   }
 
   @autobind
-  onFoucs() {
+  onFocus() {
     this.props.onFocus?.();
   }
 
   @autobind
   onBlur() {
+    this.setState({
+      tempValue: null
+    });
     this.props.onBlur?.();
   }
 
@@ -48,22 +65,42 @@ export class TransferPicker extends React.Component<TransferPickerProps> {
       disabled,
       className,
       onChange,
+      onItemClick,
       size,
       borderMode,
+      labelField = 'label',
+      mobileUI,
+      popOverContainer,
+      maxTagCount,
+      overflowTagPopover,
+      placeholder,
       ...rest
     } = this.props;
+
+    const tp = {
+      value: this.state.tempValue || value,
+      onChange: (value: any) => {
+        this.setState({
+          tempValue: value
+        });
+      }
+    };
 
     return (
       <PickerContainer
         title={__('Select.placeholder')}
-        onFocus={this.onFoucs}
+        onFocus={this.onFocus}
         onClose={this.onBlur}
+        mobileUI={mobileUI}
+        popOverContainer={popOverContainer}
         bodyRender={({onClose, value, onChange, setState, ...states}) => {
           return (
             <Transfer
+              mobileUI={mobileUI}
               {...rest}
               {...states}
               value={value}
+              labelField={labelField}
               onChange={(value: any, optionModified) => {
                 if (optionModified) {
                   let options = mapTree(rest.options, item => {
@@ -74,13 +111,13 @@ export class TransferPicker extends React.Component<TransferPickerProps> {
                   this.optionModified = true;
                   setState({options, value});
                 } else {
-                  onChange(value);
+                  tp.onChange(value);
                 }
               }}
             />
           );
         }}
-        value={value}
+        value={tp.value}
         onConfirm={this.handleConfirm}
         size={size}
       >
@@ -93,15 +130,24 @@ export class TransferPicker extends React.Component<TransferPickerProps> {
             )}
             allowInput={false}
             result={value}
+            onItemClick={onItemClick}
             onResultChange={onChange}
             onResultClick={onClick}
-            placeholder={__('Select.placeholder')}
+            placeholder={placeholder ?? __('Select.placeholder')}
             disabled={disabled}
             borderMode={borderMode}
+            itemRender={option => (
+              <span>{(option && option[labelField]) || 'undefined'}</span>
+            )}
+            mobileUI={mobileUI}
+            maxTagCount={maxTagCount}
+            overflowTagPopover={overflowTagPopover}
           >
-            <span className={cx('TransferPicker-icon')}>
-              <Icon icon="pencil" className="icon" />
-            </span>
+            {!mobileUI ? (
+              <span className={cx('TransferPicker-icon')}>
+                <Icon icon="pencil" className="icon" />
+              </span>
+            ) : null}
           </ResultBox>
         )}
       </PickerContainer>

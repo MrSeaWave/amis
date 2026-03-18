@@ -7,10 +7,10 @@ exports[`Renderer:portlet 1`] = `
   >
     <div
       class="cxd-Tabs cxd-Tabs--line cxd-Portlet-tab"
+      data-role="container"
     >
       <div
         class="cxd-Tabs-linksContainer-wrapper cxd-Tabs-linksContainer-wrapper--toolbar"
-        style="position: relative;"
       >
         <div
           class="cxd-Tabs-linksContainer"
@@ -28,7 +28,11 @@ exports[`Renderer:portlet 1`] = `
                 <a
                   title="Tab 1"
                 >
-                  Tab 1
+                  <span
+                    class="cxd-Tabs-link-text"
+                  >
+                    Tab 1
+                  </span>
                 </a>
               </li>
               <li
@@ -37,7 +41,11 @@ exports[`Renderer:portlet 1`] = `
                 <a
                   title="Tab 2"
                 >
-                  Tab 2
+                  <span
+                    class="cxd-Tabs-link-text"
+                  >
+                    Tab 2
+                  </span>
                 </a>
               </li>
               <div
@@ -73,7 +81,7 @@ exports[`Renderer:portlet 1`] = `
                       class="cxd-Button cxd-Button--link cxd-Button--size-sm"
                     >
                       <i
-                        class="m-r-xs fa fa-ellipsis-h"
+                        class="fa fa-ellipsis-h icon m-r-xs fa fa-ellipsis-h"
                       />
                     </button>
                   </div>
@@ -81,45 +89,6 @@ exports[`Renderer:portlet 1`] = `
               </div>
             </ul>
           </div>
-        </div>
-        <div
-          class="resize-sensor"
-          style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-        >
-          
-  
-          <div
-            class="resize-sensor-expand"
-            style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-          >
-            
-    
-            <div
-              style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-            />
-            
-  
-          </div>
-          
-  
-          <div
-            class="resize-sensor-shrink"
-            style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-          >
-            
-    
-            <div
-              style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-            />
-            
-  
-          </div>
-          
-  
-          <div
-            class="resize-sensor-appear"
-            style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-          />
         </div>
       </div>
       <div
@@ -129,7 +98,7 @@ exports[`Renderer:portlet 1`] = `
           class="in is-active cxd-Tabs-pane"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               Content 1
@@ -140,7 +109,7 @@ exports[`Renderer:portlet 1`] = `
           class="cxd-Tabs-pane"
         >
           <span
-            class="cxd-TplField"
+            class="cxd-TplField fr-view"
           >
             <span>
               Content 2

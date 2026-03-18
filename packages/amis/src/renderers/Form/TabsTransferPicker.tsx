@@ -1,34 +1,42 @@
-import {OptionsControlProps, OptionsControl, resolveEventData} from 'amis-core';
+import {
+  OptionsControlProps,
+  OptionsControl,
+  resolveEventData,
+  getVariable
+} from 'amis-core';
 import React from 'react';
-import {Spinner} from 'amis-ui';
+import {Spinner, SpinnerExtraProps} from 'amis-ui';
 import {BaseTabsTransferRenderer} from './TabsTransfer';
 import {TabsTransferPicker} from 'amis-ui';
-import {TabsTransferControlSchema} from './TabsTransfer';
+import {AMISTransferSchemaBase} from './Transfer';
 import {autobind, createObject} from 'amis-core';
 import {Selection as BaseSelection} from 'amis-ui';
-import {ActionObject} from 'amis-core';
+import {ActionObject, toNumber} from 'amis-core';
 import type {ItemRenderStates} from 'amis-ui/lib/components/Selection';
 import {supportStatic} from './StaticHoc';
+import {isMobile} from 'amis-core';
 
 /**
  * TabsTransferPicker 穿梭器的弹框形态
- * 文档：https://baidu.gitee.io/amis/docs/components/form/tabs-transfer-picker
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/tabs-transfer-picker
  */
-export interface TabsTransferPickerControlSchema
-  extends Omit<TabsTransferControlSchema, 'type'> {
+export interface AMISTabsTransferPickerSchema
+  extends AMISTransferSchemaBase,
+    SpinnerExtraProps {
   type: 'tabs-transfer-picker';
 }
 
 export interface TabsTransferProps
   extends OptionsControlProps,
     Omit<
-      TabsTransferPickerControlSchema,
+      AMISTabsTransferPickerSchema,
       | 'type'
       | 'options'
       | 'inputClassName'
       | 'className'
       | 'descriptionClassName'
-    > {}
+    >,
+    SpinnerExtraProps {}
 
 interface BaseTransferState {
   activeKey: number;
@@ -45,12 +53,12 @@ export class TabsTransferPickerRenderer extends BaseTabsTransferRenderer<TabsTra
   @autobind
   dispatchEvent(name: string) {
     const {dispatchEvent, value} = this.props;
-    dispatchEvent(name, resolveEventData(this.props, {value}, 'value'));
+    dispatchEvent(name, resolveEventData(this.props, {value}));
   }
 
   @autobind
   optionItemRender(option: any, states: ItemRenderStates) {
-    const {menuTpl, render, data} = this.props;
+    const {menuTpl, render, data, classnames} = this.props;
     const ctx = arguments[2] || {};
 
     if (menuTpl) {
@@ -65,18 +73,22 @@ export class TabsTransferPickerRenderer extends BaseTabsTransferRenderer<TabsTra
       });
     }
 
-    return BaseSelection.itemRender(option, states);
+    return BaseSelection.itemRender(option, {...states, classnames});
   }
 
   // 动作
   doAction(action: ActionObject) {
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name} = this.props;
     switch (action.actionType) {
       case 'clear':
         onChange?.('');
         break;
       case 'reset':
-        onChange?.(resetValue ?? '');
+        onChange?.(
+          getVariable(formStore?.pristine ?? store?.pristine, name) ??
+            resetValue ??
+            ''
+        );
         break;
     }
   }
@@ -85,6 +97,7 @@ export class TabsTransferPickerRenderer extends BaseTabsTransferRenderer<TabsTra
   render() {
     const {
       className,
+      style,
       classnames: cx,
       options,
       selectedOptions,
@@ -98,7 +111,19 @@ export class TabsTransferPickerRenderer extends BaseTabsTransferRenderer<TabsTra
       resultTitle,
       pickerSize,
       leftMode,
-      leftOptions
+      leftOptions,
+      itemHeight,
+      virtualThreshold,
+      loadingConfig,
+      labelField = 'label',
+      valueField = 'value',
+      deferField = 'defer',
+      mobileUI,
+      env,
+      maxTagCount,
+      overflowTagPopover,
+      placeholder,
+      initiallyOpen = true
     } = this.props;
 
     return (
@@ -106,6 +131,7 @@ export class TabsTransferPickerRenderer extends BaseTabsTransferRenderer<TabsTra
         <TabsTransferPicker
           activeKey={this.state.activeKey}
           onTabChange={this.onTabChange}
+          placeholder={placeholder as string}
           value={selectedOptions}
           disabled={disabled}
           options={options}
@@ -125,9 +151,26 @@ export class TabsTransferPickerRenderer extends BaseTabsTransferRenderer<TabsTra
           resultItemRender={this.resultItemRender}
           onFocus={() => this.dispatchEvent('focus')}
           onBlur={() => this.dispatchEvent('blur')}
+          itemHeight={
+            toNumber(itemHeight) > 0 ? toNumber(itemHeight) : undefined
+          }
+          virtualThreshold={virtualThreshold}
+          labelField={labelField}
+          valueField={valueField}
+          deferField={deferField}
+          mobileUI={mobileUI}
+          popOverContainer={env?.getModalContainer}
+          maxTagCount={maxTagCount}
+          overflowTagPopover={overflowTagPopover}
+          initiallyOpen={initiallyOpen}
         />
 
-        <Spinner overlay key="info" show={loading} />
+        <Spinner
+          loadingConfig={loadingConfig}
+          overlay
+          key="info"
+          show={loading}
+        />
       </div>
     );
   }

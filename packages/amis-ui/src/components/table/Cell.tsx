@@ -5,19 +5,16 @@
 
 import React from 'react';
 
-import {
-  themeable,
-  ThemeProps,
-  LocaleProps,
-  localeable,
-  ClassNamesFn
-} from 'amis-core';
+import {ThemeProps, ClassNamesFn} from 'amis-core';
+
 import {ColumnProps} from './index';
+import type {TestIdBuilder} from 'amis-core';
 
 const zIndex = 1;
 
-export interface Props extends ThemeProps, LocaleProps {
+export interface Props extends ThemeProps {
   fixed?: string | boolean; // left | right
+  selfSticky?: boolean;
   rowSpan?: number | any;
   colSpan?: number | any;
   key?: string | number;
@@ -27,14 +24,17 @@ export interface Props extends ThemeProps, LocaleProps {
   style?: Object;
   column?: ColumnProps;
   wrapperComponent: any;
-  groupId?: string; // 表头分组随机生成的id
   depth?: number; // 表头分组
+  col?: string;
+  index?: number;
   classnames: ClassNamesFn;
+  testIdBuilder?: TestIdBuilder;
 }
 
-export class BodyCell extends React.Component<Props> {
+export default class BodyCell extends React.PureComponent<Props> {
   static defaultProps = {
     fixed: '',
+    selfSticky: false,
     wrapperComponent: 'td',
     rowSpan: null,
     colSpan: null
@@ -43,36 +43,47 @@ export class BodyCell extends React.Component<Props> {
   render() {
     const {
       fixed,
+      selfSticky,
       rowSpan,
       colSpan,
-      key,
       children,
       className,
       column,
       style,
-      groupId,
       depth,
+      col,
       wrapperComponent: Component,
-      classnames: cx
+      classnames: cx,
+      testIdBuilder
     } = this.props;
+
+    let _style: object = {...style};
+
+    if (fixed || selfSticky) {
+      _style = {
+        position: 'sticky',
+        zIndex,
+        ..._style
+      };
+    }
 
     return (
       <Component
-        key={key || null}
         rowSpan={rowSpan && rowSpan > 1 ? rowSpan : null}
         colSpan={colSpan && colSpan > 1 ? colSpan : null}
         className={cx('Table-cell', className, {
           [cx(`Table-cell-fix-${fixed}`)]: fixed,
-          [`text-${column?.align}`]: column?.align
+          [`Table-cell-self-sticky`]: selfSticky,
+          [`text-${column?.align}`]: column?.align,
+          [`align-${column?.vAlign}`]: column?.vAlign
         })}
-        style={fixed ? {position: 'sticky', zIndex, ...style} : {...style}}
-        data-group-id={groupId || null}
+        style={_style}
         data-depth={depth || null}
+        data-col={col}
+        {...testIdBuilder?.getTestId()}
       >
         {children}
       </Component>
     );
   }
 }
-
-export default themeable(localeable(BodyCell));

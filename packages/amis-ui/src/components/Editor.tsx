@@ -6,7 +6,7 @@
 
 import React from 'react';
 import cx from 'classnames';
-import {ClassNamesFn, themeable} from 'amis-core';
+import {ClassNamesFn, themeable, ThemeProps} from 'amis-core';
 import {autobind} from 'amis-core';
 import {Icon} from './icons';
 import {LocaleProps, localeable} from 'amis-core';
@@ -16,34 +16,34 @@ import {LocaleProps, localeable} from 'amis-core';
 function filterUrl(url: string) {
   return url;
 }
+if (!(window as any).MonacoEnvironment) {
+  (window as any).MonacoEnvironment = {
+    getWorkerUrl: function (moduleId: string, label: string) {
+      let url = '/pkg/editor.worker.js';
 
-(window as any).MonacoEnvironment = {
-  getWorkerUrl: function (moduleId: string, label: string) {
-    let url = '/pkg/editor.worker.js';
+      if (label === 'json') {
+        url = '/pkg/json.worker.js';
+      } else if (label === 'css') {
+        url = '/pkg/css.worker.js';
+      } else if (label === 'html') {
+        url = '/pkg/html.worker.js';
+      } else if (label === 'typescript' || label === 'javascript') {
+        url = '/pkg/ts.worker.js';
+      }
 
-    if (label === 'json') {
-      url = '/pkg/json.worker.js';
-    } else if (label === 'css') {
-      url = '/pkg/css.worker.js';
-    } else if (label === 'html') {
-      url = '/pkg/html.worker.js';
-    } else if (label === 'typescript' || label === 'javascript') {
-      url = '/pkg/ts.worker.js';
-    }
+      url = filterUrl(url);
 
-    url = filterUrl(url);
-
-    // url 有可能会插件替换成 cdn 地址，比如：fis3-prepackager-stand-alone-pack
-    if (/^https?/.test(url)) {
-      return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+      // url 有可能会插件替换成 cdn 地址，比如：fis3-prepackager-stand-alone-pack
+      if (/^https?/.test(url)) {
+        return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
         importScripts('${url}');`)}
       `;
+      }
+
+      return url;
     }
-
-    return url;
-  }
-};
-
+  };
+}
 export function monacoFactory(
   containerElement: HTMLElement,
   monaco: any,
@@ -67,32 +67,31 @@ export function monacoFactory(
   });
 }
 
-export interface EditorProps extends LocaleProps {
+export interface EditorBaseProps {
   value?: string;
   defaultValue?: string;
   width?: number | string;
   height?: number | string;
   onChange?: (value: string, event: any) => void;
+  disabled?: boolean;
   language?: string;
   editorTheme?: string;
   allowFullscreen?: boolean;
   options: {
     [propName: string]: any;
   };
-  classPrefix: string;
-  className?: string;
-  classnames: ClassNamesFn;
   context?: any;
-  style?: any;
   isDiffEditor?: boolean;
   placeholder?: string;
-  onFocus?: () => void;
-  onBlur?: () => void;
+  onFocus?: (e: any) => void;
+  onBlur?: (e: any) => void;
   editorDidMount?: (editor: any, monaco: any) => void;
   editorWillMount?: (monaco: any) => void;
   editorWillUnmount?: (editor: any, monaco: any) => void;
   editorFactory?: (conatainer: HTMLElement, monaco: any, options: any) => any;
 }
+
+export interface EditorProps extends EditorBaseProps, LocaleProps, ThemeProps {}
 
 export interface EditorState {
   isFullscreen?: boolean;
@@ -119,11 +118,12 @@ export class Editor extends React.Component<EditorProps, EditorState> {
   container: any;
   currentValue: any;
   preventTriggerChangeEvent: boolean;
-  disposes: Array<{dispose: () => void}> = [];
+  disposes: Array<() => void> = [];
   constructor(props: EditorProps) {
     super(props);
 
     this.wrapperRef = this.wrapperRef.bind(this);
+    this.getDom = this.getDom.bind(this);
     this.currentValue = props.value;
   }
 
@@ -176,7 +176,7 @@ export class Editor extends React.Component<EditorProps, EditorState> {
       const editorWillUnmount = this.props.editorWillUnmount;
       editorWillUnmount && editorWillUnmount(this.editor, monaco);
     }
-    this.disposes.forEach(({dispose}) => dispose());
+    this.disposes.forEach(dispose => dispose());
     this.disposes = [];
     this.editor?.dispose();
   }
@@ -187,7 +187,7 @@ export class Editor extends React.Component<EditorProps, EditorState> {
       this.loadMonaco();
     } else {
       try {
-        this.disposes.forEach(({dispose}) => dispose());
+        this.disposes.forEach(dispose => dispose());
         this.disposes = [];
         if (this.editor) {
           this.editor.getModel().dispose();
@@ -200,7 +200,14 @@ export class Editor extends React.Component<EditorProps, EditorState> {
     }
   }
 
+  getDom() {
+    return this.container;
+  }
+
   loadMonaco() {
+    // 由于 require.config({'vs/nls': { availableLanguages: { '*': 'xxxx' }}}) 只能在初始化之前设置有用，所以这里只能用全局变量的方式来设置。
+    // 另外此方式只是针对 jssdk 和平台有效，对于其他方式还需要再想想。
+    (window as any).__amis_monaco_editor_locale = this.props.locale;
     import('monaco-editor').then(monaco => this.initMonaco(monaco));
   }
 
@@ -231,6 +238,7 @@ export class Editor extends React.Component<EditorProps, EditorState> {
     const factory = editorFactory || monacoFactory;
     this.editor = factory(containerElement, monaco, {
       ...options,
+      readOnly: this.props.disabled,
       automaticLayout: true,
       value,
       language,
@@ -269,14 +277,14 @@ export class Editor extends React.Component<EditorProps, EditorState> {
           if (!this.preventTriggerChangeEvent && onChange) {
             onChange(value, event);
           }
-        })
+        }).dispose
       );
     onFocus &&
       editor.onDidFocusEditorWidget &&
-      this.disposes.push(editor.onDidFocusEditorWidget(onFocus));
+      this.disposes.push(editor.onDidFocusEditorWidget(onFocus).dispose);
     onBlur &&
       editor.onDidBlurEditorWidget &&
-      this.disposes.push(editor.onDidBlurEditorWidget(onBlur));
+      this.disposes.push(editor.onDidBlurEditorWidget(onBlur).dispose);
 
     const {width = 'auto', height = 'auto'} =
       this?.editor?._configuration?._elementSizeObserver ?? {};
@@ -350,4 +358,4 @@ export class Editor extends React.Component<EditorProps, EditorState> {
   }
 }
 
-export default themeable(localeable(Editor));
+export default themeable(localeable(Editor, ['getDom']), ['getDom']);

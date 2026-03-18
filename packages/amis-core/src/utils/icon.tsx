@@ -3,16 +3,22 @@
  */
 
 import React from 'react';
+import isObject from 'lodash/isObject';
 import {ClassNamesFn} from '../theme';
 
-import {isObject} from 'lodash';
-
-export interface IconCheckedSchema {
+interface IconCheckedSchema {
   id: string;
   name?: string;
+  svg?: string;
+}
+
+interface IconCheckedSchemaNew {
+  type: 'icon';
+  icon: IconCheckedSchema;
 }
 
 /**
+ * 废弃，不建议使用
  * 判断字符串来生成 i 或 img
  * @param icon icon 设置
  * @param className 内部用的 className
@@ -20,10 +26,18 @@ export interface IconCheckedSchema {
  */
 export const generateIcon = (
   cx: ClassNamesFn,
-  icon?: string | IconCheckedSchema,
+  icon?: string | IconCheckedSchema | React.ReactNode | IconCheckedSchemaNew,
   className?: string,
   classNameProp?: string
 ) => {
+  if (
+    isObject(icon) &&
+    (icon as IconCheckedSchemaNew).type === 'icon' &&
+    (icon as IconCheckedSchemaNew).icon
+  ) {
+    icon = (icon as IconCheckedSchemaNew).icon;
+  }
+
   if (React.isValidElement(icon)) {
     return icon;
   }
@@ -31,12 +45,17 @@ export const generateIcon = (
   if (typeof icon !== 'string') {
     if (
       isObject(icon) &&
-      typeof icon.id === 'string' &&
-      icon.id.startsWith('svg-')
+      typeof (icon as IconCheckedSchema).id === 'string' &&
+      (icon as IconCheckedSchema).id.startsWith('svg-')
     ) {
       return (
         <svg className={cx('icon', 'icon-object', className, classNameProp)}>
-          <use xlinkHref={`#${icon.id.replace(/^svg-/, '')}`}></use>
+          <use
+            xlinkHref={`#${(icon as IconCheckedSchema).id.replace(
+              /^svg-/,
+              ''
+            )}`}
+          ></use>
         </svg>
       );
     }
@@ -54,3 +73,27 @@ export const generateIcon = (
     )
   ) : null;
 };
+
+export type CustomVendorFn = (
+  icon: string,
+  options: {
+    [propName: string]: any;
+  }
+) => {
+  icon: string;
+  style: {
+    [propName: string]: any;
+  };
+};
+
+const customVendor = new Map<string, CustomVendorFn>();
+export function registerCustomVendor(vendor: string, fn: CustomVendorFn) {
+  customVendor.set(vendor, fn);
+}
+
+export function getCustomVendor(vendor?: string) {
+  if (!vendor) {
+    return undefined;
+  }
+  return customVendor.get(vendor);
+}

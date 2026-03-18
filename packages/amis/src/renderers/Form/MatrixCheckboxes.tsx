@@ -8,20 +8,23 @@ import {
   FormBaseControl,
   FormControlProps,
   FormItem,
+  getVariable,
   resolveEventData
 } from 'amis-core';
 import {buildApi, isValidApi, isEffectiveApi} from 'amis-core';
-import {Checkbox, Spinner} from 'amis-ui';
-import {autobind, setVariable, createObject} from 'amis-core';
-import {ApiObject, ActionObject} from 'amis-core';
+import {Checkbox, Spinner, SpinnerExtraProps} from 'amis-ui';
+import {setVariable, createObject} from 'amis-core';
+import {ApiObject, ActionObject, isMobile} from 'amis-core';
 import {FormBaseControlSchema, SchemaApi} from '../../Schema';
 import {supportStatic} from './StaticHoc';
 
+import type {AMISFormItem, TestIdBuilder} from 'amis-core';
+
 /**
  * Matrix 选择控件。适合做权限勾选。
- * 文档：https://baidu.gitee.io/amis/docs/components/form/matrix
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/matrix
  */
-export interface MatrixControlSchema extends FormBaseControlSchema {
+export interface AMISMatrixCheckboxesSchema extends AMISFormItem {
   type: 'matrix-checkboxes';
 
   /**
@@ -30,12 +33,12 @@ export interface MatrixControlSchema extends FormBaseControlSchema {
   multiple?: boolean;
 
   /**
-   * 设置单选模式，multiple为false时有效
+   * 设置单选模式
    */
   singleSelectMode?: boolean;
 
   /**
-   * 可用来通过 API 拉取 options。
+   * 可用来通过 API 拉取 options
    */
   source?: SchemaApi;
 
@@ -69,10 +72,26 @@ export interface ValueItem extends Column, Row {
   checked: boolean;
 }
 
-export interface MatrixProps extends FormControlProps {
+export interface MatrixProps extends FormControlProps, SpinnerExtraProps {
   columns: Array<Column>;
   rows: Array<Row>;
   multiple: boolean;
+
+  /**
+   * 内容布局方式，left/center/right/justify
+   */
+  textAlign?: string;
+
+  /**
+   * 纵向选择所有能力
+   */
+  yCheckAll?: boolean;
+
+  /**
+   * 横向选择所有能力
+   */
+  xCheckAll?: boolean;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export interface MatrixState {
@@ -96,6 +115,7 @@ export default class MatrixCheckbox extends React.Component<
 
   state: MatrixState;
   mounted: boolean = false;
+  toDispose: Array<() => void> = [];
 
   constructor(props: MatrixProps) {
     super(props);
@@ -113,9 +133,14 @@ export default class MatrixCheckbox extends React.Component<
   }
 
   componentDidMount() {
-    const {formInited, addHook} = this.props;
+    const {formInited, addHook, formItem} = this.props;
 
-    formInited || !addHook ? this.reload() : addHook(this.initOptions, 'init');
+    formItem &&
+      this.toDispose.push(
+        formInited || !addHook
+          ? formItem.addInitHook(this.initOptions)
+          : addHook(this.initOptions, 'init')
+      );
   }
 
   componentDidUpdate(prevProps: MatrixProps) {
@@ -149,18 +174,21 @@ export default class MatrixCheckbox extends React.Component<
 
   componentWillUnmount() {
     this.mounted = false;
-    const {removeHook} = this.props;
-    removeHook?.(this.initOptions, 'init');
+    this.toDispose.forEach(fn => fn());
+    this.toDispose = [];
   }
 
   doAction(action: ActionObject, data: object, throwErrors: boolean) {
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name} = this.props;
     const actionType = action?.actionType as string;
 
     if (actionType === 'clear') {
       onChange?.('');
     } else if (actionType === 'reset') {
-      onChange?.(resetValue ?? '');
+      // todo pristine被更新了，需要看看为啥
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange?.(pristineVal ?? '');
     }
   }
 
@@ -281,7 +309,7 @@ export default class MatrixCheckbox extends React.Component<
 
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value: value.concat()}, 'value')
+      resolveEventData(this.props, {value: value.concat()})
     );
     if (rendererEvent?.prevented) {
       return;
@@ -290,21 +318,138 @@ export default class MatrixCheckbox extends React.Component<
     this.props.onChange(value.concat());
   }
 
+  /**
+   * 检查列是否有选中
+   *
+   * @param value
+   * @param columnIndex
+   */
+  isColumChecked(value: any, columnIndex: any) {
+    let rows = value[columnIndex];
+    if (!rows) {
+      return false;
+    }
+    return rows.some((item: any) => item && item.checked);
+  }
+
+  /**
+   * 检查列是全选还是部分选择
+   * @param value
+   * @param columnIndex
+   */
+  isColumnPartialChecked(value: any, columnIndex: any) {
+    let rows = value[columnIndex];
+    if (!rows || rows.length == 1) {
+      return false; // 只有一行时，列上无部分选中状态
+    }
+    let checked = rows[0].checked;
+    return (
+      rows.some((item: any) => {
+        return item.checked !== checked; // 只要有不同的值，均认为是部分选中
+      }) && !rows.every((item: any) => item.checked === checked) // 全部选中时不认为是部分选中
+    );
+  }
+
+  /**
+   * 切换整列的选择
+   * @param checked
+   * @param value
+   * @param columnIndex
+   */
+  async toggleColumnCheckAll(checked: any, value: any, columnIndex: any) {
+    let rows = value[columnIndex];
+    for (let i = 0; i < rows.length; i++) {
+      await this.toggleItem(checked, columnIndex, i);
+    }
+  }
+
+  /**
+   * 检查行是否有选中项
+   *
+   * @param value
+   * @param rowIndex
+   */
+  isRowChecked(value: any, rowIndex: any) {
+    return (
+      value &&
+      value.some((columns: any) => {
+        return columns[rowIndex] && columns[rowIndex].checked;
+      })
+    );
+  }
+
+  /**
+   * 检查行是全选还是部分选中
+   * @param value
+   * @param rowIndex
+   */
+  isRowPartialChecked(value: any, rowIndex: any) {
+    if (!value || value.length == 1) {
+      return false; // 只有一列时无部分选中状态
+    }
+    let checked = value[0][rowIndex].checked;
+    return (
+      value.some((columns: any) => {
+        // 只要有不同的值就可以认为是部分选中
+        return checked !== columns[rowIndex].checked;
+      }) && !value.every((columns: any) => columns.checked) // 全部选中时不认为是部分选中
+    );
+  }
+
+  /**
+   * 切换行的选中状态
+   *
+   * @param checked
+   * @param value
+   * @param rowIndex
+   */
+  async toggleRowCheckAll(checked: any, value: any, rowIndex: any) {
+    for (let i = 0; i < value.length; i++) {
+      await this.toggleItem(checked, i, rowIndex);
+    }
+  }
+
   renderInput(forceDisabled = false) {
     const {columns, rows} = this.state;
-    const {rowLabel, disabled, classnames: cx, multiple} = this.props;
+    const {
+      rowLabel,
+      disabled,
+      classnames: cx,
+      multiple,
+      textAlign,
+      xCheckAll,
+      yCheckAll,
+      testIdBuilder,
+      mobileUI
+    } = this.props;
 
     const value = this.props.value || buildDefaultValue(columns, rows);
 
     return (
-      <div className={cx('Table m-b-none')}>
+      <div className={cx('Table m-b-none', {'is-mobile': mobileUI})}>
         <div className={cx('Table-content')}>
           <table className={cx('Table-table')}>
             <thead>
               <tr>
                 <th>{rowLabel}</th>
                 {columns.map((column, x) => (
-                  <th key={x} className="text-center">
+                  <th
+                    key={x}
+                    className={
+                      'text-' + (textAlign || multiple ? 'left' : 'center')
+                    }
+                  >
+                    {multiple && yCheckAll ? (
+                      <Checkbox
+                        type={'checkbox'}
+                        disabled={forceDisabled || disabled}
+                        checked={this.isColumChecked(value, x)}
+                        partial={this.isColumnPartialChecked(value, x)}
+                        onChange={(checked: boolean) =>
+                          this.toggleColumnCheckAll(checked, value, x)
+                        }
+                      />
+                    ) : null}
                     {column.label}
                   </th>
                 ))}
@@ -314,6 +459,18 @@ export default class MatrixCheckbox extends React.Component<
               {rows.map((row, y) => (
                 <tr key={y}>
                   <td>
+                    {multiple && xCheckAll ? (
+                      <Checkbox
+                        type={'checkbox'}
+                        disabled={forceDisabled || disabled}
+                        checked={this.isRowChecked(value, y)}
+                        partial={this.isRowPartialChecked(value, y)}
+                        onChange={(checked: boolean) =>
+                          this.toggleRowCheckAll(checked, value, y)
+                        }
+                        testIdBuilder={testIdBuilder?.getChild(y)}
+                      />
+                    ) : null}
                     {row.label}
                     {row.description || row.desc ? (
                       <span className="m-l-xs text-muted text-xs">
@@ -322,7 +479,12 @@ export default class MatrixCheckbox extends React.Component<
                     ) : null}
                   </td>
                   {columns.map((column, x) => (
-                    <td key={x} className="text-center">
+                    <td
+                      key={x}
+                      className={
+                        'text-' + (textAlign || multiple ? 'left' : 'center')
+                      }
+                    >
                       <Checkbox
                         type={multiple ? 'checkbox' : 'radio'}
                         disabled={forceDisabled || disabled}
@@ -332,6 +494,7 @@ export default class MatrixCheckbox extends React.Component<
                         onChange={(checked: boolean) =>
                           this.toggleItem(checked, x, y)
                         }
+                        testIdBuilder={testIdBuilder?.getChild(`${x}-${y}`)}
                       />
                     </td>
                   ))}
@@ -349,17 +512,14 @@ export default class MatrixCheckbox extends React.Component<
     const {error} = this.state;
     return (
       <div key="input" className={cx('MatrixControl', className || '')}>
-        {error
-          ? displayValue
-          : this.renderInput(true)
-        }
+        {error ? displayValue : this.renderInput(true)}
       </div>
     );
   }
 
   @supportStatic()
   render() {
-    const {className, render, classnames: cx} = this.props;
+    const {className, render, classnames: cx, loadingConfig} = this.props;
     const {error, loading} = this.state;
 
     return (
@@ -372,7 +532,13 @@ export default class MatrixCheckbox extends React.Component<
           this.renderInput()
         )}
 
-        <Spinner size="lg" overlay key="info" show={loading} />
+        <Spinner
+          size="lg"
+          overlay
+          key="info"
+          show={loading}
+          loadingConfig={loadingConfig}
+        />
       </div>
     );
   }

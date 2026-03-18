@@ -1,16 +1,10 @@
 import moment from 'moment';
 import React from 'react';
-import {
-  LocaleProps,
-  localeable,
-  TranslateFn,
-  utils,
-  getRange,
-  isMobile
-} from 'amis-core';
+import {LocaleProps, localeable, getRange} from 'amis-core';
 import Picker from '../Picker';
 import {PickerOption} from '../PickerColumn';
 import {DateType} from './Calendar';
+import type {TestIdBuilder} from 'amis-core';
 
 export interface OtherProps {
   inputFormat?: string;
@@ -42,13 +36,19 @@ export interface CustomMonthsViewProps extends LocaleProps {
   setDate?: (date: string) => void;
   updateSelectedMonth?: () => void;
   updateSelectedDate: (event: React.MouseEvent<any>, close?: boolean) => void;
-  renderMonth?: (props: any, month: number, year: number, date: any) => void;
+  renderMonth?: (
+    props: any,
+    month: number,
+    year: number,
+    date: any
+  ) => React.ReactNode;
   onConfirm?: (value: number[], types?: string[]) => void;
   getColumns: (types: DateType[], dateBoundary: void) => any;
   isValidDate?(value: any): boolean;
   timeCell: (value: number, type: DateType) => string;
   getDateBoundary: (currentDate: moment.Moment) => any;
-  useMobileUI: boolean;
+  mobileUI: boolean;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
@@ -65,7 +65,7 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
     const dateBoundary = this.props.getDateBoundary(currentDate);
     const columns = this.props.getColumns(['year', 'month'], dateBoundary);
     this.state = {
-      columns,
+      columns: this.getColumnsWithUnit(columns),
       pickerValue: currentDate.toArray()
     };
 
@@ -73,12 +73,13 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
   }
 
   renderMonths() {
+    const {testIdBuilder} = this.props;
     let date = this.props.selectedDate,
       month = this.props.viewDate.month(),
       year = this.props.viewDate.year(),
       rows = [],
       i = 0,
-      months = [],
+      months: Array<React.ReactNode> = [],
       renderer = this.props.renderMonth || this.renderMonth,
       isValid = this.props.isValidDate || this.alwaysValidDate,
       classes,
@@ -116,7 +117,8 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
       props = {
         'key': i,
         'data-value': i,
-        'className': classes
+        'className': classes,
+        'viewDate': this.props.viewDate
       };
 
       if (!isDisabled)
@@ -142,23 +144,37 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
     this.props.updateSelectedDate(event);
   }
 
+  getColumnsWithUnit(columns: {options: PickerOption[]}[]) {
+    return this.props.locale === 'zh-CN' && columns.length === 2
+      ? columns.map((item, index) => {
+          item.options?.map((option: any) => {
+            option.text = option.text + (index === 0 ? '年' : '月');
+            return option;
+          });
+          return item;
+        })
+      : columns;
+  }
+
   renderMonth = (
     props: any,
     month: number,
     year: number,
     date: moment.Moment
   ) => {
-    var localMoment = this.props.viewDate;
-    var monthStr = localMoment
-      .localeData()
-      .monthsShort(localMoment.month(month));
-    var strLength = 3;
+    const {translate: __, testIdBuilder} = this.props;
+    const {viewDate: localMoment, ...rest} = props;
+    const monthStr = localMoment.month(month).format(__('MMM'));
+    const strLength = 3;
     // Because some months are up to 5 characters long, we want to
     // use a fixed string length for consistency
-    var monthStrFixedLength = monthStr.substring(0, strLength);
+    const monthStrFixedLength = monthStr.substring(0, strLength);
+
     return (
-      <td {...props}>
-        <span>{monthStrFixedLength}</span>
+      <td {...rest}>
+        <span {...testIdBuilder?.getChild(props.key).getTestId()}>
+          {monthStrFixedLength}
+        </span>
       </td>
     );
   };
@@ -206,7 +222,10 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
           };
         })
       };
-      this.setState({columns, pickerValue: value});
+      this.setState({
+        columns: this.getColumnsWithUnit(columns),
+        pickerValue: value
+      });
     }
   };
 
@@ -234,11 +253,12 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
 
   render() {
     const __ = this.props.translate;
+    const {testIdBuilder} = this.props;
     const showYearHead =
       !/^mm$/i.test(this.props.inputFormat || '') && !this.props.hideHeader;
     const canClick = /yy/i.test(this.props.inputFormat || '');
 
-    if (isMobile() && this.props.useMobileUI) {
+    if (this.props.mobileUI) {
       return <div className="rdtYears">{this.renderPicker()}</div>;
     }
     return (
@@ -250,6 +270,7 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
                 <th
                   className="rdtPrev"
                   onClick={this.props.subtractTime(1, 'years')}
+                  {...testIdBuilder?.getChild('prev-year').getTestId()}
                 >
                   &laquo;
                 </th>
@@ -257,6 +278,7 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
                   <th
                     className="rdtSwitch"
                     onClick={this.props.showView('years')}
+                    {...testIdBuilder?.getChild('switch-year').getTestId()}
                   >
                     {this.props.viewDate.format(__('dateformat.year'))}
                   </th>
@@ -269,6 +291,7 @@ export class CustomMonthsView extends React.Component<CustomMonthsViewProps> {
                 <th
                   className="rdtNext"
                   onClick={this.props.addTime(1, 'years')}
+                  {...testIdBuilder?.getChild('next-year').getTestId()}
                 >
                   &raquo;
                 </th>

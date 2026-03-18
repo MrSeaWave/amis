@@ -1,7 +1,7 @@
 import React from 'react';
 import {themeable, ThemeProps} from 'amis-core';
 import {autobind} from 'amis-core';
-import {generateIcon} from 'amis-core';
+import {Icon} from './icons';
 
 export interface LinkProps
   extends ThemeProps,
@@ -24,7 +24,7 @@ export interface LinkProps
   href?: string;
   htmlTarget?: string;
   title?: string;
-  children?: JSX.Element;
+  children?: React.ReactNode | Array<React.ReactNode>;
 }
 
 export class Link extends React.Component<LinkProps, object> {
@@ -46,6 +46,7 @@ export class Link extends React.Component<LinkProps, object> {
   render() {
     const {
       className,
+      style,
       href,
       classnames: cx,
       disabled,
@@ -71,12 +72,15 @@ export class Link extends React.Component<LinkProps, object> {
           },
           className
         )}
+        style={style}
         title={title}
         onClick={this.handleClick}
       >
-        {icon ? generateIcon(cx, icon, 'Link-icon') : null}
+        {icon ? <Icon cx={cx} icon={icon} className="Link-icon" /> : null}
         {children}
-        {rightIcon ? generateIcon(cx, rightIcon, 'Link-icon') : null}
+        {rightIcon ? (
+          <Icon cx={cx} icon={rightIcon} className="Link-icon" />
+        ) : null}
       </a>
     );
   }

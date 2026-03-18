@@ -1,10 +1,17 @@
 import {types, getEnv, flow, isAlive, Instance} from 'mobx-state-tree';
 import debounce from 'lodash/debounce';
+import throttle from 'lodash/throttle';
 import toPairs from 'lodash/toPairs';
 import pick from 'lodash/pick';
 import {ServiceStore} from './service';
 import type {IFormItemStore} from './formItem';
-import {Api, ApiObject, fetchOptions, Payload} from '../types';
+import {
+  Api,
+  ApiObject,
+  DataChangeReason,
+  fetchOptions,
+  Payload
+} from '../types';
 import {ServerError} from '../utils/errors';
 import {
   getVariable,
@@ -16,7 +23,9 @@ import {
   isEmpty,
   mapObject,
   keyToPath,
-  isObject
+  isObject,
+  ValidateError,
+  extendObject
 } from '../utils/helper';
 import isEqual from 'lodash/isEqual';
 import flatten from 'lodash/flatten';
@@ -46,9 +55,11 @@ export const FormStore = ServiceStore.named('FormStore')
       while (pool.length) {
         const current = pool.shift()!;
 
-        if (current.storeType === 'FormItemStore') {
+        if (current.storeType === 'FormItemStore' && !current.isControlled) {
           formItems.push(current);
-        } else {
+        } else if (
+          !['ComboStore', 'TableStore', 'FormStore'].includes(current.storeType)
+        ) {
           pool.push(...current.children);
         }
       }
@@ -57,31 +68,33 @@ export const FormStore = ServiceStore.named('FormStore')
     }
 
     return {
+      get items() {
+        return getItems();
+      }
+    };
+  })
+  .views(self => {
+    return {
       get loading() {
         return self.saving || self.fetching;
       },
 
-      get items() {
-        return getItems();
-      },
+      /** 获取InputGroup的子元素 */
+      get inputGroupItems() {
+        const formItems: Record<string, IFormItemStore[]> = {};
+        const children: Array<any> = self.items.concat();
 
-      /**
-       * 相对于 items(), 只收集直接子formItem
-       * 避免 子form 表单项的重复验证
-       */
-      get directItems() {
-        const formItems: Array<IFormItemStore> = [];
+        while (children.length) {
+          const current = children.shift();
 
-        // 查找孩子节点中是 formItem 的表单项
-        const pool = self.children.concat();
-        while (pool.length) {
-          const current = pool.shift()!;
-          if (current.storeType === 'FormItemStore') {
-            formItems.push(current);
-          } else if (
-            !['ComboStore', 'TableStore'].includes(current.storeType)
-          ) {
-            pool.push(...current.children);
+          if (current.inputGroupControl && current.inputGroupControl?.name) {
+            const controlName = current.inputGroupControl?.name as string;
+
+            if (formItems.hasOwnProperty(controlName)) {
+              formItems[controlName].push(current);
+            } else {
+              formItems[controlName] = [current];
+            }
           }
         }
 
@@ -93,7 +106,7 @@ export const FormStore = ServiceStore.named('FormStore')
           [propName: string]: Array<string>;
         } = {};
 
-        getItems().forEach(item => {
+        self.items.forEach(item => {
           if (!item.valid) {
             errors[item.name] = Array.isArray(errors[item.name])
               ? errors[item.name].concat(item.errors)
@@ -116,26 +129,26 @@ export const FormStore = ServiceStore.named('FormStore')
       },
 
       getItemById(id: string) {
-        return getItems().find(item => item.itemId === id);
+        return self.items.find(item => item.itemId === id);
       },
 
       getItemByName(name: string) {
-        return getItems().find(item => item.name === name);
+        return self.items.find(item => item.name === name);
       },
 
       getItemsByName(name: string) {
-        return getItems().filter(item => item.name === name);
+        return self.items.filter(item => item.name === name);
       },
 
       get valid() {
         return (
-          getItems().every(item => item.valid) &&
+          self.items.every(item => item.valid) &&
           (!self.restError || !self.restError.length)
         );
       },
 
       get validating() {
-        return getItems().some(item => item.validating);
+        return self.items.some(item => item.validating);
       },
 
       get isPristine() {
@@ -160,11 +173,43 @@ export const FormStore = ServiceStore.named('FormStore')
     };
   })
   .actions(self => {
-    function setValues(values: object, tag?: object, replace?: boolean) {
-      self.updateData(values, tag, replace);
+    function setValues(
+      values: object,
+      tag?: object,
+      replace?: boolean,
+      concatFields?: string | string[],
+      changeReason?: DataChangeReason
+    ) {
+      self.updateData(values, tag, replace, concatFields, changeReason);
 
       // 如果数据域中有数据变化，就都reset一下，去掉之前残留的验证消息
-      self.items.forEach(item => item.reset());
+      self.items.forEach(item => {
+        if (item.extraName) {
+          const value = [
+            getVariable(values, item.name, false),
+            getVariable(values, item.extraName, false)
+          ];
+          if (
+            value.some(item => item !== undefined) &&
+            !isEqual(value, item.tmpValue)
+          ) {
+            const origin = item.splitExtraValue(item.tmpValue);
+            item.changeTmpValue(
+              value.map((item, idx) => item ?? origin[idx]),
+              'dataChanged'
+            );
+            item.changeEmitedValue(undefined);
+          }
+        } else {
+          const value = getVariable(values, item.name, false);
+          if (value !== undefined && value !== item.tmpValue) {
+            item.changeTmpValue(value, 'dataChanged');
+            item.changeEmitedValue(undefined);
+          }
+        }
+        item.reset();
+        self.inited && item.validateOnChange && item.validate(self.data);
+      });
 
       // 同步 options
       syncOptions();
@@ -174,7 +219,8 @@ export const FormStore = ServiceStore.named('FormStore')
       name: string,
       value: any,
       isPristine: boolean = false,
-      force: boolean = false
+      force: boolean = false,
+      changeReason?: DataChangeReason
     ) {
       // 没有变化就不跑了。
       const origin = getVariable(self.data, name, false);
@@ -183,7 +229,7 @@ export const FormStore = ServiceStore.named('FormStore')
       const data = cloneObject(self.data);
 
       if (value !== origin) {
-        if (prev.__prev) {
+        if (prev.hasOwnProperty('__prev')) {
           // 基于之前的 __prev 改
           const prevData = cloneObject(prev.__prev);
           setVariable(prevData, name, origin);
@@ -222,17 +268,27 @@ export const FormStore = ServiceStore.named('FormStore')
         });
       }
 
+      changeReason &&
+        Object.isExtensible(data) &&
+        !data.__changeReason &&
+        Object.defineProperty(data, '__changeReason', {
+          value: changeReason,
+          enumerable: false,
+          configurable: false,
+          writable: false
+        });
+
       self.data = data;
 
       // 同步 options
       syncOptions();
     }
 
-    function deleteValueByName(name: string) {
+    function deleteValueByName(name: string, changeReason?: DataChangeReason) {
       const prev = self.data;
       const data = cloneObject(self.data);
 
-      if (prev.__prev) {
+      if (prev.hasOwnProperty('__prev')) {
         // 基于之前的 __prev 改
         const prevData = cloneObject(prev.__prev);
         setVariable(prevData, name, getVariable(prev, name));
@@ -252,6 +308,16 @@ export const FormStore = ServiceStore.named('FormStore')
       }
 
       deleteVariable(data, name);
+
+      changeReason &&
+        Object.isExtensible(data) &&
+        !data.__changeReason &&
+        Object.defineProperty(data, '__changeReason', {
+          value: changeReason,
+          enumerable: false,
+          configurable: false,
+          writable: false
+        });
       self.data = data;
     }
 
@@ -338,7 +404,11 @@ export const FormStore = ServiceStore.named('FormStore')
                   __saved: Date.now()
                 }
               : undefined,
-            !!(api as ApiObject).replaceData
+            !!(api as ApiObject).replaceData,
+            (api as ApiObject).concatDataFields,
+            {
+              type: 'api'
+            }
           );
         }
 
@@ -347,14 +417,17 @@ export const FormStore = ServiceStore.named('FormStore')
             setFormItemErrors(json.errors);
 
             self.updateMessage(
-              json.msg ??
+              (api as ApiObject)?.messages?.failed ??
+                json.msg ??
                 self.__(options && options.errorMessage) ??
                 self.__('Form.validateFailed'),
               true
             );
           } else {
             self.updateMessage(
-              json.msg ?? self.__(options && options.errorMessage),
+              (api as ApiObject)?.messages?.failed ??
+                json.msg ??
+                self.__(options && options.errorMessage),
               true
             );
           }
@@ -362,7 +435,7 @@ export const FormStore = ServiceStore.named('FormStore')
           throw new ServerError(self.msg, json);
         } else {
           updateSavedData();
-          let ret = options && options.onSuccess && options.onSuccess(json);
+          let ret = options?.onSuccess?.(json, json.data);
           if (ret?.then) {
             ret = yield ret;
           }
@@ -371,7 +444,8 @@ export const FormStore = ServiceStore.named('FormStore')
           }
           self.markSaving(false);
           self.updateMessage(
-            json.msg ??
+            (api as ApiObject)?.messages?.success ??
+              json.msg ??
               (options.successMessage === 'saveSuccess'
                 ? json.defaultMsg
                 : self.__(options && options.successMessage)) ??
@@ -405,20 +479,22 @@ export const FormStore = ServiceStore.named('FormStore')
         if (ret?.dispatcher?.prevented) {
           return;
         }
-        if (e.type === 'ServerError') {
-          const result = (e as ServerError).response;
-          getEnv(self).notify(
-            'error',
-            e.message,
-            result.msgTimeout !== undefined
-              ? {
-                  closeButton: true,
-                  timeout: result.msgTimeout
-                }
-              : undefined
-          );
-        } else {
-          getEnv(self).notify('error', e.message);
+        if (!(api as ApiObject)?.silent) {
+          if (e.type === 'ServerError') {
+            const result = (e as ServerError).response;
+            getEnv(self).notify(
+              'error',
+              e.message,
+              result.msgTimeout !== undefined
+                ? {
+                    closeButton: true,
+                    timeout: result.msgTimeout
+                  }
+                : undefined
+            );
+          } else {
+            getEnv(self).notify('error', e.message);
+          }
         }
         throw e;
       }
@@ -476,46 +552,49 @@ export const FormStore = ServiceStore.named('FormStore')
       );
     };
 
+    // 5s 内不要重复弹同一个错误
+    const toastValidateError = throttle(
+      (msg, validateError?: ValidateError) => {
+        const env = getEnv(self);
+        env.notify('error', msg, {
+          validateError
+        });
+      },
+      5000,
+      {
+        trailing: false,
+        leading: true
+      }
+    );
+
     const submit: (
       fn?: (values: object) => Promise<any>,
       hooks?: Array<() => Promise<any>>,
       failedMessage?: string,
-      validateErrCb?: () => void
+      validateErrCb?: () => void,
+      throwErrors?: boolean
     ) => Promise<any> = flow(function* submit(
       fn: any,
       hooks?: Array<() => Promise<any>>,
       failedMessage?: string,
-      validateErrCb?: () => void
+      validateErrCb?: () => void,
+      throwErrors?: boolean
     ) {
       self.submited = true;
       self.submiting = true;
 
       try {
-        let valid = yield validate(hooks);
-
-        // 如果不是valid，而且有包含不是remote的报错的表单项时，不可提交
-        if (
-          (!valid &&
-            self.items.some(item =>
-              item.errorData.some(e => e.tag !== 'remote')
-            )) ||
-          self.restError.length
-        ) {
-          let msg = failedMessage ?? self.__('Form.validateFailed');
-          const env = getEnv(self);
-          let dispatcher: any = validateErrCb && validateErrCb();
-          if (dispatcher?.then) {
-            dispatcher = yield dispatcher;
-          }
-          if (!dispatcher?.prevented) {
-            msg && env.notify('error', msg);
-          }
-          throw new Error(msg);
-        }
+        const valid = yield validate(
+          hooks,
+          true,
+          true,
+          failedMessage,
+          validateErrCb
+        );
 
         if (fn) {
           const diff = difference(self.data, self.pristine);
-          const result = yield fn(
+          const result: any = yield fn(
             createObject(
               createObject(self.data.__super, {
                 diff: diff,
@@ -536,13 +615,19 @@ export const FormStore = ServiceStore.named('FormStore')
 
     const validate: (
       hooks?: Array<() => Promise<any>>,
-      forceValidate?: boolean
+      forceValidate?: boolean,
+      throwErrors?: boolean,
+      failedMessage?: string,
+      validateErrCb?: () => void
     ) => Promise<boolean> = flow(function* validate(
-      hooks?: Array<() => Promise<any>>,
-      forceValidate?: boolean
+      hooks?: Array<(data: any) => Promise<any>>,
+      forceValidate?: boolean,
+      throwErrors?: boolean,
+      failedMessage?: string,
+      validateErrCb?: () => void
     ) {
       self.validated = true;
-      const items = self.directItems.concat();
+      const items = self.items.concat();
       for (let i = 0, len = items.length; i < len; i++) {
         let item = items[i] as IFormItemStore;
 
@@ -564,22 +649,83 @@ export const FormStore = ServiceStore.named('FormStore')
           item.resetValidationStatus();
         }
 
-        // 验证过，或者是 unique 的表单项，或者强制验证，或者有远端校验api
+        /**
+         * 1. 验证过，或者是 unique 的表单项，或者强制验证，或者有远端校验api
+         * 2. 如果Schema的默认值为表达式，则需要基于联动计算结果重新校验
+         */
         if (
           !item.validated ||
           item.rules.equals ||
           item.rules.equalsField ||
           item.unique ||
           forceValidate ||
-          !!item.validateApi
+          !!item.validateApi ||
+          item.isValueSchemaExp
         ) {
           yield item.validate(self.data);
         }
       }
 
-      if (hooks && hooks.length) {
-        for (let i = 0, len = hooks.length; i < len; i++) {
-          yield hooks[i]();
+      try {
+        if (hooks && hooks.length) {
+          for (let i = 0, len = hooks.length; i < len; i++) {
+            const msg = yield hooks[i](self.data);
+
+            if (typeof msg == 'string' && msg) {
+              throw new Error(msg);
+            } else if (msg === false) {
+              // 不提示直接不通过校验
+              throw new ValidateError(
+                failedMessage || self.__('Form.validateFailed'),
+                self.errors
+              );
+            }
+          }
+        }
+      } catch (e) {
+        if (throwErrors) {
+          throw e;
+        } else {
+          toastValidateError(e.message);
+        }
+
+        return false;
+      }
+
+      if (!self.valid) {
+        // 如果不是valid，而且有包含不是remote的报错的表单项时，不可提交
+        if (
+          self.items.some(item =>
+            item.errorData.some(e => e.tag !== 'remote')
+          ) ||
+          self.restError.length
+        ) {
+          let msg = failedMessage ?? self.__('Form.validateFailed');
+          let dispatcher: any = validateErrCb && validateErrCb();
+          if (dispatcher?.then) {
+            dispatcher = yield dispatcher;
+          }
+          if (!dispatcher?.prevented) {
+            const validateError = new ValidateError(
+              failedMessage || self.__('Form.validateFailed'),
+              self.errors,
+              {
+                items: self.items,
+                msg: {
+                  customMsg: failedMessage,
+                  defaultMsg: self.__('Form.validateFailed')
+                }
+              }
+            );
+            msg && toastValidateError(msg, validateError);
+          }
+        }
+
+        if (throwErrors) {
+          throw new ValidateError(
+            failedMessage || self.__('Form.validateFailed'),
+            self.errors
+          );
         }
       }
 
@@ -613,9 +759,14 @@ export const FormStore = ServiceStore.named('FormStore')
       items.forEach(item => item.reset());
     }
 
+    function setPristine(data: object) {
+      self.pristine = data;
+    }
+
     function reset(cb?: (data: any) => void, resetData: boolean = true) {
       if (resetData) {
-        self.data = self.pristine;
+        // 父级的数据可能已经被修改，__super不应该被修改
+        self.data = createObject(self.data.__super, self.pristine);
       }
 
       // 值可能变了，重新验证一次。
@@ -630,6 +781,9 @@ export const FormStore = ServiceStore.named('FormStore')
       self.items.forEach(item => {
         if (item.name && item.type !== 'hidden') {
           setVariable(toClear, item.name, item.resetValue);
+        }
+        if (item.extraName && typeof item.extraName === 'string') {
+          setVariable(toClear, item.extraName, item.resetValue);
         }
       });
       setValues(toClear);
@@ -695,6 +849,7 @@ export const FormStore = ServiceStore.named('FormStore')
       getLocalPersistData,
       setLocalPersistData,
       clearLocalPersistData,
+      setPristine,
       setPersistData,
       clear,
       updateSavedData,
@@ -705,6 +860,7 @@ export const FormStore = ServiceStore.named('FormStore')
       clearRestError,
       beforeDestroy() {
         syncOptions.cancel();
+        toastValidateError.cancel();
       }
     };
   });

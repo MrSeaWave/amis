@@ -18,6 +18,7 @@ const makeRegexp = (reg: string | RegExp) => {
 };
 import memoize from 'lodash/memoize';
 import isPlainObject from 'lodash/isPlainObject';
+import {isId, isId15, isId18} from './validateId';
 
 const makeUrlRegexp = memoize(function (options: any) {
   options = {
@@ -90,6 +91,16 @@ const makeUrlRegexp = memoize(function (options: any) {
   return new RegExp(regex, 'i');
 });
 
+const valueToString = (value: any) => {
+  return typeof value === 'undefined' || value === null
+    ? ''
+    : typeof value === 'string'
+    ? value
+    : value instanceof Date
+    ? value.toISOString()
+    : JSON.stringify(value);
+};
+
 export interface ValidateFn {
   (
     values: {[propsName: string]: any},
@@ -99,7 +110,12 @@ export interface ValidateFn {
     arg3?: any,
     arg4?: any,
     arg5?: any
-  ): boolean;
+  ):
+    | boolean
+    | {
+        error: boolean;
+        msg?: string;
+      };
 }
 
 export const validations: {
@@ -171,9 +187,7 @@ export const validations: {
   },
   isLength: function (values, value, length) {
     // 此方法应该判断文本长度，如果传入数据为number，导致 maxLength 和 maximum 表现一致了，默认转成string
-    if (typeof value === 'number') {
-      value = String(value);
-    }
+    value = valueToString(value);
 
     return !isExisty(value) || isEmpty(value) || value.length === length;
   },
@@ -185,16 +199,14 @@ export const validations: {
   },
   maxLength: function (values, value, length) {
     // 此方法应该判断文本长度，如果传入数据为number，导致 maxLength 和 maximum 表现一致了，默认转成string
-    if (typeof value === 'number') {
-      value = String(value);
-    }
+    value = valueToString(value);
+
     return !isExisty(value) || value.length <= length;
   },
   minLength: function (values, value, length) {
     // 此方法应该判断文本长度，如果传入数据为number，导致 maxLength 和 maximum 表现一致了，默认转成string
-    if (typeof value === 'number') {
-      value = String(value);
-    }
+    value = valueToString(value);
+
     return !isExisty(value) || isEmpty(value) || value.length >= length;
   },
   isUrlPath: function (values, value, regexp) {
@@ -244,29 +256,34 @@ export const validations: {
   },
   isPhoneNumber: function (values, value) {
     return (
-      !isExisty(value) || isEmpty(value) || /^[1]([3-9])[0-9]{9}$/.test(value)
+      !isExisty(value) ||
+      isEmpty(value) ||
+      /^(\+\d{2}-)?[1]([3-9])[0-9]{9}$/.test(value)
     );
   },
   isTelNumber: function (values, value) {
     return (
       !isExisty(value) ||
       isEmpty(value) ||
-      /^(\(\d{3,4}\)|\d{3,4}-|\s)?\d{7,14}$/.test(value)
+      /^(\+\d{2}-)?(\(\d{3,4}\)|\d{3,4}-|\s)?\d{7,14}$/.test(value)
     );
   },
   isZipcode: function (values, value) {
     return !isExisty(value) || isEmpty(value) || /^\d{6}$/.test(value);
   },
   isId: function (values, value) {
-    return (
-      !isExisty(value) ||
-      isEmpty(value) ||
-      /(^[1-9]\d{5}(18|19|([23]\d))\d{2}((0[1-9])|(10|11|12))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$)|(^[1-9]\d{5}\d{2}((0[1-9])|(10|11|12))(([0-2][1-9])|10|20|30|31)\d{3}$)/.test(
-        value
-      )
-    );
+    return !isExisty(value) || isEmpty(value) || isId(String(value));
+  },
+  isId18: function (values, value) {
+    return !isExisty(value) || isEmpty(value) || isId18(String(value));
+  },
+  isId15: function (values, value) {
+    return !isExisty(value) || isEmpty(value) || isId15(String(value));
   },
   notEmptyString: function (values, value) {
+    return !isExisty(value) || !(String(value) && String(value).trim() === '');
+  },
+  notEmpty: function (values, value) {
     return !isExisty(value) || !(String(value) && String(value).trim() === '');
   },
   matchRegexp1: function (values, value, regexp) {
@@ -440,7 +457,7 @@ export const validations: {
     return validations.matchRegexp(
       values,
       value,
-      regexp instanceof RegExp ? regexp : /^[a-zA-Z_]+[a-zA-Z0-9]*$/
+      regexp instanceof RegExp ? regexp : /^[a-zA-Z_]+[a-zA-Z0-9_]*$/
     );
   }
 };
@@ -479,12 +496,15 @@ export const validateMessages: {
   isJson: 'validate.isJson',
   isLength: 'validate.isLength',
   notEmptyString: 'validate.notEmptyString',
+  notEmpty: 'validate.notEmptyString',
   equalsField: 'validate.equalsField',
   equals: 'validate.equals',
   isPhoneNumber: 'validate.isPhoneNumber',
   isTelNumber: 'validate.isTelNumber',
   isZipcode: 'validate.isZipcode',
   isId: 'validate.isId',
+  isId18: 'validate.isId',
+  isId15: 'validate.isId',
   isDateTimeSame: 'validate.isDateTimeSame',
   isDateTimeBefore: 'validate.isDateTimeBefore',
   isDateTimeAfter: 'validate.isDateTimeAfter',
@@ -515,10 +535,13 @@ export function validate(
     msg: string;
   }> = [];
 
-  rules &&
-    Object.keys(rules).forEach(ruleName => {
+  if (rules) {
+    const ruleNames = Object.keys(rules);
+    const length = ruleNames.length;
+    for (let index = 0; index < length; index++) {
+      const ruleName = ruleNames[index];
       if (!rules[ruleName] && rules[ruleName] !== 0) {
-        return;
+        continue;
       } else if (typeof validations[ruleName] !== 'function') {
         throw new Error('Validation `' + ruleName + '` not exists!');
       }
@@ -534,27 +557,41 @@ export function validate(
         return item;
       });
 
-      if (!fn(values, value, ...args)) {
+      let validateRes = fn(values, value, ...args);
+
+      // addRule 允许返回
+      //   {error: true, msg: '错误提示'}
+      // 格式的信息来灵活展示错误
+      let fnResErrorMsg = '';
+      if (typeof validateRes === 'object' && validateRes.error === true) {
+        fnResErrorMsg = validateRes?.msg ?? '';
+      }
+
+      if (!validateRes || fnResErrorMsg) {
         let msgRuleName = ruleName;
         if (Array.isArray(value)) {
           msgRuleName = `${ruleName}Array`;
         }
 
-        errors.push({
-          rule: ruleName,
-          msg: filter(
-            __(
-              (messages && messages[ruleName]) ||
-                validateMessages[msgRuleName] ||
-                validateMessages[ruleName]
-            ),
-            {
-              ...[''].concat(args)
-            }
-          )
-        });
+        return [
+          {
+            rule: ruleName,
+            msg: filter(
+              __(
+                (messages && messages[ruleName]) ||
+                  fnResErrorMsg ||
+                  validateMessages[msgRuleName] ||
+                  validateMessages[ruleName]
+              ),
+              {
+                ...[''].concat(args)
+              }
+            )
+          }
+        ];
       }
-    });
+    }
+  }
 
   return errors;
 }

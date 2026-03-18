@@ -10,12 +10,16 @@ import {Badge} from 'amis-ui';
 import {ColorScale} from 'amis-core';
 import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
 
+import type {TestIdBuilder} from 'amis-core';
+
 export interface TableCellProps extends RendererProps {
-  wrapperComponent?: React.ReactType;
-  column: object;
+  wrapperComponent?: React.ElementType;
+  column: any;
+  contentsOnly?: boolean;
+  testIdBuilder?: TestIdBuilder;
 }
 
-export class TableCell extends React.Component<RendererProps> {
+export class TableCell extends React.Component<TableCellProps> {
   static defaultProps = {
     wrapperComponent: 'td'
   };
@@ -27,8 +31,11 @@ export class TableCell extends React.Component<RendererProps> {
     'body',
     'tpl',
     'rowSpan',
-    'remark'
+    'remark',
+    'contentsOnly'
   ];
+
+  readonly propsNeedRemove: string[] = [];
 
   render() {
     let {
@@ -38,12 +45,14 @@ export class TableCell extends React.Component<RendererProps> {
       render,
       style = {},
       wrapperComponent: Component,
+      contentsOnly,
       column,
       value,
       data,
       children,
       width,
       align,
+      vAlign,
       innerClassName,
       label,
       tabIndex,
@@ -52,21 +61,36 @@ export class TableCell extends React.Component<RendererProps> {
       body: _body,
       tpl,
       remark,
-      prefix,
-      affix,
+      cellPrefix,
+      cellAffix,
       isHead,
       colIndex,
       row,
       showBadge,
       itemBadge,
+      textOverflow,
+      testIdBuilder,
       ...rest
     } = this.props;
+
+    if (isHead) {
+      Component = 'th';
+    } else {
+      Component = Component || 'td';
+    }
+    const isTableCell = Component === 'td' || Component === 'th';
+
     const schema = {
       ...column,
+      // 因为列本身已经做过显隐判断了，单元格不应该再处理
+      visibleOn: '',
+      hiddenOn: '',
+      visible: true,
+      hidden: false,
+      style: column.innerStyle, // column的innerStyle配置 作为内部组件的style 覆盖column的style
       className: innerClassName,
       type: (column && column.type) || 'plain'
     };
-    const canAccessSuperData = schema?.canAccessSuperData !== false;
 
     // 如果本来就是 type 为 button，不要删除，其他情况下都应该删除。
     if (schema.type !== 'button' && schema.type !== 'dropdown-button') {
@@ -76,37 +100,35 @@ export class TableCell extends React.Component<RendererProps> {
     let body = children
       ? children
       : render('field', schema, {
-          ...omit(rest, Object.keys(schema)),
+          ...omit(rest, Object.keys(schema), this.propsNeedRemove),
+          // inputOnly 属性不能传递给子组件，在 SchemaRenderer.renderChild 中处理掉了
           inputOnly: true,
-          /** value没有返回值时设置默认值，避免错误获取到父级数据域的值 */
-          value: canAccessSuperData ? value : value ?? '',
+          value: value,
           data
         });
 
-    if (width) {
+    if (isTableCell) {
+      // table Cell 会用 colGroup 来设置宽度，这里不需要再设置
+      // 同时剔除style中的定位相关样式，避免表格样式异常
+      style = omit(style, ['width', 'position', 'display']);
+    } else if (width) {
       style = {
         ...style,
         width: (style && style.width) || width
       };
-
-      if (!/%$/.test(String(style.width))) {
-        body = (
-          <div style={{width: style.width}}>
-            {prefix}
-            {body}
-            {affix}
-          </div>
-        );
-        prefix = null;
-        affix = null;
-        // delete style.width;
-      }
     }
 
     if (align) {
       style = {
         ...style,
         textAlign: align
+      };
+    }
+
+    if (vAlign) {
+      style = {
+        ...style,
+        verticalAlign: vAlign
       };
     }
 
@@ -143,24 +165,18 @@ export class TableCell extends React.Component<RendererProps> {
       style.background = color;
     }
 
-    if (!Component) {
+    if (contentsOnly) {
       return body as JSX.Element;
-    }
-
-    if (isHead) {
-      Component = 'th';
     }
 
     return (
       <Component
         rowSpan={rowSpan > 1 ? rowSpan : undefined}
         style={style}
-        className={cx(
-          className,
-          column.classNameExpr ? filter(column.classNameExpr, data) : null
-        )}
+        className={cx(className)}
         tabIndex={tabIndex}
         onKeyUp={onKeyUp}
+        {...testIdBuilder?.getChild('cell').getTestId()}
       >
         {showBadge ? (
           <Badge
@@ -172,22 +188,26 @@ export class TableCell extends React.Component<RendererProps> {
             data={row.data}
           />
         ) : null}
-        {prefix}
-        {body}
-        {affix}
+        {cellPrefix}
+        {textOverflow === 'ellipsis' ? (
+          <div className={cx(`TableCell-ellipsis`)}>{body}</div>
+        ) : (
+          body
+        )}
+        {cellAffix}
       </Component>
     );
   }
 }
 
 @Renderer({
-  test: /(^|\/)table\/(?:.*\/)?cell$/,
+  type: 'cell',
   name: 'table-cell'
 })
-@QuickEdit()
 @PopOverable({
   targetOutter: true
 })
+@QuickEdit()
 @Copyable()
 @observer
 export class TableCellRenderer extends TableCell {

@@ -2,6 +2,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   vertical-align: middle;
   user-select: none;
   background: transparent;
@@ -605,6 +606,7 @@
   &--size-default {
     @include button-size(
       var(--button-size-default-fontSize),
+      var(--button-size-default-fontWeight),
       var(--button-size-default-lineHeight),
       var(--button-size-default-top-right-border-radius),
       var(--button-size-default-top-left-border-radius),
@@ -628,6 +630,7 @@
   &--size-xs {
     @include button-size(
       var(--button-size-xs-fontSize),
+      var(--button-size-xs-fontWeight),
       var(--button-size-xs-lineHeight),
       var(--button-size-xs-top-right-border-radius),
       var(--button-size-xs-top-left-border-radius),
@@ -646,17 +649,12 @@
       var(--button-size-xs-icon-size),
       var(--button-size-xs-icon-margin)
     );
-
-    &.#{$ns}Button--iconOnly {
-      min-width: calc(
-        var(--Button--xs-height) * var(--Button--iconOnly-minWidthRate)
-      );
-    }
   }
 
   &--size-sm {
     @include button-size(
       var(--button-size-sm-fontSize),
+      var(--button-size-sm-fontWeight),
       var(--button-size-sm-lineHeight),
       var(--button-size-sm-top-right-border-radius),
       var(--button-size-sm-top-left-border-radius),
@@ -675,17 +673,12 @@
       var(--button-size-sm-icon-size),
       var(--button-size-sm-icon-margin)
     );
-
-    &.#{$ns}Button--iconOnly {
-      min-width: calc(
-        var(--Button--sm-height) * var(--Button--iconOnly-minWidthRate)
-      );
-    }
   }
 
   &--size-md {
     @include button-size(
       var(--button-size-md-fontSize),
+      var(--button-size-md-fontWeight),
       var(--button-size-md-lineHeight),
       var(--button-size-md-top-right-border-radius),
       var(--button-size-md-top-left-border-radius),
@@ -704,17 +697,12 @@
       var(--button-size-md-icon-size),
       var(--button-size-md-icon-margin)
     );
-
-    &.#{$ns}Button--iconOnly {
-      min-width: calc(
-        var(--Button--md-height) * var(--Button--iconOnly-minWidthRate)
-      );
-    }
   }
 
   &--size-lg {
     @include button-size(
       var(--button-size-lg-fontSize),
+      var(--button-size-lg-fontWeight),
       var(--button-size-lg-lineHeight),
       var(--button-size-lg-top-right-border-radius),
       var(--button-size-lg-top-left-border-radius),
@@ -733,35 +721,6 @@
       var(--button-size-lg-icon-size),
       var(--button-size-lg-icon-margin)
     );
-
-    &.#{$ns}Button--iconOnly {
-      min-width: calc(
-        var(--Button--lg-height) * var(--Button--iconOnly-minWidthRate)
-      );
-    }
-  }
-
-  &--iconOnly {
-    min-width: calc(
-      var(--Button-height) * var(--Button--iconOnly-minWidthRate)
-    );
-
-    &:not(.#{$ns}Button--link) {
-      > svg.icon {
-        width: px2rem(14px);
-        height: px2rem(14px);
-        top: px2rem(2px);
-      }
-
-      > .fa,
-      > .iconfont {
-        font-size: var(--fontSizeMd);
-      }
-
-      > .iconfont {
-        line-height: 1;
-      }
-    }
   }
 
   @include hover-focus {
@@ -776,6 +735,7 @@
   }
 
   &.is-disabled,
+  &.is-loading,
   &:disabled {
     box-shadow: none;
     cursor: not-allowed;
@@ -786,7 +746,7 @@
     }
   }
 
-  &:not(:disabled):not(.is-disabled) {
+  &:not(:disabled):not(.is-disabled):not(.is-loading) {
     cursor: pointer;
   }
 
@@ -853,10 +813,6 @@
       var(--button-link-disabled-left-border-style),
       var(--button-link-disabled-shadow)
     );
-    padding: 0;
-    margin: 0;
-    height: auto;
-    line-height: auto;
   }
 
   &--block {

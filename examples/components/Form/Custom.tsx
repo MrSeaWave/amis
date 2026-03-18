@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import {FormItem, Renderer} from 'amis-core';
 
@@ -26,7 +27,7 @@ class MyFormItem extends React.Component {
 }
 
 @Renderer({
-  test: /(^|\/)my\-renderer$/,
+  type: 'my-renderer',
   autoVar: true
 })
 class CustomRenderer extends React.Component {

@@ -6,7 +6,7 @@
 import React from 'react';
 import {themeable, ThemeProps} from 'amis-core';
 import {LocaleProps, localeable} from 'amis-core';
-import {ResultBox} from '.';
+import ResultBox from './ResultBox';
 import UserSelect from './UserSelect';
 import type {Option} from 'amis-core';
 import Sortable from 'sortablejs';
@@ -33,7 +33,9 @@ export interface UserTabSelectProps extends ThemeProps, LocaleProps {
   valueField?: string;
   labelField?: string;
   selection?: Array<Option>;
+  displayFields: string[];
   data?: PlainObject;
+  disabled?: boolean;
   onChange: (value: Array<Option> | Option) => void;
   onSearch?: (
     term: string,
@@ -210,7 +212,10 @@ export class UserTabSelect extends React.Component<
       tabOptions,
       onSearch,
       deferLoad,
-      data
+      data,
+      disabled,
+      displayFields,
+      mobileUI
     } = this.props;
     const {activeKey, isOpened} = this.state;
 
@@ -223,7 +228,8 @@ export class UserTabSelect extends React.Component<
           onResultChange={this.handleImmediateChange}
           onResultClick={this.onOpen}
           placeholder={placeholder}
-          useMobileUI
+          mobileUI={mobileUI}
+          disabled={disabled}
         />
         <PopUp
           isShow={isOpened}
@@ -254,6 +260,7 @@ export class UserTabSelect extends React.Component<
                     className="TabsTransfer-tab"
                   >
                     <UserSelect
+                      isTab={true}
                       selection={this.state.selection}
                       showResultBox={false}
                       {...item}
@@ -268,6 +275,7 @@ export class UserTabSelect extends React.Component<
                       }
                       multiple
                       controlled
+                      displayFields={displayFields}
                       onChange={this.handleSelectChange}
                       onSearch={(input: string, cancelExecutor: Function) =>
                         item.searchable && onSearch

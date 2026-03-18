@@ -1,39 +1,43 @@
-import {Renderer, RendererProps} from 'amis-core';
 import React from 'react';
-import {Alert2 as Alert} from 'amis-ui';
 import {
-  BaseSchema,
-  SchemaObject,
-  SchemaCollection,
-  SchemaIcon
-} from '../Schema';
+  Renderer,
+  RendererProps,
+  AMISSchemaBase,
+  AMISTemplate,
+  AMISSchemaCollection,
+  AMISClassName,
+  AMISIcon,
+  AMISLegacyActionSchema,
+  AMISButtonSchema
+} from 'amis-core';
+import {Alert2 as Alert} from 'amis-ui';
 import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
+
 import type {AlertProps} from 'amis-ui/lib/components/Alert2';
 
 /**
- * Alert 提示渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/alert
+ * 信息提示组件，用于展示通知、警告或成功/失败消息。支持标题、图标、操作按钮。
  */
-export interface AlertSchema extends BaseSchema {
+export interface AMISAlertSchema extends AMISSchemaBase {
   /**
-   * 指定为提示框类型
+   * 指定为 alert 组件
    */
   type: 'alert';
 
   /**
    * 提示框标题
    */
-  title?: string;
+  title?: AMISTemplate;
 
   /**
-   * 内容区域
+   * 提示内容
    */
-  body: SchemaCollection;
+  body: AMISSchemaCollection;
 
   /**
    * 提示类型
    */
-  level?: 'info' | 'warning' | 'success' | 'error' | 'danger';
+  level?: 'info' | 'warning' | 'success' | 'danger';
 
   /**
    * 是否显示关闭按钮
@@ -43,30 +47,37 @@ export interface AlertSchema extends BaseSchema {
   /**
    * 关闭按钮CSS类名
    */
-  closeButtonClassName?: string;
+  closeButtonClassName?: AMISClassName;
 
   /**
-   * 是否显示ICON
+   * 是否显示图标
    */
   showIcon?: boolean;
 
   /**
    * 左侧图标
    */
-  icon?: SchemaIcon;
+  icon?: AMISIcon;
 
   /**
    * 图标CSS类名
    */
-  iconClassName?: string;
+  iconClassName?: AMISClassName;
+
+  /**
+   * 操作区域配置
+   */
+  actions?: AMISButtonSchema[];
 }
 
 @Renderer({
   type: 'alert'
 })
-export class TplRenderer extends React.Component<AlertProps & RendererProps> {
+export class AlertRenderer extends React.Component<
+  Omit<AlertProps, 'actions'> & RendererProps
+> {
   render() {
-    let {render, body, level, icon, showIcon, ...rest} = this.props;
+    let {render, body, level, icon, showIcon, actions, ...rest} = this.props;
     if (isPureVariable(level)) {
       level = resolveVariableAndFilter(level, this.props.data);
     }
@@ -77,8 +88,20 @@ export class TplRenderer extends React.Component<AlertProps & RendererProps> {
       showIcon = resolveVariableAndFilter(showIcon, this.props.data);
     }
 
+    const actionsDom: React.ReactNode = actions
+      ? React.isValidElement(actions)
+        ? actions
+        : render('alert-actions', actions)
+      : null;
+
     return (
-      <Alert {...rest} level={level} icon={icon} showIcon={showIcon}>
+      <Alert
+        {...rest}
+        level={level}
+        icon={icon}
+        showIcon={showIcon}
+        actions={actionsDom}
+      >
         {render('body', body)}
       </Alert>
     );

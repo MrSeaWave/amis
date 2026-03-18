@@ -9,7 +9,7 @@ exports[`Renderer:Pagination 1`] = `
       class="cxd-PaginationWrapper"
     >
       <div
-        class="cxd-Pagination-wrap cxd-PaginationWrapper-pager"
+        class="cxd-Pagination-wrap cxd-Pagination-wrap-size--md cxd-PaginationWrapper-pager"
       >
         <ul
           class="cxd-Pagination cxd-Pagination--sm cxd-Pagination-item"
@@ -83,28 +83,34 @@ exports[`Renderer:Pagination 1`] = `
       </div>
       <div
         class="cxd-Table"
+        style="--Table-thead-height: 0px; --Table-column-3-width: 0px; --Table-column-4-width: 0px;"
       >
         <div
-          class="cxd-Table-heading"
+          class="cxd-Table-fixedTop"
         >
-          分页表格
+          <div
+            class="cxd-Table-heading"
+          >
+            分页表格
+          </div>
         </div>
         <div
           class="cxd-Table-contentWrap"
         >
           <div
-            class="cxd-Table-fixedLeft"
-          />
-          <div
-            class="cxd-Table-fixedRight"
-          />
-          <div
             class="cxd-Table-content"
-            style="position: relative;"
           >
             <table
               class="cxd-Table-table"
             >
+              <colgroup>
+                <col
+                  data-index="3"
+                />
+                <col
+                  data-index="4"
+                />
+              </colgroup>
               <thead>
                 <tr
                   class=""
@@ -117,7 +123,7 @@ exports[`Renderer:Pagination 1`] = `
                       class="cxd-TableCell--title"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           Engine
@@ -126,6 +132,7 @@ exports[`Renderer:Pagination 1`] = `
                     </div>
                     <div
                       class="cxd-Table-content-colDragLine"
+                      data-index="3"
                     />
                   </th>
                   <th
@@ -136,7 +143,7 @@ exports[`Renderer:Pagination 1`] = `
                       class="cxd-TableCell--title"
                     >
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           Version
@@ -145,13 +152,14 @@ exports[`Renderer:Pagination 1`] = `
                     </div>
                     <div
                       class="cxd-Table-content-colDragLine"
+                      data-index="4"
                     />
                   </th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  class="cxd-Table-tr--odd cxd-Table-tr--1th"
+                  class="cxd-Table-table-tr cxd-Table-tr--odd cxd-Table-tr--1th"
                   data-id="1"
                   data-index="0"
                 >
@@ -175,7 +183,7 @@ exports[`Renderer:Pagination 1`] = `
                   </td>
                 </tr>
                 <tr
-                  class="cxd-Table-tr--even cxd-Table-tr--1th"
+                  class="cxd-Table-table-tr cxd-Table-tr--even cxd-Table-tr--1th"
                   data-id="2"
                   data-index="1"
                 >
@@ -200,131 +208,8 @@ exports[`Renderer:Pagination 1`] = `
                 </tr>
               </tbody>
             </table>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
-            </div>
           </div>
         </div>
-        <div
-          class="cxd-Table-fixedTop"
-          style="top: 0px; width: 0px;"
-        >
-          <div
-            class="cxd-Table-heading"
-          >
-            分页表格
-          </div>
-          <div
-            class="cxd-Table-fixedLeft"
-          />
-          <div
-            class="cxd-Table-fixedRight"
-          />
-          <div
-            class="cxd-Table-wrapper"
-            style="width: 0px;"
-          >
-            <table
-              class="cxd-Table-table"
-              style="width: 0px; table-layout: auto; transform: translateX(-0px);"
-            >
-              <colgroup>
-                <col
-                  data-index="3"
-                  width="0"
-                />
-                <col
-                  data-index="4"
-                  width="0"
-                />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th
-                    class=""
-                    data-index="3"
-                    style="width: 0px; height: 0px;"
-                  >
-                    <div
-                      class="cxd-TableCell--title"
-                    >
-                      <span
-                        class="cxd-TplField"
-                      >
-                        <span>
-                          Engine
-                        </span>
-                      </span>
-                    </div>
-                    <div
-                      class="cxd-Table-content-colDragLine"
-                    />
-                  </th>
-                  <th
-                    class=""
-                    data-index="4"
-                    style="width: 0px; height: 0px;"
-                  >
-                    <div
-                      class="cxd-TableCell--title"
-                    >
-                      <span
-                        class="cxd-TplField"
-                      >
-                        <span>
-                          Version
-                        </span>
-                      </span>
-                    </div>
-                    <div
-                      class="cxd-Table-content-colDragLine"
-                    />
-                  </th>
-                </tr>
-              </thead>
-            </table>
-          </div>
-        </div>
-        <div
-          class="cxd-Table-fixedTop-shadow"
-          style=""
-        />
       </div>
     </div>
   </div>
@@ -337,7 +222,7 @@ exports[`Renderer:Pagination 2`] = `
     class="cxd-Service"
   >
     <div
-      class="cxd-Pagination-wrap"
+      class="cxd-Pagination-wrap cxd-Pagination-wrap-size--md"
     >
       <div
         class="cxd-Pagination-total cxd-Pagination-item"
@@ -347,7 +232,6 @@ exports[`Renderer:Pagination 2`] = `
       <div
         aria-expanded="false"
         aria-haspopup="listbox"
-        aria-labelledby="downshift-0-label"
         class="cxd-Select cxd-Pagination-perpage cxd-Pagination-item"
         role="combobox"
         tabindex="0"
@@ -393,13 +277,21 @@ exports[`Renderer:Pagination 2`] = `
           </a>
         </li>
         <li
-          class="ellipsis"
+          class="cxd-Pagination-ellipsis"
         >
           <a
             role="button"
           >
             ...
           </a>
+          <span
+            class="icon"
+          >
+            <icon-mock
+              classname="icon icon-arrow-double-left"
+              icon="arrow-double-left"
+            />
+          </span>
         </li>
         <li
           class="cxd-Pagination-pager-item"
@@ -420,13 +312,21 @@ exports[`Renderer:Pagination 2`] = `
           </a>
         </li>
         <li
-          class="ellipsis"
+          class="cxd-Pagination-ellipsis"
         >
           <a
             role="button"
           >
             ...
           </a>
+          <span
+            class="icon"
+          >
+            <icon-mock
+              classname="icon icon-arrow-double-right"
+              icon="arrow-double-right"
+            />
+          </span>
         </li>
         <li
           class="cxd-Pagination-pager-item"
@@ -464,9 +364,621 @@ exports[`Renderer:Pagination 2`] = `
         <span
           class="cxd-Pagination-inputGroup-right"
         >
-          GO
+          前往
         </span>
       </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:Pagination with disabled 1`] = `
+<div>
+  <div
+    class="cxd-Service"
+  >
+    <div
+      class="cxd-Pagination-wrap cxd-Pagination-wrap-size--md disabled"
+    >
+      <ul
+        class="cxd-Pagination cxd-Pagination--sm cxd-Pagination-item"
+      >
+        <li
+          class="cxd-Pagination-prev is-disabled"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-left-arrow"
+              icon="left-arrow"
+            />
+          </span>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item is-active"
+        >
+          <a
+            role="button"
+          >
+            1
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            2
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            3
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            4
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            5
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            6
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            7
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-ellipsis"
+        >
+          <a
+            role="button"
+          >
+            ...
+          </a>
+          <span
+            class="icon"
+          >
+            <icon-mock
+              classname="icon icon-arrow-double-right"
+              icon="arrow-double-right"
+            />
+          </span>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            100
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-next"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-right-arrow"
+              icon="right-arrow"
+            />
+          </span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:Pagination with layout 1`] = `
+<div>
+  <div
+    class="cxd-Service"
+  >
+    <div
+      class="cxd-Pagination-wrap cxd-Pagination-wrap-size--md"
+    >
+      <div
+        class="cxd-Pagination-total cxd-Pagination-item"
+      >
+        共 999 条
+      </div>
+      <div
+        class="cxd-Pagination-inputGroup cxd-Pagination-item"
+      >
+        <span
+          class="cxd-Pagination-inputGroup-left"
+        >
+          跳转至
+        </span>
+        <input
+          class="cxd-Pagination-inputGroup-input"
+          type="text"
+          value=""
+        />
+        <span
+          class="cxd-Pagination-inputGroup-right"
+        >
+          前往
+        </span>
+      </div>
+      <div
+        aria-expanded="false"
+        aria-haspopup="listbox"
+        class="cxd-Select cxd-Pagination-perpage cxd-Pagination-item"
+        role="combobox"
+        tabindex="0"
+      >
+        <div
+          class="cxd-Select-valueWrap"
+        >
+          <div
+            class="cxd-Select-value"
+          >
+            10条/页
+          </div>
+        </div>
+        <span
+          class="cxd-Select-arrow"
+        >
+          <icon-mock
+            classname="icon icon-right-arrow-bold"
+            icon="right-arrow-bold"
+          />
+        </span>
+      </div>
+      <ul
+        class="cxd-Pagination cxd-Pagination--sm cxd-Pagination-item"
+      >
+        <li
+          class="cxd-Pagination-prev"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-left-arrow"
+              icon="left-arrow"
+            />
+          </span>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            1
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item is-active"
+        >
+          <a
+            role="button"
+          >
+            2
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            3
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            4
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            5
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            6
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            7
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-ellipsis"
+        >
+          <a
+            role="button"
+          >
+            ...
+          </a>
+          <span
+            class="icon"
+          >
+            <icon-mock
+              classname="icon icon-arrow-double-right"
+              icon="arrow-double-right"
+            />
+          </span>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            100
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-next"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-right-arrow"
+              icon="right-arrow"
+            />
+          </span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:Pagination with maxButtons 1`] = `
+<div>
+  <div
+    class="cxd-Service"
+  >
+    <div
+      class="cxd-Pagination-wrap cxd-Pagination-wrap-size--md"
+    >
+      <ul
+        class="cxd-Pagination cxd-Pagination--sm cxd-Pagination-item"
+      >
+        <li
+          class="cxd-Pagination-prev"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-left-arrow"
+              icon="left-arrow"
+            />
+          </span>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            1
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-ellipsis"
+        >
+          <a
+            role="button"
+          >
+            ...
+          </a>
+          <span
+            class="icon"
+          >
+            <icon-mock
+              classname="icon icon-arrow-double-left"
+              icon="arrow-double-left"
+            />
+          </span>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            16
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            17
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            18
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            19
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item is-active"
+        >
+          <a
+            role="button"
+          >
+            20
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            21
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            22
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            23
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-ellipsis"
+        >
+          <a
+            role="button"
+          >
+            ...
+          </a>
+          <span
+            class="icon"
+          >
+            <icon-mock
+              classname="icon icon-arrow-double-right"
+              icon="arrow-double-right"
+            />
+          </span>
+        </li>
+        <li
+          class="cxd-Pagination-pager-item"
+        >
+          <a
+            role="button"
+          >
+            100
+          </a>
+        </li>
+        <li
+          class="cxd-Pagination-next"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-right-arrow"
+              icon="right-arrow"
+            />
+          </span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:Pagination with showPerPage & perPageAvailable & showPageInput 1`] = `
+<div
+  aria-expanded="true"
+  aria-haspopup="listbox"
+  aria-owns="downshift-2-menu"
+  class="cxd-Select is-opened cxd-Pagination-perpage cxd-Pagination-item has-popover"
+  role="combobox"
+  tabindex="0"
+>
+  <div
+    class="cxd-Select-valueWrap"
+  >
+    <div
+      class="cxd-Select-placeholder"
+    >
+      请选择
+    </div>
+  </div>
+  <span
+    class="cxd-Select-arrow"
+  >
+    <icon-mock
+      classname="icon icon-right-arrow-bold"
+      icon="right-arrow-bold"
+    />
+  </span>
+  <div
+    class="cxd-PopOver cxd-Select-popover"
+    role="popover"
+    style="display: block; width: auto; left: 0px; top: 0px; visibility: hidden;"
+    theme="cxd"
+  >
+    <div
+      class="cxd-PopOver-overlay"
+    />
+    <div
+      class="cxd-Select-menu"
+    >
+      <div
+        aria-selected="false"
+        class="cxd-Select-option"
+        id="downshift-2-item-0"
+        role="option"
+      >
+        <span
+          class="cxd-Select-option-content"
+          title="2条/页"
+        >
+          2条/页
+        </span>
+      </div>
+      <div
+        aria-selected="false"
+        class="cxd-Select-option"
+        id="downshift-2-item-1"
+        role="option"
+      >
+        <span
+          class="cxd-Select-option-content"
+          title="11条/页"
+        >
+          11条/页
+        </span>
+      </div>
+      <div
+        aria-selected="false"
+        class="cxd-Select-option"
+        id="downshift-2-item-2"
+        role="option"
+      >
+        <span
+          class="cxd-Select-option-content"
+          title="37条/页"
+        >
+          37条/页
+        </span>
+      </div>
+      <div
+        aria-selected="false"
+        class="cxd-Select-option"
+        id="downshift-2-item-3"
+        role="option"
+      >
+        <span
+          class="cxd-Select-option-content"
+          title="101条/页"
+        >
+          101条/页
+        </span>
+      </div>
+      <div
+        aria-selected="false"
+        class="cxd-Select-option"
+        id="downshift-2-item-4"
+        role="option"
+      >
+        <span
+          class="cxd-Select-option-content"
+          title="555条/页"
+        >
+          555条/页
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Renderer:Pagination with simple mode 1`] = `
+<div>
+  <div
+    class="cxd-Service"
+  >
+    <div
+      class="cxd-Pagination-wrap cxd-Pagination-wrap-size--md cxd-Pagination-simple"
+    >
+      <ul
+        class="cxd-Pagination cxd-Pagination--sm cxd-Pagination-pager-items cxd-Pagination-item"
+      >
+        <li
+          class="cxd-Pagination-prev is-disabled"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-left-arrow"
+              icon="left-arrow"
+            />
+          </span>
+        </li>
+        <span
+          class="Pagination-simple-number"
+        >
+          1
+        </span>
+        <li
+          class="cxd-Pagination-next is-disabled"
+        >
+          <span>
+            <icon-mock
+              classname="icon icon-right-arrow"
+              icon="right-arrow"
+            />
+          </span>
+        </li>
+      </ul>
     </div>
   </div>
 </div>

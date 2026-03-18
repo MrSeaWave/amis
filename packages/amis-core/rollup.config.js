@@ -15,6 +15,7 @@ import {
   dependencies
 } from './package.json';
 import path from 'path';
+import fs from 'fs';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -22,37 +23,30 @@ const settings = {
   globals: {}
 };
 
-const external = id => {
-  const result = new RegExp(
-    `^(?:${Object.keys(dependencies)
-      .concat([
-        'react',
-        'react-dom',
-        'react-overlays',
-        'warning',
-        'tslib',
-        'dom-helpers',
-        '@restart/hooks',
-        'entities',
-        'linkify-it',
-        'markdown-it',
-        'prop-types',
-        'markdown-it-html5-media',
-        'mdurl',
-        'uc.micro'
-      ])
-      .map(value =>
-        value.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&').replace(/-/g, '\\x2d')
-      )
-      .join('|')})`
-  ).test(id);
+const pkgs = [];
+// 读取所有的node_modules目录，获取所有的包名
+[
+  path.join(__dirname, './node_modules'),
+  path.join(__dirname, '../../node_modules')
+].forEach(dir => {
+  if (fs.existsSync(dir)) {
+    fs.readdirSync(dir).forEach(item => {
+      if (item.startsWith('.')) {
+        return;
+      }
 
-  if (!result && ~id.indexOf('node_modules')) {
-    console.log(id);
+      if (item.startsWith('@')) {
+        fs.readdirSync(path.join(dir, item)).forEach(subItem => {
+          pkgs.push(item + '/' + subItem);
+        });
+      }
+
+      return pkgs.push(item);
+    });
   }
-
-  return result;
-};
+});
+const external = id =>
+  pkgs.some(pkg => id.startsWith(pkg) || ~id.indexOf(`node_modules/${pkg}`));
 const input = './src/index.tsx';
 
 /** 获取子包编译后的入口路径，需要使用相对路径 */
@@ -112,7 +106,8 @@ function transpileDynamicImportForCJS(options) {
 
       return {
         left: 'Promise.resolve().then(function() {return new Promise(function(fullfill) {require([',
-        right: '], function(mod) {fullfill(tslib.__importStar(mod))})})})'
+        right:
+          ', "tslib"], function(mod, tslib) {fullfill(tslib.__importStar(mod))})})})'
       };
 
       // return {
@@ -122,6 +117,37 @@ function transpileDynamicImportForCJS(options) {
       //     targetModuleId +
       //     '")))})})})'
       // };
+    }
+  };
+}
+
+// 参考：https://github.com/theKashey/jsx-compress-loader/blob/master/src/index.js
+function transpileReactCreateElement() {
+  return {
+    name: 'transpile-react-create-element',
+    enforce: 'post',
+    transform: (code, id) => {
+      if (
+        /\.(?:tsx|jsx|svg)$/.test(id) &&
+        code.indexOf('React.createElement') !== -1
+      ) {
+        const separator = '\n\n;';
+        const appendText =
+          `\n` +
+          `var __react_jsx__ = require('react');\n` +
+          `var _J$X_ = (__react_jsx__["default"] || __react_jsx__).createElement;\n` +
+          `var _J$F_ = (__react_jsx__["default"] || __react_jsx__).Fragment;\n`;
+
+        const newSource = code
+          .replace(/React\.createElement\(/g, '_J$X_(')
+          .replace(/React\.createElement\(/g, '_J$F_(');
+
+        code = [appendText, newSource].join(separator);
+      }
+
+      return {
+        code
+      };
     }
   };
 }
@@ -167,17 +193,34 @@ function getPlugins(format = 'esm') {
     }),
     replace({
       preventAssignment: true,
-      __buildVersion: version
+      __buildVersion: version,
+      __buildTime: () => new Date().toISOString()
     }),
     typescript(typeScriptOptions),
     commonjs({
       sourceMap: false
     }),
+    format === 'esm' ? null : transpileReactCreateElement(),
     license({
       banner: `
         ${name} v${version}
         Copyright 2018<%= moment().format('YYYY') > 2018 ? '-' + moment().format('YYYY') : null %> ${author}
       `
-    })
-  ];
+    }),
+    {
+      name: 'disable-treeshake',
+      transform(code, id) {
+        if (/\/src\/renderers\//.test(id)) {
+          // Disable tree shake for modules under `src/renderers`
+          return {
+            code,
+            map: null,
+            moduleSideEffects: 'no-treeshake'
+          };
+        }
+
+        return null;
+      }
+    }
+  ].filter(item => item);
 }

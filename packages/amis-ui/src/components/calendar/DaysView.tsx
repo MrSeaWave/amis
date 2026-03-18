@@ -13,15 +13,17 @@ import {
   LocaleProps,
   localeable,
   ClassNamesFn,
-  utils,
-  convertArrayValueToMoment,
-  isMobile
+  convertArrayValueToMoment
 } from 'amis-core';
+import type {RendererEnv, TestIdBuilder} from 'amis-core';
 import Picker from '../Picker';
 import {PickerOption} from '../PickerColumn';
 import {DateType} from './Calendar';
-import type {TimeScale} from './TimeView';
 import {Icon} from '../icons';
+
+import type {Moment} from 'moment';
+import type {TimeScale} from './TimeView';
+import type {ViewMode} from './Calendar';
 
 interface CustomDaysViewProps extends LocaleProps {
   classPrefix?: string;
@@ -31,14 +33,20 @@ interface CustomDaysViewProps extends LocaleProps {
   selectedDate: moment.Moment;
   minDate: moment.Moment;
   maxDate: moment.Moment;
-  useMobileUI: boolean;
+  mobileUI: boolean;
   embed: boolean;
   timeFormat: string;
   requiredConfirm?: boolean;
   isEndDate?: boolean;
   renderDay?: Function;
   onClose?: () => void;
-  onChange: (value: moment.Moment) => void;
+  onChange: (
+    value: moment.Moment,
+    viewMode?: Extract<ViewMode, 'time'>
+  ) => void;
+  onClick: (event: React.MouseEvent<any>) => void;
+  onMouseEnter: (event: React.MouseEvent<any>) => void;
+  onMouseLeave: (event: React.MouseEvent<any>) => void;
   onConfirm?: (value: number[], types: DateType[]) => void;
   setDateTimeState: (state: any) => void;
   showTime: () => void;
@@ -73,6 +81,7 @@ interface CustomDaysViewProps extends LocaleProps {
     content: any;
     className?: string;
   }>;
+  env?: RendererEnv;
   largeMode?: boolean;
   todayActiveStyle?: React.CSSProperties;
   onScheduleClick?: (scheduleData: any) => void;
@@ -80,6 +89,7 @@ interface CustomDaysViewProps extends LocaleProps {
   getColumns: (types: DateType[], dateBoundary: void) => any;
   getDateBoundary: (currentDate: moment.Moment) => any;
   timeConstraints?: any;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export class CustomDaysView extends React.Component<CustomDaysViewProps> {
@@ -183,7 +193,18 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
         classes.includes('rdtToday') ? {todayActiveStyle} : {}
       );
 
-      if (!isDisabled) (dayProps as any).onClick = this.updateSelectedDate;
+      if (!isDisabled) {
+        (dayProps as any).onClick = (event: React.MouseEvent<any>) => {
+          this.props.onClick(event);
+          this.updateSelectedDate(event);
+        };
+        (dayProps as any).onMouseEnter = (event: React.MouseEvent<any>) => {
+          this.props.onMouseEnter(event);
+        };
+        (dayProps as any).onMouseLeave = (event: React.MouseEvent<any>) => {
+          this.props.onMouseLeave(event);
+        };
+      }
 
       days.push(renderer(dayProps, currentDate, selected));
 
@@ -220,7 +241,7 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
     const dateBoundary = this.props.getDateBoundary(currentDate);
     const columns = this.props.getColumns(types, dateBoundary);
     this.state = {
-      columns,
+      columns: this.getColumnsWithUnit(columns),
       types,
       pickerValue: currentDate.toArray(),
       uniqueTag: new Date().valueOf()
@@ -233,12 +254,33 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
 
   componentDidMount() {
     const {timeFormat, selectedDate, viewDate, isEndDate} = this.props;
+    const date = selectedDate || (isEndDate ? viewDate.endOf('day') : viewDate);
+    this.setupTime(date, timeFormat, 'init');
+  }
+
+  componentDidUpdate(
+    prevProps: Readonly<CustomDaysViewProps>,
+    prevState: Readonly<{}>,
+    snapshot?: any
+  ): void {
+    const currentDate = this.props.selectedDate;
+
+    if (
+      moment.isMoment(currentDate) &&
+      currentDate.isValid() &&
+      !currentDate.isSame(prevProps.selectedDate)
+    ) {
+      const {timeFormat} = this.props;
+      this.setupTime(currentDate, timeFormat);
+    }
+  }
+
+  setupTime(date: Moment, timeFormat: string, mode?: 'init') {
     const formatMap = {
       hours: 'HH',
       minutes: 'mm',
       seconds: 'ss'
     };
-    const date = selectedDate || (isEndDate ? viewDate.endOf('day') : viewDate);
     timeFormat.split(':').forEach((format, i) => {
       const type = /h/i.test(format)
         ? 'hours'
@@ -252,10 +294,23 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
           type,
           parseInt(date.format(formatMap[type]), 10),
           i,
-          'init'
+          mode
         );
       }
     });
+  }
+
+  getColumnsWithUnit(columns: {options: PickerOption[]}[]) {
+    return this.props.locale === 'zh-CN' && columns.length === 3
+      ? columns.map((item, index) => {
+          item.options?.map((option: any) => {
+            option.text =
+              option.text + (index === 0 ? '年' : index === 1 ? '月' : '日');
+            return option;
+          });
+          return item;
+        })
+      : columns;
   }
 
   updateSelectedDate = (event: React.MouseEvent<any>) => {
@@ -294,6 +349,7 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
 
   showTime = () => {
     const {selectedDate, viewDate, timeFormat} = this.props;
+
     return (
       <div key="stb" className="rdtShowTime">
         {(selectedDate || viewDate || moment()).format(timeFormat)}
@@ -306,15 +362,16 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
     value: number
   ) => {
     const date = (this.props.selectedDate || this.props.viewDate).clone();
-    date[type](value);
 
+    date[type](value);
+    const updatedDate = date.clone();
     this.props.setDateTimeState({
-      viewDate: date.clone(),
-      selectedDate: date.clone()
+      viewDate: updatedDate,
+      selectedDate: updatedDate
     });
 
     if (!this.props.requiredConfirm) {
-      this.props.onChange(date);
+      this.props.onChange(date, 'time');
     }
   };
 
@@ -356,10 +413,19 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
     this.props.onClose && this.props.onClose();
   };
 
+  curfilterHtml = (content: any) => {
+    const {env} = this.props;
+    if (env?.filterHtml) {
+      return env.filterHtml(content);
+    }
+    return content;
+  };
+
   renderDay = (props: any, currentDate: moment.Moment) => {
     const {todayActiveStyle} = props; /** 只有today才会传入这个属性 */
-    const {classnames: cx, translate: __} = this.props;
-    const injectedProps = omit(props, ['todayActiveStyle']);
+    const {classnames: cx, translate: __, testIdBuilder} = this.props;
+    const key = props.key;
+    const injectedProps = omit(props, ['todayActiveStyle', 'key']);
     /** 某些情况下需要用inline style覆盖动态class，需要hack important的样式 */
     const todayDomRef = (node: HTMLSpanElement | null) => {
       if (todayActiveStyle && node) {
@@ -451,7 +517,7 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                 (item: any) => item.height === undefined
               );
             }
-            if (tempIndex > -1 && tempIndex !== i) {
+            if (tempIndex > -1 && tempIndex !== i && showSchedule[i]) {
               let temp = showSchedule[i];
               showSchedule[i] = showSchedule[tempIndex];
               showSchedule[tempIndex] = temp;
@@ -462,6 +528,11 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
           });
           // 最多展示3个
           showSchedule = showSchedule.slice(0, 3);
+
+          const locale = this.props.viewDate.localeData();
+          // 以周几作为一周的开始，0表示周日，1表示周一
+          const firstDayOfWeek = locale.firstDayOfWeek();
+
           const scheduleDiv = showSchedule.map((item: any, index: number) => {
             let diffDays = moment(item.endTime).diff(
               moment(item.startTime),
@@ -476,13 +547,13 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
             /* 前面的计算结果是闭区间，所以最终结果要补足1 */
             diffDays += 1;
 
-            const width =
-              item.width ||
-              Math.min(diffDays, 7 - moment(item.startTime).weekday());
+            const endWidth =
+              7 - (moment(item.startTime).weekday() - firstDayOfWeek + 1);
+            const width = item.width || Math.min(diffDays, endWidth) || 1;
 
             return (
               <div
-                key={injectedProps.key + 'content' + index}
+                key={key + 'content' + index}
                 className={cx(
                   'ScheduleCalendar-large-schedule-content',
                   item.className
@@ -493,14 +564,17 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                   this.props.onScheduleClick(scheduleData)
                 }
               >
-                <div className={cx('ScheduleCalendar-text-overflow')}>
-                  {item.content}
-                </div>
+                <div
+                  className={cx('ScheduleCalendar-text-overflow')}
+                  dangerouslySetInnerHTML={{
+                    __html: this.curfilterHtml(item.content)
+                  }}
+                ></div>
               </div>
             );
           });
           return (
-            <td {...injectedProps}>
+            <td key={key} {...injectedProps}>
               <div className={cx('ScheduleCalendar-large-day-wrap')}>
                 <div className={cx('ScheduleCalendar-large-schedule-header')}>
                   <span>{currentDate.date()}</span>
@@ -518,16 +592,16 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
 
         // 正常模式
         const ScheduleIcon = (
-          <span
+          <div
             className={cx('ScheduleCalendar-icon', schedule[0].className)}
             onClick={() =>
               this.props.onScheduleClick &&
               this.props.onScheduleClick(scheduleData)
             }
-          ></span>
+          ></div>
         );
         return (
-          <td {...injectedProps}>
+          <td key={key} {...injectedProps}>
             <span style={todayActiveStyle} ref={todayDomRef}>
               {currentDate.date()}
               {ScheduleIcon}
@@ -538,8 +612,12 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
     }
 
     return (
-      <td {...injectedProps}>
-        <span style={todayActiveStyle} ref={todayDomRef}>
+      <td key={key} {...injectedProps}>
+        <span
+          style={todayActiveStyle}
+          ref={todayDomRef}
+          {...testIdBuilder?.getChild(props.key)?.getTestId()}
+        >
           {currentDate.date()}
         </span>
       </td>
@@ -565,7 +643,8 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
       selectedDate,
       viewDate,
       isEndDate,
-      classnames: cx
+      classnames: cx,
+      testIdBuilder
     } = this.props;
 
     const date = selectedDate || (isEndDate ? viewDate.endOf('day') : viewDate);
@@ -613,6 +692,7 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                     )
                   )
               });
+              const itemTIB = testIdBuilder?.getChild(type);
               return (
                 <div
                   className={cx(
@@ -646,6 +726,7 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                               ? option.value === date.format(formatMap[type])
                               : option.value === options?.[0]?.value
                           })}
+                          {...itemTIB?.getChild(option.value)?.getTestId()}
                           onClick={() => {
                             this.setTime(type, parseInt(option.value, 10));
                             this.scrollToTop(
@@ -730,7 +811,9 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
       );
       const dateBoundary = this.props.getDateBoundary(selectDate);
       this.setState({
-        columns: this.props.getColumns(this.state.types, dateBoundary),
+        columns: this.getColumnsWithUnit(
+          this.props.getColumns(this.state.types, dateBoundary)
+        ),
         pickerValue: value
       });
     }
@@ -757,14 +840,15 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
   render() {
     const {
       viewDate: date,
-      useMobileUI,
+      mobileUI,
       embed,
       timeFormat,
-      classnames: cx
+      classnames: cx,
+      testIdBuilder
     } = this.props;
     const locale = date.localeData();
     const __ = this.props.translate;
-    if (isMobile() && useMobileUI && !embed) {
+    if (mobileUI && !embed) {
       return <div className="rdtYears">{this.renderPicker()}</div>;
     }
 
@@ -777,6 +861,7 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                 <a
                   className="rdtPrev"
                   onClick={this.props.subtractTime(1, 'years')}
+                  {...testIdBuilder?.getChild('prev-year').getTestId()}
                 >
                   <Icon
                     icon="right-double-arrow"
@@ -786,6 +871,7 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                 <a
                   className="rdtPrev"
                   onClick={this.props.subtractTime(1, 'months')}
+                  {...testIdBuilder?.getChild('prev-month').getTestId()}
                 >
                   <Icon
                     icon="right-arrow"
@@ -797,12 +883,14 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                   <a
                     className="rdtSwitch"
                     onClick={this.props.showView('years')}
+                    {...testIdBuilder?.getChild('switch-years').getTestId()}
                   >
                     {date.format(__('dateformat.year'))}
                   </a>
                   <a
                     className="rdtSwitch"
                     onClick={this.props.showView('months')}
+                    {...testIdBuilder?.getChild('switch-months').getTestId()}
                   >
                     {date.format(__('MMM'))}
                   </a>
@@ -811,10 +899,15 @@ export class CustomDaysView extends React.Component<CustomDaysViewProps> {
                 <a
                   className="rdtNext"
                   onClick={this.props.addTime(1, 'months')}
+                  {...testIdBuilder?.getChild('next-month').getTestId()}
                 >
                   <Icon icon="right-arrow" className="icon date-icon-arrow" />
                 </a>
-                <a className="rdtNext" onClick={this.props.addTime(1, 'years')}>
+                <a
+                  className="rdtNext"
+                  onClick={this.props.addTime(1, 'years')}
+                  {...testIdBuilder?.getChild('next-year').getTestId()}
+                >
                   <Icon
                     icon="right-double-arrow"
                     className="icon date-icon-arrow"

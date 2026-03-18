@@ -5,7 +5,12 @@
  */
 import React from 'react';
 import isInteger from 'lodash/isInteger';
-import {localeable, LocaleProps} from 'amis-core';
+import {
+  localeable,
+  LocaleProps,
+  resolveEventData,
+  TestIdBuilder
+} from 'amis-core';
 import {themeable, ThemeProps} from 'amis-core';
 import {autobind} from 'amis-core';
 import {Icon} from './icons';
@@ -18,6 +23,12 @@ export const enum PaginationWidget {
   PerPage = 'perpage',
   Total = 'total',
   Go = 'go'
+}
+
+export const enum KeyCode {
+  ENTER = 'Enter',
+  UP = 'ArrowUp',
+  DOWN = 'ArrowDown'
 }
 
 export interface BasicPaginationProps {
@@ -93,14 +104,39 @@ export interface BasicPaginationProps {
    */
   popOverContainerSelector?: string;
 
-  onPageChange?: (page: number, perPage?: number) => void;
+  /**
+   * 多页跳转页数
+   *
+   * @default 5
+   */
+  ellipsisPageGap?: number;
+
+  /**
+   * 组件尺寸
+   *
+   * @default 'md'
+   */
+  size?: string;
+
+  onPageChange?: (page: number, perPage?: number, dir?: string) => void;
+
+  /**
+   * 按钮类型
+   *
+   * @default 'icon'
+   */
+  buttonType?: string;
 }
 export interface PaginationProps
   extends BasicPaginationProps,
     ThemeProps,
-    LocaleProps {}
+    LocaleProps {
+  popOverContainer?: any;
+  testIdBuilder?: TestIdBuilder;
+}
 export interface PaginationState {
   pageNum: string;
+  internalPageNum: string;
   perPage: number;
 }
 export class Pagination extends React.Component<
@@ -113,11 +149,15 @@ export class Pagination extends React.Component<
     mode: 'normal' as MODE_TYPE,
     activePage: 1,
     perPage: 10,
-    perPageAvailable: [10, 20, 50, 100]
+    perPageAvailable: [10, 20, 50, 100],
+    ellipsisPageGap: 5,
+    size: 'md',
+    buttonType: 'icon'
   };
 
   state = {
     pageNum: '',
+    internalPageNum: '1',
     perPage: Number(this.props.perPage)
   };
 
@@ -137,13 +177,24 @@ export class Pagination extends React.Component<
     }
   }
 
-  handlePageNumChange(page: number, perPage?: number) {
+  componentWillReceiveProps(nextProps: PaginationProps) {
+    if (
+      // 原本作用在simple上的样式和部分方法变成了normal的，这里需要重置内部状态
+      this.props.mode !== 'simple' &&
+      nextProps.activePage !== Number(this.state.internalPageNum)
+    ) {
+      this.setState({internalPageNum: String(nextProps.activePage)});
+    }
+  }
+
+  async handlePageNumChange(page: number, perPage?: number, dir?: string) {
     const {disabled, onPageChange} = this.props;
+    const _page = isNaN(Number(page)) || Number(page) < 1 ? 1 : page;
 
     if (disabled) {
       return;
     }
-    onPageChange?.(isNaN(Number(page)) || Number(page) < 1 ? 1 : page, perPage);
+    onPageChange?.(_page, perPage, dir);
   }
 
   /**
@@ -152,7 +203,7 @@ export class Pagination extends React.Component<
    * @param page 页码
    */
   renderPageItem(page: number) {
-    const {classnames: cx, activePage} = this.props;
+    const {classnames: cx, activePage, testIdBuilder} = this.props;
     const {perPage} = this.state;
 
     return (
@@ -163,7 +214,12 @@ export class Pagination extends React.Component<
           'is-active': page === activePage
         })}
       >
-        <a role="button">{page}</a>
+        <a
+          role="button"
+          {...testIdBuilder?.getChild(`page-${page}`).getTestId()}
+        >
+          {page}
+        </a>
       </li>
     );
   }
@@ -175,10 +231,43 @@ export class Pagination extends React.Component<
    * @param page 页码
    */
   renderEllipsis(key: string) {
-    const {classnames: cx} = this.props;
+    const {
+      classnames: cx,
+      activePage,
+      ellipsisPageGap,
+      testIdBuilder
+    } = this.props;
+    const {perPage} = this.state;
+    const lastPage = this.getLastPage();
+    const gap: number =
+      isNaN(Number(ellipsisPageGap)) || Number(ellipsisPageGap) < 1
+        ? 5
+        : Number(ellipsisPageGap);
+    const isPrevEllipsis = key === 'prev-ellipsis';
+    const jumpContent = isPrevEllipsis ? (
+      <Icon icon="arrow-double-left" className="icon" />
+    ) : (
+      <Icon icon="arrow-double-right" className="icon" />
+    );
+    const jumpPage = isPrevEllipsis
+      ? Math.max(1, activePage - gap)
+      : Math.min(lastPage, activePage + gap);
+
     return (
-      <li key={key} className={cx('ellipsis')}>
+      <li
+        key={key}
+        className={cx('Pagination-ellipsis')}
+        onClick={(e: any) => {
+          return this.handlePageNumChange(
+            jumpPage,
+            perPage,
+            isPrevEllipsis ? 'backward' : 'forward'
+          );
+        }}
+        {...testIdBuilder?.getChild(key).getTestId()}
+      >
         <a role="button">...</a>
+        <span className="icon">{jumpContent}</span>
       </li>
     );
   }
@@ -224,9 +313,11 @@ export class Pagination extends React.Component<
   }
 
   getLastPage() {
-    const {total, perPage, lastPage, activePage, hasNext} = this.props;
+    const {total, lastPage, activePage, hasNext} = this.props;
+    const perPage = this.state.perPage;
+
     // 输入total，重新计算lastPage
-    if (total || total === 0) {
+    if (total && perPage) {
       return Math.ceil(total / (perPage as number));
     }
     if (lastPage) {
@@ -250,10 +341,57 @@ export class Pagination extends React.Component<
     this.setState({pageNum: value});
   }
 
+  /**
+   * 简洁模式input onChange/onKeyUp事件
+   *
+   * @param event
+   */
+  @autobind
+  handleSimpleKeyUp(
+    e:
+      | React.KeyboardEvent<HTMLInputElement>
+      | React.ChangeEvent<HTMLInputElement>
+  ) {
+    const lastPage = this.getLastPage();
+    const key = (e as React.KeyboardEvent<HTMLInputElement>).key;
+    let v: number = parseInt(e.currentTarget.value, 10);
+    // handle keyboard up and down events value
+    switch (key) {
+      case KeyCode.DOWN:
+        v = isNaN(v) || v < 2 ? 1 : v - 1;
+        break;
+      case KeyCode.UP:
+        v = v + 1;
+        break;
+      default:
+        break;
+    }
+    // validate inputvalue
+    if (/^\d+$/.test(String(v)) && v >= lastPage) {
+      v = lastPage;
+    }
+    this.setState({internalPageNum: String(v)});
+    // handle empty val
+    if (!v) {
+      this.setState({internalPageNum: ''});
+      return;
+    }
+    if (([KeyCode.UP, KeyCode.DOWN, KeyCode.ENTER] as string[]).includes(key)) {
+      this.handlePageNumChange(v, this.props.perPage);
+    }
+  }
+
+  /**
+   * 简洁模式input onBlur事件
+   */
+  @autobind
+  handleSimpleBlur() {
+    this.setState({internalPageNum: String(this.props.activePage)});
+  }
+
   render() {
     const {
       layout,
-      maxButtons,
       mode,
       activePage,
       total,
@@ -262,24 +400,60 @@ export class Pagination extends React.Component<
       classnames: cx,
       showPageInput,
       className,
+      style,
       disabled,
       hasNext,
+      popOverContainer,
       popOverContainerSelector,
-      translate: __
+      mobileUI,
+      size,
+      translate: __,
+      buttonType,
+      testIdBuilder
     } = this.props;
-    const {pageNum, perPage} = this.state;
+    let maxButtons = this.props.maxButtons;
+    const {pageNum, perPage, internalPageNum} = this.state;
     const lastPage = this.getLastPage();
 
-    // 简易模式
-    if (mode === 'simple') {
+    let basePager: React.ReactNode = null;
+    // 移动端复用简洁模式的样式
+    if ((mode !== 'simple' && mobileUI) || mode === 'simple') {
+      basePager = mobileUI ? (
+        // 移动端简洁模式不需要中间的数字
+        mode === 'simple' ? null : (
+          <li className={cx('Pagination-simplego')} key="simple-go">
+            <input
+              className={cx('Pagination-simplego-input')}
+              key="simple-input"
+              type="text"
+              disabled={disabled}
+              onChange={this.handleSimpleKeyUp}
+              onKeyUp={this.handleSimpleKeyUp}
+              onBlur={this.handleSimpleBlur}
+              value={internalPageNum}
+              {...testIdBuilder?.getChild('simple-input').getTestId()}
+            />
+            /
+            <span className={cx('Pagination-simplego-right')} key="go-right">
+              {lastPage}
+            </span>
+          </li>
+        )
+      ) : (
+        <span className="Pagination-simple-number">{activePage}</span>
+      );
+
       return (
         <div
           className={cx(
             'Pagination-wrap',
+            `Pagination-wrap-size--${size}`,
             'Pagination-simple',
             {disabled: disabled},
             className
           )}
+          style={style}
+          {...testIdBuilder?.getTestId()}
         >
           <ul
             key="pager-items"
@@ -298,28 +472,46 @@ export class Pagination extends React.Component<
                 if (activePage < 2) {
                   return e.preventDefault();
                 }
-                return this.handlePageNumChange(activePage - 1);
+
+                return this.handlePageNumChange(
+                  activePage - 1,
+                  undefined,
+                  'backward'
+                );
               }}
               key="prev"
             >
-              <span>
-                <Icon icon="left-arrow" className="icon" />
+              <span {...testIdBuilder?.getChild(`go-prev`).getTestId()}>
+                {buttonType === 'icon' ? (
+                  <Icon icon="left-arrow" className="icon" />
+                ) : buttonType === 'text' ? (
+                  '上一页'
+                ) : null}
               </span>
             </li>
+            {basePager}
             <li
               className={cx('Pagination-next', {
-                'is-disabled': !hasNext
+                'is-disabled': activePage >= lastPage && !hasNext // 到达最后一页并且没有配置hasNext属性时，禁止点击下一页按钮
               })}
               onClick={(e: any) => {
-                if (!hasNext) {
+                if (activePage === lastPage && !hasNext) {
                   return e.preventDefault();
                 }
-                return this.handlePageNumChange(activePage + 1, perPage);
+                return this.handlePageNumChange(
+                  activePage + 1,
+                  perPage,
+                  'forward'
+                );
               }}
               key="next"
             >
-              <span>
-                <Icon icon="right-arrow" className="icon" />
+              <span {...testIdBuilder?.getChild(`go-next`).getTestId()}>
+                {buttonType === 'icon' ? (
+                  <Icon icon="right-arrow" className="icon" />
+                ) : buttonType === 'text' ? (
+                  '下一页'
+                ) : null}
               </span>
             </li>
           </ul>
@@ -395,7 +587,6 @@ export class Pagination extends React.Component<
       pageButtons.push(this.renderEllipsis('next-ellipsis'));
       pageButtons.push(this.renderPageItem(lastPage));
     }
-
     pageButtons.unshift(
       <li
         className={cx('Pagination-prev', {
@@ -409,8 +600,12 @@ export class Pagination extends React.Component<
         }}
         key="prev"
       >
-        <span>
-          <Icon icon="left-arrow" className="icon" />
+        <span {...testIdBuilder?.getChild('go-prev').getTestId()}>
+          {buttonType === 'icon' ? (
+            <Icon icon="left-arrow" className="icon" />
+          ) : buttonType === 'text' ? (
+            '上一页'
+          ) : null}
         </span>
       </li>
     );
@@ -428,13 +623,25 @@ export class Pagination extends React.Component<
         }}
         key="next"
       >
-        <span>
-          <Icon icon="right-arrow" className="icon" />
+        <span {...testIdBuilder?.getChild('go-next').getTestId()}>
+          {buttonType === 'icon' ? (
+            <Icon icon="right-arrow" className="icon" />
+          ) : buttonType === 'text' ? (
+            '下一页'
+          ) : null}
         </span>
       </li>
     );
 
-    const go = (
+    if (mobileUI) {
+      pageButtons = [
+        pageButtons[0],
+        // this.renderPageItem(activePage),
+        pageButtons[pageButtons.length - 1]
+      ];
+    }
+
+    const go = mobileUI ? null : (
       <div className={cx('Pagination-inputGroup Pagination-item')} key="go">
         <span className={cx('Pagination-inputGroup-left')} key="go-left">
           {__('Pagination.goto')}
@@ -455,6 +662,7 @@ export class Pagination extends React.Component<
             this.handlePageNumChange(v, perPage);
           }}
           value={pageNum}
+          {...testIdBuilder?.getChild('go-input').getTestId()}
         />
         <span
           className={cx('Pagination-inputGroup-right')}
@@ -466,6 +674,7 @@ export class Pagination extends React.Component<
             this.setState({pageNum: ''});
             this.handlePageNumChange(+pageNum, perPage);
           }}
+          {...testIdBuilder?.getChild('go').getTestId()}
         >
           {__('Pagination.go')}
         </span>
@@ -474,14 +683,15 @@ export class Pagination extends React.Component<
     const selection = (perPageAvailable as Array<number>)
       .filter(v => !!v)
       .map(v => ({label: __('Pagination.select', {count: v}), value: v}));
-    const perPageEle = (
+    const perPageEle = mobileUI ? null : (
       <Select
         key="perpage"
         className={cx('Pagination-perpage', 'Pagination-item')}
         clearable={false}
         disabled={disabled}
         value={perPage}
-        options={selection}
+        options={selection || []}
+        popOverContainer={popOverContainer}
         popOverContainerSelector={popOverContainerSelector}
         onChange={(p: any) => {
           this.setState({
@@ -490,18 +700,29 @@ export class Pagination extends React.Component<
           });
           this.handlePageNumChange(1, p.value);
         }}
+        {...testIdBuilder?.getChild('perpage').getTestId()}
       />
     );
+
     // total或者lastpage不存在，不渲染总数
-    const totalPage = !(total || lastPage) ? null : (
-      <div className={cx('Pagination-total Pagination-item')} key="total">
-        {total || total === 0
-          ? __('Pagination.totalCount', {total})
-          : __('Pagination.totalPage', {lastPage})}
-      </div>
-    );
+    const totalPage =
+      !(total || lastPage) || mobileUI ? null : (
+        <div className={cx('Pagination-total Pagination-item')} key="total">
+          {total || total === 0
+            ? __('Pagination.totalCount', {total})
+            : __('Pagination.totalPage', {lastPage})}
+        </div>
+      );
     return (
-      <div className={cx('Pagination-wrap', {disabled: disabled}, className)}>
+      <div
+        className={cx(
+          'Pagination-wrap',
+          `Pagination-wrap-size--${size}`,
+          {disabled: disabled},
+          className
+        )}
+        {...testIdBuilder?.getTestId()}
+      >
         {layoutList.map(layoutItem => {
           if (layoutItem === PaginationWidget.Pager) {
             return (

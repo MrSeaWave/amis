@@ -1,3 +1,4 @@
+import moment from 'moment';
 import {parse} from '../src/index';
 
 test('parser:simple', () => {
@@ -35,6 +36,12 @@ test('parser:template', () => {
 test('parser:string', () => {
   expect(
     parse('"string literall, escape \\""', {
+      evalMode: true
+    })
+  ).toMatchSnapshot();
+
+  expect(
+    parse('"string literall, escape \\" \\\\ \\/ \\b \\f \\n \\r \\t"', {
       evalMode: true
     })
   ).toMatchSnapshot();
@@ -120,8 +127,12 @@ test('parser:filter', () => {
 test('parser:filter-escape', () => {
   expect(
     parse('\\$abc is ${abc | date: YYYY-MM-DD HH\\:mm\\:ss}', {
-      evalMode: false
-    })
+      evalMode: false,
+      filters: {
+        date: (input: any, format = 'LLL', inputFormat = 'X') =>
+          moment(input, inputFormat).format(format)
+      }
+    } as any)
   ).toMatchSnapshot();
 });
 

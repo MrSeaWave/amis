@@ -12,22 +12,27 @@ export interface CollapseItem {
 }
 
 import {ClassNamesFn, themeable, autobind} from 'amis-core';
-import type {SchemaNode} from 'amis-core';
+import type {SchemaNode, ThemeProps} from 'amis-core';
 import isEqual from 'lodash/isEqual';
 
-export interface CollapseGroupProps {
+export interface CollapseGroupProps extends ThemeProps {
   defaultActiveKey?: Array<string | number | never> | string | number;
   accordion?: boolean;
   expandIcon?: SchemaNode;
   expandIconPosition?: 'left' | 'right';
   body?: Array<React.ReactElement>;
   className?: string;
-  classnames: ClassNamesFn;
-  classPrefix: string;
+  style?: any;
+  children?: React.ReactNode | Array<React.ReactNode>;
+  onCollapseChange?: (
+    activeKeys: Array<string | number>,
+    collapseId: string | number,
+    collapsed: boolean
+  ) => void;
 }
 
 export interface CollapseGroupState {
-  activeKey: Array<string | number | never>;
+  activeKeys: Array<string | number | never>;
 }
 
 class CollapseGroup extends React.Component<
@@ -58,7 +63,7 @@ class CollapseGroup extends React.Component<
   updateActiveKey(propsActiveKey: any, isInit?: boolean) {
     const props = this.props;
     let curActiveKey = propsActiveKey;
-    
+
     if (!Array.isArray(curActiveKey)) {
       curActiveKey = curActiveKey ? [curActiveKey] : [];
     }
@@ -69,38 +74,42 @@ class CollapseGroup extends React.Component<
 
     if (isInit) {
       this.state = {
-        activeKey: curActiveKey.map((key: number | string) => String(key))
+        activeKeys: curActiveKey.map((key: number | string) => String(key))
       };
     } else {
       this.setState({
-        activeKey: curActiveKey.map((key: number | string) => String(key))
+        activeKeys: curActiveKey.map((key: number | string) => String(key))
       });
     }
   }
 
   collapseChange(collapseId: string, collapsed: boolean) {
-    let activeKey = this.state.activeKey.concat();
-    if (!collapsed) {
-      // 开启状态
+    let activeKeys = this.state.activeKeys.concat();
+    if (collapsed) {
+      // 设置成折叠状态
       if (this.props.accordion) {
-        activeKey = [];
+        activeKeys = [];
       } else {
-        for (let i = 0; i < activeKey.length; i++) {
-          if (activeKey[i] === collapseId) {
-            activeKey.splice(i, 1); // 剔除开启状态
-            break;
-          }
+        const activeKeyIndex = activeKeys.indexOf(collapseId);
+        if (activeKeyIndex !== -1) {
+          activeKeys.splice(activeKeyIndex, 1); // 剔除开启状态
         }
       }
     } else {
+      // 展开折叠器
       if (this.props.accordion) {
-        activeKey = [collapseId as string];
-      } else {
-        activeKey.push(collapseId as string);
+        activeKeys = [collapseId as string];
+      } else if (activeKeys.indexOf(collapseId) === -1) {
+        activeKeys.push(collapseId as string);
       }
     }
+    this.props.onCollapseChange?.(
+      activeKeys,
+      collapseId,
+      activeKeys.indexOf(collapseId) === -1
+    );
     this.setState({
-      activeKey
+      activeKeys
     });
   }
 
@@ -114,7 +123,7 @@ class CollapseGroup extends React.Component<
 
       const collapseId = props.propKey || String(index);
       // 判断是否折叠
-      const collapsed = this.state.activeKey.indexOf(collapseId) === -1;
+      const collapsed = this.state.activeKeys.indexOf(collapseId) === -1;
 
       return React.cloneElement(child as any, {
         ...props,
@@ -123,7 +132,8 @@ class CollapseGroup extends React.Component<
         collapsed,
         expandIcon: this.props.expandIcon,
         propsUpdate: true,
-        onCollapse: () => this.collapseChange(collapseId, collapsed)
+        onCollapse: (collapsed: boolean) =>
+          this.collapseChange(collapseId, collapsed)
       });
     });
   };
@@ -132,8 +142,10 @@ class CollapseGroup extends React.Component<
     const {
       classnames: cx,
       className,
+      style,
       expandIconPosition,
-      children
+      children,
+      mobileUI
     } = this.props;
 
     return (
@@ -143,8 +155,13 @@ class CollapseGroup extends React.Component<
           {
             'icon-position-right': expandIconPosition === 'right'
           },
+          {
+            'is-mobile': mobileUI
+          },
           className
         )}
+        style={style}
+        data-role="container"
       >
         {this.getItems(children)}
       </div>

@@ -2,28 +2,39 @@ import React from 'react';
 import {
   OptionsControl,
   OptionsControlProps,
-  FormOptionsControl
+  FormOptionsControl,
+  FormOptionsControlSelf,
+  FormBaseControl,
+  BaseSchemaWithoutType,
+  FormBaseControlWithoutSize,
+  filter,
+  getVariable,
+  AMISFormItemWithOptions
 } from 'amis-core';
-import type {Option} from 'amis-core';
-import {ActionObject} from 'amis-core';
+import {Option, TestIdBuilder} from 'amis-core';
+import {ActionObject, isObject} from 'amis-core';
+import type {BadgeObject} from 'amis-ui';
 import {getLevelFromClassName, autobind, isEmpty} from 'amis-core';
-import {ButtonGroupSchema} from '../ButtonGroup';
+import {AMISButtonGroupSchemaBase} from '../ButtonGroup';
 import {supportStatic} from './StaticHoc';
 
 /**
  * 按钮组控件。
- * 文档：https://baidu.gitee.io/amis/docs/components/form/button-group
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/button-group
  */
-export interface ButtonGroupControlSchema
-  extends Omit<ButtonGroupSchema, 'type'>,
-    Omit<FormOptionsControl, 'size'> {
+/**
+ * 按钮组选择器表单项，用于在表单中通过按钮组样式选择单个或多个选项。
+ */
+export interface AMISButtonGroupSelectSchema
+  extends AMISFormItemWithOptions,
+    AMISButtonGroupSchemaBase {
   type: 'button-group-select';
 }
 
 export interface ButtonGroupProps
   extends OptionsControlProps,
     Omit<
-      ButtonGroupControlSchema,
+      AMISButtonGroupSelectSchema,
       | 'size'
       | 'source'
       | 'type'
@@ -33,6 +44,7 @@ export interface ButtonGroupProps
       | 'btnClassName'
     > {
   options: Array<Option>;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export default class ButtonGroupControl extends React.Component<
@@ -47,13 +59,15 @@ export default class ButtonGroupControl extends React.Component<
   };
 
   doAction(action: ActionObject, data: object, throwErrors: boolean) {
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name} = this.props;
     const actionType = action?.actionType as string;
 
     if (actionType === 'clear') {
       onChange('');
     } else if (actionType === 'reset') {
-      onChange(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange(pristineVal ?? '');
     }
   }
 
@@ -63,9 +77,20 @@ export default class ButtonGroupControl extends React.Component<
     onToggle(option);
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     const reload = this.props.reloadOptions;
-    reload && reload();
+    reload && reload(subpath, query);
+  }
+
+  getBadgeConfig(config: BadgeObject, item: Option) {
+    return config
+      ? item?.badge &&
+        (typeof item.badge === 'string' || typeof item.badge === 'number')
+        ? {...config, text: item.badge}
+        : item?.badge && isObject(item.badge)
+        ? {...config, ...item.badge}
+        : null
+      : item.badge;
   }
 
   @supportStatic()
@@ -75,6 +100,7 @@ export default class ButtonGroupControl extends React.Component<
       classPrefix: ns,
       classnames: cx,
       className,
+      style,
       disabled,
       options,
       value,
@@ -88,6 +114,8 @@ export default class ButtonGroupControl extends React.Component<
       block,
       vertical,
       tiled,
+      badge,
+      testIdBuilder,
       translate: __
     } = props;
 
@@ -102,21 +130,30 @@ export default class ButtonGroupControl extends React.Component<
     if (options && options.length) {
       body = options.map((option, key) => {
         const active = !!~selectedOptions.indexOf(option);
+        const optionBadge = this.getBadgeConfig(badge, option);
+
         return render(
           `option/${key}`,
           {
             label: option[labelField || 'label'],
             icon: option.icon,
             size: option.size || size,
+            badge: optionBadge,
             type: 'button',
             block: block
           },
           {
             key: key,
-            active,
             level: (active ? btnActiveLevel : '') || option.level || btnLevel,
-            className: cx(option.className, btnClassName),
+            className: cx(
+              option.className,
+              btnClassName,
+              active && 'ButtonGroup-button--active'
+            ),
             disabled: option.disabled || disabled,
+            testIdBuilder: testIdBuilder?.getChild(
+              `item-${option[labelField || 'label'] || key}`
+            ),
             onClick: (e: React.UIEvent<any>) => {
               if (disabled) {
                 return;
@@ -128,8 +165,9 @@ export default class ButtonGroupControl extends React.Component<
         );
       });
     } else if (Array.isArray(buttons)) {
-      body = buttons.map((button, key) =>
-        render(
+      body = buttons.map((button, key) => {
+        const buttonBadge = this.getBadgeConfig(badge, button);
+        return render(
           `button/${key}`,
           {
             size: size,
@@ -137,14 +175,15 @@ export default class ButtonGroupControl extends React.Component<
             activeLevel: btnActiveLevel,
             level: btnLevel,
             disabled,
-            ...button
+            ...button,
+            badge: buttonBadge
           },
           {
             key,
             className: cx(button.className, btnClassName)
           }
-        )
-      );
+        );
+      });
     }
 
     return (

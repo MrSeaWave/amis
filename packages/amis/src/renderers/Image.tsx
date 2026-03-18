@@ -1,11 +1,23 @@
 import React from 'react';
-import {Renderer, RendererProps} from 'amis-core';
+import {
+  Renderer,
+  RendererProps,
+  CustomStyle,
+  setThemeClassName,
+  ActionObject,
+  IScopedContext,
+  ScopedContext,
+  createObject,
+  resolveVariableAndFilter,
+  isPureVariable,
+  AMISSchemaBase
+} from 'amis-core';
 import {filter} from 'amis-core';
 import {themeable, ThemeProps} from 'amis-core';
 import {autobind, getPropValue} from 'amis-core';
 import {Icon} from 'amis-ui';
 import {LocaleProps, localeable} from 'amis-core';
-import {BaseSchema, SchemaClassName, SchemaTpl, SchemaUrlPath} from '../Schema';
+import {BaseSchema, AMISClassName, SchemaTpl, SchemaUrlPath} from '../Schema';
 import {handleAction} from 'amis-core';
 import type {
   ImageAction,
@@ -13,20 +25,38 @@ import type {
 } from 'amis-ui/lib/components/ImageGallery';
 
 export interface ImageToolbarAction {
+  /**
+   * 操作按钮键名
+   */
   key: keyof typeof ImageActionKey;
+
+  /**
+   * 操作按钮标签文本
+   */
   label?: string;
+
+  /**
+   * 操作按钮图标
+   */
   icon?: string;
+
+  /**
+   * 操作按钮图标CSS类名
+   */
   iconClassName?: string;
+
+  /**
+   * 是否禁用操作按钮
+   */
   disabled?: boolean;
 }
 
 /**
- * 图片展示控件。
- * 文档：https://baidu.gitee.io/amis/docs/components/image
+ * 图片展示组件，用于显示图片内容。支持点击放大、工具栏操作、懒加载等功能。
  */
-export interface ImageSchema extends BaseSchema {
+export interface AMISImageSchema extends AMISSchemaBase {
   /**
-   * 指定为图片展示类型
+   * 指定为 image 组件
    */
   type: 'image' | 'static-image';
 
@@ -41,7 +71,7 @@ export interface ImageSchema extends BaseSchema {
   title?: SchemaTpl;
 
   /**
-   * 关联字段名，也可以直接配置 src
+   * 关联字段名
    */
   name?: string;
 
@@ -51,24 +81,24 @@ export interface ImageSchema extends BaseSchema {
   imageCaption?: SchemaTpl;
 
   /**
-   * 图片地址，如果配置了 name，这个属性不用配置。
+   * 图片地址
    */
   src?: SchemaUrlPath;
 
   /**
-   * 大图地址，不设置用 src
+   * 大图地址
    */
   originalSrc?: SchemaUrlPath;
 
   /**
-   * 是否启动放大功能。
+   * 是否启用放大功能
    */
   enlargeAble?: boolean;
 
   /**
-   * 是否显示尺寸。
+   * 放大时是否显示图片集
    */
-  // showDimensions?: boolean;
+  enlargeWithGallary?: boolean;
 
   /**
    * 图片无法显示时的替换文本
@@ -76,7 +106,7 @@ export interface ImageSchema extends BaseSchema {
   alt?: string;
 
   /**
-   * 高度
+   * 图片高度
    */
   height?: number;
 
@@ -86,28 +116,33 @@ export interface ImageSchema extends BaseSchema {
   width?: number;
 
   /**
-   * 外层 css 类名
+   * 外层 CSS 类名
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
 
-  /** 组件内层 css 类名 */
-  innerClassName?: SchemaClassName;
-
-  /**
-   * 图片 css 类名
-   */
-  imageClassName?: SchemaClassName;
+  /** 组件内层 CSS 类名 */
+  innerClassName?: AMISClassName;
 
   /**
-   * 图片缩略图外层 css 类名
+   * 图片 CSS 类名
    */
-  thumbClassName?: SchemaClassName;
+  imageClassName?: AMISClassName;
+
+  /**
+   * 图片缩略图外层 CSS 类名
+   */
+  thumbClassName?: AMISClassName;
+
+  /**
+   * 放大详情图 CSS 类名
+   */
+  imageGallaryClassName?: AMISClassName;
 
   /** 图片说明文字 */
   caption?: SchemaTpl;
 
   /**
-   * 图片展示模式，默认为缩略图模式、可以配置成原图模式
+   * 图片展示模式，默认为缩略图模式、配置成原图模式
    */
   imageMode?: 'thumb' | 'original';
 
@@ -145,16 +180,53 @@ export interface ImageSchema extends BaseSchema {
    * 工具栏配置
    */
   toolbarActions?: ImageToolbarAction[];
+  /**
+   * 鼠标悬浮时的展示状态（对应AIpage的文字6，9，10不存在）
+   * */
+  hoverMode?:
+    | 'hover-slide'
+    | 'pull-top'
+    | 'scale-center'
+    | 'scale-top'
+    | 'text-style-1'
+    | 'text-style-2'
+    | 'text-style-3'
+    | 'text-style-4'
+    | 'text-style-5'
+    | 'text-style-6'
+    | 'text-style-7';
+  /**
+   * 图集组件传入的排序方式
+   * */
+  sortType?: string;
+  /**
+   * 描述文字样式
+   * */
+  fontStyle?: {
+    fontSize?: string;
+    fontWeight?: string;
+    fontFamily?: string;
+    color?: string;
+  };
+  /**
+   * 蒙层颜色
+   * */
+  maskColor?: string;
 }
 
 export interface ImageThumbProps
   extends LocaleProps,
     ThemeProps,
-    Omit<ImageSchema, 'type' | 'className' | 'innerClassName'> {
+    Omit<AMISImageSchema, 'type' | 'className' | 'innerClassName'> {
   onEnlarge?: (info: ImageThumbProps) => void;
   index?: number;
   onLoad?: React.EventHandler<any>;
   overlays?: JSX.Element;
+  imageControlClassName?: string;
+  imageContentClassName?: string;
+  titleControlClassName?: string;
+  desControlClassName?: string;
+  iconControlClassName?: string;
 }
 
 interface ImageThumbState {
@@ -207,6 +279,7 @@ export class ImageThumb extends React.Component<
     const {
       classnames: cx,
       className,
+      style,
       imageClassName,
       thumbClassName,
       thumbMode,
@@ -224,7 +297,12 @@ export class ImageThumb extends React.Component<
       enlargeAble,
       translate: __,
       overlays,
-      imageMode
+      imageMode,
+      titleControlClassName,
+      iconControlClassName,
+      imageControlClassName,
+      imageContentClassName,
+      desControlClassName
     } = this.props;
 
     const {imageLoading} = this.state;
@@ -238,6 +316,9 @@ export class ImageThumb extends React.Component<
             alt={alt}
           />
         ) : null}
+        <div className="mask" style={{background: this.props.maskColor}}>
+          <span>{title}</span>
+        </div>
         <img
           onLoad={this.handleImgLoaded}
           onError={this.handleImgError}
@@ -259,8 +340,13 @@ export class ImageThumb extends React.Component<
               data-position="bottom"
               target="_blank"
               onClick={this.handleEnlarge}
+              className={cx('Image-overlay-view-icon', iconControlClassName)}
             >
-              <Icon icon="view" className="icon" />
+              <Icon
+                icon="view"
+                className="icon"
+                iconContent="Image-view-icon"
+              />
             </a>
           ) : null}
           {overlays}
@@ -272,15 +358,19 @@ export class ImageThumb extends React.Component<
         className={cx(
           'Image',
           imageMode === 'original' ? 'Image--original' : 'Image--thumb',
-          className
+          className,
+          imageControlClassName
         )}
+        style={href ? undefined : style} // 避免重复设置style
       >
         {imageMode === 'original' ? (
           <div
-            className={cx(
+            className={`
+            ${cx(
               'Image-origin',
-              thumbMode ? `Image-origin--${thumbMode}` : ''
-            )}
+              thumbMode ? `Image-origin--${thumbMode}` : '',
+              imageContentClassName
+            )} ${this.props.hoverMode} Img-container`}
             style={{height: height, width: width}}
           >
             {imageContent}
@@ -295,7 +385,10 @@ export class ImageThumb extends React.Component<
                 thumbMode ? `Image-thumb--${thumbMode}` : '',
                 thumbRatio
                   ? `Image-thumb--${thumbRatio.replace(/:/g, '-')}`
-                  : ''
+                  : '',
+                imageContentClassName,
+                'Img-container',
+                this.props.hoverMode
               )}
               style={{height: height, width: width}}
             >
@@ -305,15 +398,21 @@ export class ImageThumb extends React.Component<
           </div>
         )}
 
-        {title || caption ? (
+        {(title || caption) && !this.props.hoverMode && !this.props.sortType ? (
           <div key="caption" className={cx('Image-info')}>
             {title ? (
-              <div className={cx('Image-title')} title={title}>
+              <div
+                className={cx('Image-title', titleControlClassName)}
+                title={title}
+              >
                 {title}
               </div>
             ) : null}
             {caption ? (
-              <div className={cx('Image-caption')} title={caption}>
+              <div
+                className={cx('Image-caption', desControlClassName)}
+                title={caption}
+              >
                 {caption}
               </div>
             ) : null}
@@ -328,6 +427,7 @@ export class ImageThumb extends React.Component<
           href={href}
           target={htmlTarget || (blank ? '_blank' : '_self')}
           className={cx('Link', className)}
+          style={style}
           title={title}
         >
           {image}
@@ -338,6 +438,7 @@ export class ImageThumb extends React.Component<
     return image;
   }
 }
+
 const ThemedImageThumb = themeable(localeable(ImageThumb));
 export default ThemedImageThumb;
 
@@ -357,8 +458,11 @@ export interface ImageFieldProps extends RendererProps {
   thumbRatio: '1:1' | '4:3' | '16:9';
   originalSrc?: string; // 原图
   enlargeAble?: boolean;
+  enlargeWithGallary?: boolean;
   showToolbar?: boolean;
   toolbarActions?: ImageAction[];
+  maxScale?: number;
+  minScale?: number;
   onImageEnlarge?: (
     info: {
       src: string;
@@ -368,21 +472,39 @@ export interface ImageFieldProps extends RendererProps {
       thumbMode?: 'w-full' | 'h-full' | 'contain' | 'cover';
       thumbRatio?: '1:1' | '4:3' | '16:9';
       showToolbar?: boolean;
+      imageGallaryClassName?: string;
       toolbarActions?: ImageAction[];
+      enlargeWithGallary?: boolean;
     },
     target: any
   ) => void;
+  imageGallaryClassName?: string;
+  onClick?:
+    | ((e: React.MouseEvent<any>, props: any) => void)
+    | string
+    | Function
+    | null;
 }
 
-export class ImageField extends React.Component<ImageFieldProps, object> {
+interface ImageFieldState {
+  scale: number; // 放大倍率
+}
+
+export class ImageField extends React.Component<
+  ImageFieldProps,
+  ImageFieldState
+> {
   static defaultProps: Pick<
     ImageFieldProps,
-    'defaultImage' | 'thumbMode' | 'thumbRatio' | 'placeholder'
+    'defaultImage' | 'thumbMode' | 'thumbRatio'
   > = {
     defaultImage: imagePlaceholder,
     thumbMode: 'contain',
-    thumbRatio: '1:1',
-    placeholder: '-'
+    thumbRatio: '1:1'
+  };
+
+  state: ImageFieldState = {
+    scale: 1
   };
 
   @autobind
@@ -399,7 +521,11 @@ export class ImageField extends React.Component<ImageFieldProps, object> {
       enlargeTitle,
       enlargeCaption,
       showToolbar,
-      toolbarActions
+      toolbarActions,
+      imageGallaryClassName,
+      id,
+      themeCss,
+      enlargeWithGallary
     } = this.props;
 
     onImageEnlarge &&
@@ -412,23 +538,96 @@ export class ImageField extends React.Component<ImageFieldProps, object> {
           thumbMode,
           thumbRatio,
           showToolbar,
-          toolbarActions
+          toolbarActions,
+          enlargeWithGallary,
+          imageGallaryClassName: `${imageGallaryClassName} ${setThemeClassName({
+            ...this.props,
+            name: 'imageGallaryClassName',
+            id,
+            themeCss
+          })} ${setThemeClassName({
+            ...this.props,
+            name: 'galleryControlClassName',
+            id,
+            themeCss
+          })}`
         },
         this.props
       );
   }
 
   @autobind
-  handleClick(e: React.MouseEvent<HTMLElement>) {
+  async handleClick(e: React.MouseEvent<HTMLElement>) {
+    const {dispatchEvent, data} = this.props;
     const clickAction = this.props.clickAction;
+    const rendererEvent = await dispatchEvent(
+      e,
+      createObject(data, {
+        nativeEvent: e
+      })
+    );
+
+    if (rendererEvent?.prevented) {
+      return;
+    }
     if (clickAction) {
       handleAction(e, clickAction, this.props);
+    }
+  }
+
+  @autobind
+  handleMouseEnter(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
+
+  @autobind
+  handleMouseLeave(e: React.MouseEvent<any>) {
+    const {dispatchEvent, data} = this.props;
+    dispatchEvent(e, data);
+  }
+
+  handleSelfAction(actionType: string, action: ActionObject) {
+    let {data, maxScale = 200, minScale = 50} = this.props;
+    let {scale = 50} = action.args;
+    if (actionType === 'zoom') {
+      if (isPureVariable(maxScale)) {
+        maxScale = isNaN(
+          resolveVariableAndFilter(maxScale, createObject(action.data, data))
+        )
+          ? 200
+          : resolveVariableAndFilter(maxScale, createObject(action.data, data));
+      }
+      if (isPureVariable(minScale)) {
+        minScale = isNaN(
+          resolveVariableAndFilter(minScale, createObject(action.data, data))
+        )
+          ? 50
+          : resolveVariableAndFilter(minScale, createObject(action.data, data));
+      }
+
+      if (scale >= 0) {
+        this.setState({
+          scale:
+            this.state.scale + scale / 100 < maxScale / 100
+              ? this.state.scale + scale / 100
+              : maxScale / 100
+        });
+      } else {
+        this.setState({
+          scale:
+            this.state.scale + scale / 100 > minScale / 100
+              ? this.state.scale + scale / 100
+              : minScale / 100
+        });
+      }
     }
   }
 
   render() {
     const {
       className,
+      style,
       innerClassName,
       defaultImage,
       imageCaption,
@@ -446,14 +645,21 @@ export class ImageField extends React.Component<ImageFieldProps, object> {
       placeholder,
       originalSrc,
       enlargeAble,
-      imageMode
+      enlargeWithGallary,
+      imageMode,
+      wrapperCustomStyle,
+      id,
+      themeCss,
+      env
     } = this.props;
 
     const finnalSrc = src ? filter(src, data, '| raw') : '';
-    let value =
-      finnalSrc || getPropValue(this.props) || defaultImage || imagePlaceholder;
-
+    let value = finnalSrc || getPropValue(this.props);
     const finnalHref = href ? filter(href, data, '| raw') : '';
+    const defaultValue =
+      defaultImage && !value
+        ? filter(defaultImage, data, '| raw')
+        : imagePlaceholder;
 
     return (
       <div
@@ -462,31 +668,102 @@ export class ImageField extends React.Component<ImageFieldProps, object> {
           imageMode === 'original'
             ? 'ImageField--original'
             : 'ImageField--thumb',
-          className
+          className,
+          setThemeClassName({
+            ...this.props,
+            name: 'wrapperCustomStyle',
+            id,
+            themeCss: wrapperCustomStyle
+          })
         )}
+        style={{transform: `scale(${this.state.scale})`, ...style}}
         onClick={this.handleClick}
+        onMouseEnter={this.handleMouseEnter}
+        onMouseLeave={this.handleMouseLeave}
       >
-        {value ? (
+        {value || (!value && !placeholder) ? (
           <ThemedImageThumb
             className={innerClassName}
             imageClassName={imageClassName}
             thumbClassName={thumbClassName}
             height={height}
             width={width}
-            src={value}
+            src={value ? value : defaultValue}
             href={finnalHref}
             title={filter(title, data)}
             caption={filter(imageCaption, data)}
             thumbMode={thumbMode}
             thumbRatio={thumbRatio}
             originalSrc={filter(originalSrc, data, '| raw') ?? value}
-            enlargeAble={enlargeAble && value !== defaultImage}
+            enlargeAble={enlargeAble && value && value !== defaultValue}
+            enlargeWithGallary={enlargeWithGallary}
             onEnlarge={this.handleEnlarge}
             imageMode={imageMode}
+            imageControlClassName={setThemeClassName({
+              ...this.props,
+              name: 'imageControlClassName',
+              id,
+              themeCss
+            })}
+            imageContentClassName={setThemeClassName({
+              ...this.props,
+              name: 'imageContentClassName',
+              id,
+              themeCss
+            })}
+            titleControlClassName={setThemeClassName({
+              ...this.props,
+              name: 'titleControlClassName',
+              id,
+              themeCss
+            })}
+            desControlClassName={setThemeClassName({
+              ...this.props,
+              name: 'desControlClassName',
+              id,
+              themeCss
+            })}
+            iconControlClassName={setThemeClassName({
+              ...this.props,
+              name: 'iconControlClassName',
+              id,
+              themeCss
+            })}
           />
         ) : (
-          <span className="text-muted">{placeholder}</span>
+          <span style={this.props.fontStyle} className="text-muted">
+            {placeholder}
+          </span>
         )}
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'imageControlClassName'
+              },
+              {
+                key: 'imageContentClassName'
+              },
+              {
+                key: 'titleControlClassName'
+              },
+              {
+                key: 'desControlClassName'
+              },
+              {
+                key: 'iconControlClassName'
+              },
+              {
+                key: 'galleryControlClassName'
+              }
+            ]
+          }}
+          env={env}
+        />
       </div>
     );
   }
@@ -495,4 +772,27 @@ export class ImageField extends React.Component<ImageFieldProps, object> {
 @Renderer({
   type: 'image'
 })
-export class ImageFieldRenderer extends ImageField {}
+export class ImageFieldRenderer extends ImageField {
+  static contextType = ScopedContext;
+
+  constructor(props: ImageFieldProps, context: IScopedContext) {
+    super(props);
+
+    const scoped = context;
+    scoped.registerComponent(this);
+  }
+
+  componentWillUnmount() {
+    const scoped = this.context as IScopedContext;
+    scoped.unRegisterComponent(this);
+  }
+
+  doAction(action: ActionObject) {
+    const actionType = action?.actionType as string;
+    if (actionType === 'preview') {
+      this.handleEnlarge(this.props as ImageThumbProps);
+    } else {
+      this.handleSelfAction(actionType, action);
+    }
+  }
+}

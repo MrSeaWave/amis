@@ -4,7 +4,7 @@ exports[`Renderer:tabs 1`] = `
 <div>
   <div
     class="cxd-Panel cxd-Panel--default cxd-Panel--form"
-    style="position: relative;"
+    data-role="container"
   >
     <div
       class="cxd-Panel-heading"
@@ -13,7 +13,7 @@ exports[`Renderer:tabs 1`] = `
         class="cxd-Panel-title"
       >
         <span
-          class="cxd-TplField"
+          class="cxd-TplField fr-view"
         >
           <span>
             The form
@@ -34,10 +34,10 @@ exports[`Renderer:tabs 1`] = `
         />
         <div
           class="cxd-Tabs cxd-Tabs--line"
+          data-role="container"
         >
           <div
             class="cxd-Tabs-linksContainer-wrapper"
-            style="position: relative;"
           >
             <div
               class="cxd-Tabs-linksContainer"
@@ -55,7 +55,11 @@ exports[`Renderer:tabs 1`] = `
                     <a
                       title="基本配置"
                     >
-                      基本配置
+                      <span
+                        class="cxd-Tabs-link-text"
+                      >
+                        基本配置
+                      </span>
                     </a>
                   </li>
                   <li
@@ -64,50 +68,15 @@ exports[`Renderer:tabs 1`] = `
                     <a
                       title="其他配置"
                     >
-                      其他配置
+                      <span
+                        class="cxd-Tabs-link-text"
+                      >
+                        其他配置
+                      </span>
                     </a>
                   </li>
                 </ul>
               </div>
-            </div>
-            <div
-              class="resize-sensor"
-              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-            >
-              
-  
-              <div
-                class="resize-sensor-expand"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-shrink"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-              >
-                
-    
-                <div
-                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                />
-                
-  
-              </div>
-              
-  
-              <div
-                class="resize-sensor-appear"
-                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-              />
             </div>
           </div>
           <div
@@ -117,7 +86,7 @@ exports[`Renderer:tabs 1`] = `
               class="in is-active cxd-Tabs-pane"
             >
               <span
-                class="cxd-TplField"
+                class="cxd-TplField fr-view"
               >
                 <span>
                   <p>
@@ -131,6 +100,7 @@ exports[`Renderer:tabs 1`] = `
             >
               <div
                 class="cxd-Form-item cxd-Form-item--normal"
+                data-amis-name="c"
                 data-role="form-item"
               >
                 <label
@@ -138,7 +108,7 @@ exports[`Renderer:tabs 1`] = `
                 >
                   <span>
                     <span
-                      class="cxd-TplField"
+                      class="cxd-TplField fr-view"
                     >
                       <span>
                         文本3
@@ -166,6 +136,7 @@ exports[`Renderer:tabs 1`] = `
               </div>
               <div
                 class="cxd-Form-item cxd-Form-item--normal"
+                data-amis-name="d"
                 data-role="form-item"
               >
                 <label
@@ -173,7 +144,7 @@ exports[`Renderer:tabs 1`] = `
                 >
                   <span>
                     <span
-                      class="cxd-TplField"
+                      class="cxd-TplField fr-view"
                     >
                       <span>
                         文本4
@@ -203,45 +174,6 @@ exports[`Renderer:tabs 1`] = `
           </div>
         </div>
       </form>
-    </div>
-    <div
-      class="resize-sensor"
-      style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-    >
-      
-  
-      <div
-        class="resize-sensor-expand"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-shrink"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-      >
-        
-    
-        <div
-          style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-        />
-        
-  
-      </div>
-      
-  
-      <div
-        class="resize-sensor-appear"
-        style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-      />
     </div>
   </div>
 </div>

@@ -212,7 +212,7 @@ export function isExpression(expression: any): boolean {
   // 备注1: "\\${xxx}"不作为表达式，至少含一个${xxx}才算是表达式
 
   // 备注2: safari 不支持 /(?<!\\)(\${).+(\})/.test(expression)
-  return /(^|[^\\])\$\{.+\}/.test(expression);
+  return /(^|[^\\])\$\{[\s\S]+\}/.test(expression);
 }
 
 // 用于判断是否需要执行表达式:
@@ -221,11 +221,22 @@ export function isNeedFormula(
   prevData: {[propName: string]: any},
   curData: {[propName: string]: any}
 ): boolean {
-  const variables = FormulaExec.collect(expression);
-  return variables.some(
-    (variable: string) =>
-      FormulaExec.var(variable, prevData) !== FormulaExec.var(variable, curData)
-  );
+  try {
+    const variables = FormulaExec.collect(expression);
+    return variables.some(
+      (variable: string) =>
+        FormulaExec.var(variable, prevData) !==
+        FormulaExec.var(variable, curData)
+    );
+  } catch (e) {
+    console.warn(
+      '[isNeedFormula]表达式执行异常，当前表达式: ',
+      expression,
+      '，当前上下文数据: ',
+      curData
+    );
+    return false;
+  }
 }
 
 // 将 \${xx} 替换成 ${xx}

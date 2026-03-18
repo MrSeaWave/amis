@@ -5,11 +5,21 @@ import {
   ActionObject,
   Renderer,
   RendererProps,
-  loadScript
+  loadScript,
+  buildStyle,
+  CustomStyle,
+  setThemeClassName,
+  str2function,
+  AMISExpression,
+  AMISLegacyActionSchema,
+  AMISApi,
+  AMISLocalSource,
+  AMISFunction,
+  AMISTokenizeableString
 } from 'amis-core';
 import {ServiceStore, IServiceStore} from 'amis-core';
 
-import {filter, evalExpression} from 'amis-core';
+import {filter} from 'amis-core';
 import cx from 'classnames';
 import {LazyComponent} from 'amis-core';
 import {resizeSensor} from 'amis-core';
@@ -33,6 +43,10 @@ import {ActionSchema} from './Action';
 import {isAlive} from 'mobx-state-tree';
 import debounce from 'lodash/debounce';
 import pick from 'lodash/pick';
+import isString from 'lodash/isString';
+import {ApiObject} from 'amis-core';
+import {AMISSchemaBase} from 'amis-core';
+import {AMISVariableName} from 'amis-core';
 
 const DEFAULT_EVENT_PARAMS = [
   'componentType',
@@ -49,11 +63,14 @@ const DEFAULT_EVENT_PARAMS = [
 
 /**
  * Chart 图表渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/carousel
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/chart
  */
-export interface ChartSchema extends BaseSchema {
+/**
+ * 图表组件，用于可视化数据展示。支持多图表类型与异步数据源。
+ */
+export interface AMISChartSchema extends AMISSchemaBase {
   /**
-   * 指定为 chart 类型
+   * 指定为 chart 组件
    */
   type: 'chart';
 
@@ -68,43 +85,41 @@ export interface ChartSchema extends BaseSchema {
   api?: SchemaApi;
 
   /**
-   * 是否初始加载。
-   * @deprecated 建议直接配置 api 的 sendOn
+   * 是否初始加载
    */
   initFetch?: boolean;
 
   /**
    * 是否初始加载用表达式来配置
-   * @deprecated 建议用 api.sendOn 属性。
    */
-  initFetchOn?: SchemaExpression;
+  initFetchOn?: AMISExpression;
 
   /**
-   * 配置echart的config，支持数据映射。如果用了数据映射，为了同步更新，请设置 trackExpression
+   * 配置echart的config，支持数据映射
    */
   config?: any;
 
   /**
    * 跟踪表达式，如果这个表达式的运行结果发生变化了，则会更新 Echart，当 config 中用了数据映射时有用。
    */
-  trackExpression?: string;
+  trackExpression?: AMISTokenizeableString;
 
   /**
    * 宽度设置
    */
-  width?: number;
+  width?: number | string;
 
   /**
    * 高度设置
    */
-  height?: number;
+  height?: number | string;
 
   /**
    * 刷新时间
    */
   interval?: number;
 
-  name?: SchemaName;
+  name?: AMISVariableName;
 
   /**
    * style样式
@@ -113,9 +128,9 @@ export interface ChartSchema extends BaseSchema {
     [propName: string]: any;
   };
 
-  dataFilter?: SchemaFunction;
+  dataFilter?: AMISFunction;
 
-  source?: SchemaTokenizeableString;
+  source?: AMISLocalSource;
 
   /**
    * 默认开启 Config 中的数据映射，如果想关闭，请开启此功能。
@@ -125,7 +140,7 @@ export interface ChartSchema extends BaseSchema {
   /**
    * 点击行为配置，可以用来满足下钻操作等。
    */
-  clickAction?: ActionSchema;
+  clickAction?: AMISLegacyActionSchema;
 
   /**
    * 默认配置时追加的，如果更新配置想完全替换配置请配置为 true.
@@ -140,7 +155,7 @@ export interface ChartSchema extends BaseSchema {
   /**
    * 获取 geo json 文件的地址
    */
-  mapURL?: string;
+  mapURL?: AMISApi;
 
   /**
    * 地图名称
@@ -198,7 +213,7 @@ function recoverFunctionType(config: object) {
 
 export interface ChartProps
   extends RendererProps,
-    Omit<ChartSchema, 'type' | 'className'> {
+    Omit<AMISChartSchema, 'type' | 'className'> {
   chartRef?: (echart: any) => void;
   onDataFilter?: (config: any, echarts: any, data?: any) => any;
   onChartWillMount?: (echarts: any) => void | Promise<void>;
@@ -222,6 +237,7 @@ export class Chart extends React.Component<ChartProps> {
   timer: ReturnType<typeof setTimeout>;
   mounted: boolean;
   reloadCancel?: Function;
+  onChartMount?: ((chart: any, echarts: any) => void) | undefined;
 
   constructor(props: ChartProps) {
     super(props);
@@ -231,13 +247,20 @@ export class Chart extends React.Component<ChartProps> {
     this.reloadEcharts = debounce(this.reloadEcharts.bind(this), 300); //过于频繁更新 ECharts 会报错
     this.handleClick = this.handleClick.bind(this);
     this.dispatchEvent = this.dispatchEvent.bind(this);
+    this.loadChartMapData = this.loadChartMapData.bind(this);
     this.mounted = true;
 
     props.config && this.renderChart(props.config);
   }
 
-  componentDidMount() {
-    const {api, data, initFetch, source} = this.props;
+  async componentDidMount() {
+    const {api, data, initFetch, source, dispatchEvent} = this.props;
+
+    const rendererEvent = await dispatchEvent('init', data, this);
+
+    if (rendererEvent?.prevented) {
+      return;
+    }
 
     if (source && isPureVariable(source)) {
       const ret = resolveVariableAndFilter(source, data, '| raw');
@@ -270,6 +293,20 @@ export class Chart extends React.Component<ChartProps> {
         filter(prevProps.trackExpression, prevProps.data)
     ) {
       this.renderChart(props.config || {});
+    } else if (
+      isApiOutdated(prevProps.mapURL, props.mapURL, prevProps.data, props.data)
+    ) {
+      const {source, data, api, config} = props;
+      this.loadChartMapData(() => {
+        if (source && isPureVariable(source)) {
+          const ret = resolveVariableAndFilter(source, data, '| raw');
+          ret && this.renderChart(ret);
+        } else if (api) {
+          this.reload();
+        } else if (config) {
+          this.renderChart(config || {});
+        }
+      });
     }
   }
 
@@ -277,6 +314,24 @@ export class Chart extends React.Component<ChartProps> {
     this.mounted = false;
     (this.reloadEcharts as any).cancel();
     clearTimeout(this.timer);
+  }
+
+  async loadChartMapData(callBackFn?: () => void) {
+    const {env, data} = this.props;
+    let {mapName, mapURL} = this.props;
+    if (mapURL && mapName && (window as any).echarts) {
+      if (isPureVariable(mapName)) {
+        mapName = resolveVariableAndFilter(mapName, data);
+      }
+      const mapGeoResult = await env.fetcher(mapURL as Api, data);
+      if (!mapGeoResult.ok) {
+        console.warn('fetch map geo error ' + mapURL);
+      }
+      (window as any).echarts.registerMap(mapName!, mapGeoResult.data);
+    }
+    if (callBackFn) {
+      callBackFn();
+    }
   }
 
   async handleClick(ctx: object) {
@@ -302,7 +357,7 @@ export class Chart extends React.Component<ChartProps> {
     const {data, dispatchEvent} = this.props;
 
     dispatchEvent(
-      (ctx as any).event,
+      (ctx as any).event || ctx.type,
       createObject(data, {
         ...pick(
           ctx,
@@ -326,7 +381,7 @@ export class Chart extends React.Component<ChartProps> {
     } = this.props;
     let {mapURL, mapName} = this.props;
 
-    let onChartMount = this.props.onChartMount;
+    let onChartMount = this.props.onChartMount || this.onChartMount;
 
     if (ref) {
       Promise.all([
@@ -335,24 +390,15 @@ export class Chart extends React.Component<ChartProps> {
         // @ts-ignore 官方没提供 type
         import('echarts/extension/dataTool'),
         // @ts-ignore 官方没提供 type
-        import('echarts/extension/bmap/bmap')
+        import('echarts/extension/bmap/bmap'),
+        // @ts-ignore 官方没提供 type
+        import('echarts-wordcloud/dist/echarts-wordcloud')
       ]).then(async ([echarts, ecStat]) => {
         (window as any).echarts = echarts;
         (window as any).ecStat = ecStat?.default || ecStat;
 
         if (mapURL && mapName) {
-          if (isPureVariable(mapURL)) {
-            mapURL = resolveVariableAndFilter(mapURL, data);
-          }
-          if (isPureVariable(mapName)) {
-            mapName = resolveVariableAndFilter(mapName, data);
-          }
-          const mapGeoResult = await env.fetcher(mapURL as Api, data);
-          if (!mapGeoResult.ok) {
-            console.warn('fetch map geo error ' + mapURL);
-          }
-
-          echarts.registerMap(mapName!, mapGeoResult.data);
+          await this.loadChartMapData();
         }
 
         if (loadBaiduMap) {
@@ -372,13 +418,17 @@ export class Chart extends React.Component<ChartProps> {
           await onChartWillMount(echarts);
         }
 
-        (echarts as any).registerTransform(
-          (ecStat as any).transform.regression
-        );
-        (echarts as any).registerTransform((ecStat as any).transform.histogram);
-        (echarts as any).registerTransform(
-          (ecStat as any).transform.clustering
-        );
+        if ((ecStat as any).transform) {
+          (echarts as any).registerTransform(
+            (ecStat as any).transform.regression
+          );
+          (echarts as any).registerTransform(
+            (ecStat as any).transform.histogram
+          );
+          (echarts as any).registerTransform(
+            (ecStat as any).transform.clustering
+          );
+        }
 
         if (env.loadChartExtends) {
           await env.loadChartExtends();
@@ -387,7 +437,7 @@ export class Chart extends React.Component<ChartProps> {
         this.echarts = (echarts as any).init(ref, theme);
 
         if (typeof onChartMount === 'string') {
-          onChartMount = new Function('chart', 'echarts') as any;
+          onChartMount = str2function(onChartMount, 'chart', 'echarts') as any;
         }
 
         onChartMount?.(this.echarts, echarts);
@@ -427,14 +477,14 @@ export class Chart extends React.Component<ChartProps> {
     });
   }
 
-  reload(
+  async reload(
     subpath?: string,
     query?: any,
     ctx?: any,
     silent?: boolean,
     replace?: boolean
   ) {
-    const {api, env, store, interval, translate: __} = this.props;
+    const {api, env, store, translate: __} = this.props;
 
     if (query) {
       return this.receive(query, undefined, replace);
@@ -451,17 +501,19 @@ export class Chart extends React.Component<ChartProps> {
     this.echarts?.showLoading();
 
     store.markFetching(true);
-    env
-      .fetcher(api, store.data, {
+    try {
+      const result = await env.fetcher(api, store.data, {
         cancelExecutor: (executor: Function) => (this.reloadCancel = executor)
-      })
-      .then(result => {
-        isAlive(store) && store.markFetching(false);
+      });
 
-        if (!result.ok) {
-          return env.notify(
+      isAlive(store) && store.markFetching(false);
+
+      if (!result.ok) {
+        !(api as ApiObject)?.silent &&
+          env.notify(
             'error',
-            result.msg || __('fetchFailed'),
+            (api as ApiObject)?.messages?.failed ??
+              (result.msg || __('fetchFailed')),
             result.msgTimeout !== undefined
               ? {
                   closeButton: true,
@@ -469,33 +521,41 @@ export class Chart extends React.Component<ChartProps> {
                 }
               : undefined
           );
-        }
-        delete this.reloadCancel;
+        return;
+      }
+      delete this.reloadCancel;
 
-        const data = normalizeApiResponseData(result.data);
-        // 说明返回的是数据接口。
-        if (!data.series && this.props.config) {
-          const ctx = createObject(this.props.data, data);
-          this.renderChart(this.props.config, ctx);
-        } else {
-          this.renderChart(result.data || {});
-        }
+      const data = normalizeApiResponseData(result.data);
+      // 说明返回的是数据接口。
+      if (!data.series && this.props.config) {
+        const ctx = createObject(this.props.data, data);
+        this.renderChart(this.props.config, ctx);
+      } else {
+        this.renderChart(result.data || {});
+      }
 
-        this.echarts?.hideLoading();
+      this.echarts?.hideLoading();
 
-        interval &&
-          this.mounted &&
-          (this.timer = setTimeout(this.reload, Math.max(interval, 1000)));
-      })
-      .catch(reason => {
-        if (env.isCancel(reason)) {
-          return;
-        }
+      let curInterval = this.props.interval;
 
-        isAlive(store) && store.markFetching(false);
-        env.notify('error', reason);
-        this.echarts?.hideLoading();
-      });
+      if (curInterval && isString(curInterval)) {
+        curInterval = Number.parseInt(curInterval);
+      }
+
+      curInterval &&
+        this.mounted &&
+        (this.timer = setTimeout(this.reload, Math.max(curInterval, 1000)));
+
+      return store.data;
+    } catch (reason) {
+      if (env.isCancel(reason)) {
+        return;
+      }
+
+      isAlive(store) && store.markFetching(false);
+      !(api as ApiObject)?.silent && env.notify('error', reason);
+      this.echarts?.hideLoading();
+    }
   }
 
   receive(data: object, subPath?: string, replace?: boolean) {
@@ -568,6 +628,29 @@ export class Chart extends React.Component<ChartProps> {
 
   reloadEcharts(config: any) {
     this.echarts?.setOption(config!, this.props.replaceChartOption);
+    this.echarts.on('finished', async () => {
+      const {data, dispatchEvent} = this.props;
+
+      const rendererEvent = await dispatchEvent(
+        'finished',
+        createObject(
+          data,
+          {},
+          {
+            echarts: {
+              value: this.echarts,
+              enumerable: false,
+              configurable: true,
+              writable: true
+            }
+          }
+        )
+      );
+
+      if (rendererEvent?.prevented) {
+        return;
+      }
+    });
   }
 
   render() {
@@ -576,21 +659,59 @@ export class Chart extends React.Component<ChartProps> {
       width,
       height,
       classPrefix: ns,
-      unMountOnHidden
+      unMountOnHidden,
+      data,
+      id,
+      wrapperCustomStyle,
+      env,
+      themeCss,
+      baseControlClassName
     } = this.props;
     let style = this.props.style || {};
-
-    width && (style.width = width);
-    height && (style.height = height);
+    style.width = style.width || width || '100%';
+    style.height = style.height || height || '300px';
+    const styleVar = buildStyle(style, data);
 
     return (
-      <div className={cx(`${ns}Chart`, className)} style={style}>
+      <div
+        className={cx(
+          `${ns}Chart`,
+          className,
+          setThemeClassName({
+            ...this.props,
+            name: 'baseControlClassName',
+            id,
+            themeCss
+          }),
+          setThemeClassName({
+            ...this.props,
+            name: 'wrapperCustomStyle',
+            id,
+            themeCss: wrapperCustomStyle
+          })
+        )}
+        style={styleVar}
+      >
         <LazyComponent
           unMountOnHidden={unMountOnHidden}
           placeholder="..." // 之前那个 spinner 会导致 sensor 失效
           component={() => (
             <div className={`${ns}Chart-content`} ref={this.refFn}></div>
           )}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'baseControlClassName'
+              }
+            ]
+          }}
+          env={env}
         />
       </div>
     );
@@ -621,6 +742,11 @@ export class ChartRenderer extends Chart {
     const {store} = this.props;
     store.updateData(values, undefined, replace);
     // 重新渲染
-    this.renderChart(this.props.config, values);
+    this.renderChart(this.props.config, store.data);
+  }
+
+  getData() {
+    const {store} = this.props;
+    return store.data;
   }
 }

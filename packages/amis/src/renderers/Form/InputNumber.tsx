@@ -1,10 +1,16 @@
 import React from 'react';
-import {toFixed} from 'rc-input-number/lib/utils/MiniDecimal';
+import {toFixed} from '@rc-component/mini-decimal';
 import {
   FormItem,
   FormControlProps,
   FormBaseControl,
-  resolveEventData
+  resolveEventData,
+  CustomStyle,
+  formatInputThemeCss,
+  setThemeClassName,
+  TestIdBuilder,
+  getVariable,
+  AMISFormItem
 } from 'amis-core';
 import cx from 'classnames';
 import {NumberInput, Select} from 'amis-ui';
@@ -12,6 +18,9 @@ import {
   filter,
   autobind,
   createObject,
+  numberFormatter,
+  numberReverter,
+  safeSub,
   normalizeOptions,
   Option,
   PlainObject,
@@ -22,9 +31,15 @@ import {supportStatic} from './StaticHoc';
 
 /**
  * 数字输入框
- * 文档：https://baidu.gitee.io/amis/docs/components/form/number
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/input-number
  */
-export interface NumberControlSchema extends FormBaseControlSchema {
+/**
+ * InputNumber 数字输入框，用于在表单中录入、修改和展示数字，支持步长、精度、最大最小值、单位选择等功能。
+ */
+export interface AMISInputNumberSchema extends AMISFormItem {
+  /**
+   * 指定为 number 组件
+   */
   type: 'input-number';
 
   /**
@@ -48,29 +63,32 @@ export interface NumberControlSchema extends FormBaseControlSchema {
   precision?: number;
 
   /**
-   * 默认当然是
+   * 是否显示步进按钮
    */
   showSteps?: boolean;
+
   /**
-   * 边框模式，全边框，还是半边框，或者没边框。
+   * 边框模式
    */
   borderMode?: 'full' | 'half' | 'none';
+
   /**
-   * 前缀
+   * 前缀文本
    */
   prefix?: string;
+
   /**
-   * 后缀
+   * 后缀文本
    */
   suffix?: string;
 
   /**
-   * 单位列表
+   * 单位选项
    */
   unitOptions?: string | Array<Option> | string[] | PlainObject;
 
   /**
-   * 是否是大数，如果是的话输入输出都将是字符串
+   * 是否大数
    */
   big?: boolean;
 
@@ -85,14 +103,19 @@ export interface NumberControlSchema extends FormBaseControlSchema {
   readOnly?: boolean;
 
   /**
-   * 是否启用键盘行为
+   * 是否启用键盘
    */
   keyboard?: boolean;
 
   /**
-   * 输入框为基础输入框还是加强输入框
+   * 显示模式
    */
   displayMode?: 'base' | 'enhance';
+
+  /**
+   * 是否显示为百分比
+   */
+  showAsPercent?: boolean;
 }
 
 export interface NumberProps extends FormControlProps {
@@ -100,42 +123,63 @@ export interface NumberProps extends FormControlProps {
   max?: number | string;
   min?: number | string;
   step?: number;
+
   /**
    *  精度
    */
   precision?: number;
+
   /**
    * 边框模式，全边框，还是半边框，或者没边框。
    */
   borderMode?: 'full' | 'half' | 'none';
+
   /**
    * 前缀
    */
   prefix?: string;
+
   /**
    * 后缀
    */
   suffix?: string;
+
   /**
    * 是否千分分隔
    */
   kilobitSeparator?: boolean;
+
   /**
    * 只读
    */
   readOnly?: boolean;
+
   /**
    * 启用键盘行为，即通过上下方向键控制是否生效
    */
   keyboard?: boolean;
+
   /**
    * 输入框为基础输入框还是加强输入框
    */
   displayMode?: 'base' | 'enhance';
+
   /**
    * 是否是大数，如果是的话输入输出都将是字符串
    */
   big?: boolean;
+
+  /**
+   * 是否在清空内容时从数据域中删除该表单项对应的值
+   */
+  clearValueOnEmpty?: boolean;
+
+  testIdBuilder?: TestIdBuilder;
+
+  /**
+   * 用来开启百分号的展示形式，搭配suffix使用
+   */
+  showAsPercent?: boolean;
 }
 
 interface NumberState {
@@ -154,7 +198,8 @@ export default class NumberControl extends React.Component<
   input?: HTMLInputElement;
   static defaultProps: Partial<NumberProps> = {
     step: 1,
-    resetValue: ''
+    resetValue: '',
+    clearValueOnEmpty: false
   };
 
   constructor(props: NumberProps) {
@@ -164,30 +209,9 @@ export default class NumberControl extends React.Component<
     this.handleChangeUnit = this.handleChangeUnit.bind(this);
     const unit = this.getUnit();
     const unitOptions = normalizeOptions(props.unitOptions);
-    const {formItem, setPrinstineValue, precision, step, value} = props;
-    const normalizedPrecision = NumberInput.normalizePrecision(
-      this.filterNum(precision),
-      this.filterNum(step)
-    );
+    const {formItem, value} = props;
 
-    /**
-     * 如果设置了precision需要处理入参value的精度
-     * 如果是带有单位的输入，则不支持精度处理
-     */
-    if (
-      formItem &&
-      value != null &&
-      normalizedPrecision != null &&
-      (!unit || unitOptions.length === 0)
-    ) {
-      const normalizedValue = parseFloat(
-        toFixed(value.toString(), '.', normalizedPrecision)
-      );
-
-      if (!isNaN(normalizedValue)) {
-        setPrinstineValue(normalizedValue);
-      }
-    }
+    formItem && this.formatNumber(value, true);
 
     this.state = {unit, unitOptions};
   }
@@ -195,28 +219,81 @@ export default class NumberControl extends React.Component<
   /**
    * 动作处理
    */
-  doAction(action: ActionObject, args: any) {
+  doAction(
+    action: ActionObject,
+    data: any,
+    throwErrors: boolean = false,
+    args?: any
+  ) {
     const actionType = action?.actionType as string;
-    const {min, max, precision, step, resetValue, big, onChange} = this.props;
+    const {
+      min,
+      max,
+      precision,
+      step,
+      resetValue,
+      big,
+      onChange,
+      clearValueOnEmpty,
+      formStore,
+      store,
+      name
+    } = this.props;
 
     if (actionType === 'clear') {
-      onChange?.('');
+      onChange?.(clearValueOnEmpty ? undefined : '');
     } else if (actionType === 'reset') {
       const finalPrecision = NumberInput.normalizePrecision(
         this.filterNum(precision),
         this.filterNum(step)
       );
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
       const value = NumberInput.normalizeValue(
-        resetValue ?? '',
+        pristineVal ?? '',
         this.filterNum(min, big),
         this.filterNum(max, big),
         finalPrecision,
-        resetValue ?? '',
+        pristineVal ?? '',
+        clearValueOnEmpty,
         big
       );
 
-      onChange?.(value);
+      onChange?.(clearValueOnEmpty && value === '' ? undefined : value);
     }
+  }
+
+  formatNumber(value: any, setPrinstine = false) {
+    const {showAsPercent, suffix, step, big, setPrinstineValue} = this.props;
+    let {precision} = this.props;
+    //展示百分号情况下，需要精度加2后，才能保持跟配置一致
+    if (showAsPercent && suffix === '%') {
+      precision = (precision || 0) + 2;
+    }
+    const unit = this.getUnit();
+    const unitOptions = normalizeOptions(this.props.unitOptions);
+    const normalizedPrecision = NumberInput.normalizePrecision(
+      this.filterNum(precision),
+      this.filterNum(step)
+    );
+    if (
+      value != null &&
+      normalizedPrecision != null &&
+      (!unit || unitOptions.length === 0) &&
+      // 大数下不需要进行精度处理，因为是字符串
+      big !== true
+    ) {
+      // 精度处理，遵循四舍五入的处理规则
+      const normalizedValue = parseFloat(
+        toFixed(value.toString(), '.', normalizedPrecision)
+      );
+
+      if (!isNaN(normalizedValue) && normalizedValue !== value) {
+        value = normalizedValue;
+        setPrinstine && setPrinstineValue(normalizedValue);
+      }
+    }
+    return value;
   }
 
   // 解析出单位
@@ -258,7 +335,7 @@ export default class NumberControl extends React.Component<
     }
 
     if (inputValue !== null && unitOptions && this.state.unit) {
-      inputValue = inputValue + this.state.unit;
+      inputValue = inputValue + String(this.state.unit);
     }
     return inputValue === null ? resetValue ?? null : inputValue;
   }
@@ -268,23 +345,57 @@ export default class NumberControl extends React.Component<
   async dispatchEvent(eventName: string) {
     const {dispatchEvent, value} = this.props;
 
-    dispatchEvent(eventName, resolveEventData(this.props, {value}, 'value'));
+    dispatchEvent(eventName, resolveEventData(this.props, {value}));
   }
 
   async handleChange(inputValue: any) {
-    const {onChange, dispatchEvent} = this.props;
+    const {onChange, dispatchEvent, clearValueOnEmpty} = this.props;
     const value = this.getValue(inputValue);
+    let resultValue = clearValueOnEmpty && value === '' ? undefined : value;
+
+    // 精度处理
+    resultValue = this.formatNumber(resultValue);
     const rendererEvent = await dispatchEvent(
       'change',
-      resolveEventData(this.props, {value}, 'value')
+      resolveEventData(this.props, {value: resultValue})
     );
     if (rendererEvent?.prevented) {
       return;
     }
+    onChange(resultValue);
 
-    onChange(value);
+    // 移动光标的方式会引发其他问题，暂不使用这种方式
+    // setTimeout(() => {
+    //   this.changeCursorPos(+resultValue);
+    // }, 0);
   }
 
+  // 取真实用户输入的值去改变光标的位置
+  @autobind
+  changeCursorPos(value: number) {
+    if (isNaN(value)) {
+      return;
+    }
+    const {kilobitSeparator, prefix} = this.props;
+    const integer = value > 0 ? Math.floor(value) : Math.ceil(value);
+    let pos = `${value}`.length;
+
+    if (prefix) {
+      pos += prefix.length;
+    }
+
+    if (kilobitSeparator) {
+      // 处理有千分符的情况 123,456,789
+      const ksLen = Math.floor((`${Math.abs(integer)}`.length - 1) / 3);
+      if (ksLen > 0) {
+        pos += ksLen;
+      }
+    }
+
+    if (this.input && (kilobitSeparator || prefix)) {
+      this.input.setSelectionRange?.(pos, pos);
+    }
+  }
   filterNum(value: number | string | undefined): number | undefined;
   filterNum(
     value: number | string | undefined,
@@ -316,10 +427,22 @@ export default class NumberControl extends React.Component<
   }
 
   componentDidUpdate(prevProps: NumberProps) {
+    const unit = this.getUnit();
+    const {value, formInited, onChange, setPrinstineValue} = this.props;
+    if (
+      value != null &&
+      (typeof value === 'string' || typeof value === 'number') &&
+      unit &&
+      !String(value).endsWith(unit)
+    ) {
+      const finalValue = this.getValue(value);
+      formInited === false
+        ? setPrinstineValue?.(finalValue)
+        : onChange?.(finalValue);
+    }
     // 匹配 数字 + ?字符
     const reg = /^([-+]?(([1-9]\d*\.?\d*)|(0\.\d*[1-9]))[^\d\.]*)$/;
-    if (reg.test(this.props.value) && this.props.value !== prevProps.value) {
-      const unit = this.getUnit();
+    if (this.props.value !== prevProps.value && reg.test(this.props.value)) {
       this.setState({unit: unit});
     }
 
@@ -338,19 +461,11 @@ export default class NumberControl extends React.Component<
     this.input.focus();
   }
 
-  renderStatic(displayValue = '-') {
-    const {unit, value} = this.props;
-    const finalValue =
-      unit && value && typeof value === 'string'
-        ? value.replace(unit, '')
-        : value;
-    return <>{finalValue || displayValue}</>;
-  }
-
   @supportStatic()
   render() {
     const {
       className,
+      style,
       classPrefix: ns,
       value,
       step,
@@ -369,18 +484,53 @@ export default class NumberControl extends React.Component<
       keyboard,
       displayMode,
       big,
-      resetValue
+      resetValue,
+      clearValueOnEmpty,
+      css,
+      themeCss,
+      inputControlClassName,
+      id,
+      env,
+      name,
+      showAsPercent,
+      testIdBuilder,
+      popOverContainer
     } = this.props;
+    const {unit} = this.state;
     const finalPrecision = this.filterNum(precision);
-    const unit = this.state?.unit;
     // 数据格式化
-    const formatter = (value: string | number) => {
-      // 增加千分分隔
-      if (kilobitSeparator && value) {
-        value = (value + '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      }
-      return (prefix ? prefix : '') + value + (suffix ? suffix : '');
-    };
+    const formatter =
+      kilobitSeparator || prefix || suffix
+        ? (
+            value: string | number,
+            {userTyping, input}: {userTyping: boolean; input: string}
+          ) => {
+            // 增加千分分隔
+            if (kilobitSeparator && value) {
+              if (
+                (userTyping || this.input === document.activeElement) &&
+                numberReverter(value) === numberReverter(this.input?.value)
+              ) {
+                // 如果是用户输入状态，且value与输入框内值相同，则只进行千分隔处理，避免光标乱跳
+                let parts = value.toString().split('.');
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                value = parts.join('.');
+              } else {
+                // 如果是非用户输入状态（如 blur），则进行千分隔 + 精度处理
+                value = numberFormatter(value, finalPrecision);
+              }
+            }
+            if (
+              suffix &&
+              userTyping &&
+              this.input?.selectionStart === input.length
+            ) {
+              return `${prefix || ''}${value}`;
+            }
+
+            return `${prefix || ''}${value}${suffix || ''}`;
+          }
+        : undefined;
     // 将数字还原
     const parser = (value: string) => {
       if (value) {
@@ -394,6 +544,8 @@ export default class NumberControl extends React.Component<
     const finalValue =
       unit && value && typeof value === 'string'
         ? value.replace(unit, '')
+        : isNaN(value)
+        ? void 0
         : value;
 
     return (
@@ -405,8 +557,26 @@ export default class NumberControl extends React.Component<
           },
           className
         )}
+        style={style}
       >
         <NumberInput
+          name={name}
+          inputControlClassName={cx(
+            inputControlClassName,
+            setThemeClassName({
+              ...this.props,
+              name: 'inputControlClassName',
+              id,
+              themeCss: themeCss || css
+            }),
+            setThemeClassName({
+              ...this.props,
+              name: 'inputControlClassName',
+              id,
+              themeCss: themeCss || css,
+              extra: 'inner'
+            })
+          )}
           inputRef={this.inputRef}
           value={finalValue}
           resetValue={resetValue}
@@ -422,27 +592,108 @@ export default class NumberControl extends React.Component<
           showSteps={showSteps}
           borderMode={borderMode}
           readOnly={readOnly}
+          suffix={suffix}
+          showAsPercent={showAsPercent}
           onFocus={() => this.dispatchEvent('focus')}
           onBlur={() => this.dispatchEvent('blur')}
           keyboard={keyboard}
           displayMode={displayMode}
           big={big}
+          clearValueOnEmpty={clearValueOnEmpty}
+          testIdBuilder={testIdBuilder}
         />
-        {unitOptions ? (
-          <Select
-            value={unit}
-            clearable={false}
-            options={this.state.unitOptions || []}
-            onChange={this.handleChangeUnit}
-          />
+        {Array.isArray(unitOptions) && unitOptions.length !== 0 ? (
+          unitOptions.length > 1 ? (
+            <Select
+              value={unit}
+              clearable={false}
+              options={this.state.unitOptions || []}
+              onChange={this.handleChangeUnit}
+              className={`${ns}NumberControl-unit`}
+              disabled={disabled}
+              popOverContainer={popOverContainer}
+            />
+          ) : (
+            <div
+              className={cx(
+                `${ns}NumberControl-unit`,
+                `${ns}NumberControl-single-unit`,
+                `${ns}Select`,
+                `${readOnly ? `${ns}NumberControl-readonly` : ''}`
+              )}
+            >
+              {typeof unitOptions[0] === 'string'
+                ? unitOptions[0]
+                : unitOptions[0].label}
+            </div>
+          )
         ) : null}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss || css,
+            classNames: [
+              {
+                key: 'inputControlClassName',
+                weights: {
+                  focused: {
+                    pre: `${ns}Number-${
+                      displayMode ? displayMode + '-' : ''
+                    }focused.`
+                  },
+                  disabled: {
+                    pre: `${ns}Number-${
+                      displayMode ? displayMode + '-' : ''
+                    }disabled.`
+                  }
+                }
+              }
+            ],
+            id
+          }}
+          env={env}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: formatInputThemeCss(themeCss || css),
+            classNames: [
+              {
+                key: 'inputControlClassName',
+                weights: {
+                  default: {
+                    inner: 'input'
+                  },
+                  hover: {
+                    inner: 'input'
+                  },
+                  focused: {
+                    pre: `${ns}Number-${
+                      displayMode ? displayMode + '-' : ''
+                    }focused.`,
+                    inner: 'input'
+                  },
+                  disabled: {
+                    pre: `${ns}Number-${
+                      displayMode ? displayMode + '-' : ''
+                    }disabled.`,
+                    inner: 'input'
+                  }
+                }
+              }
+            ],
+            id: id && id + '-inner'
+          }}
+          env={env}
+        />
       </div>
     );
   }
 }
 
 @FormItem({
-  type: 'input-number'
+  type: 'input-number',
+  detectProps: ['unitOptions', 'precision', 'suffix']
 })
 export class NumberControlRenderer extends NumberControl {
   static defaultProps: Partial<FormControlProps> = {
